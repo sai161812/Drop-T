@@ -263,3 +263,94 @@ export const GroqEvaluationItemSchema = z.object({
 export const GroqBatchEvaluationResponseSchema = z.object({
   evaluations: z.array(GroqEvaluationItemSchema)
 });
+
+// ==========================================
+// DROPTEST v2 Validation Schemas
+// ==========================================
+
+export const UserRoleSchema = z.enum(['user', 'sponsor', 'startup']);
+
+export const SignUpPayloadSchema = z.object({
+  email: z.string().trim().email('Enter a valid email address').max(255),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(100),
+  role: UserRoleSchema,
+  display_name: z.string().trim().min(2, 'Display name must be at least 2 characters').max(100),
+  startup_name: z.string().trim().max(100).optional(),
+  startup_description: z.string().trim().max(500).optional()
+}).superRefine((data, ctx) => {
+  if (data.role === 'startup') {
+    if (!data.startup_name || data.startup_name.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['startup_name'],
+        message: 'Startup name is required for startup accounts'
+      });
+    }
+  }
+});
+
+export const SignInPayloadSchema = z.object({
+  email: z.string().trim().email('Enter a valid email address'),
+  password: z.string().min(1, 'Password is required')
+});
+
+export const ProductStageSchema = z.enum(['idea', 'prototype', 'preparing_to_launch', 'launched']);
+
+export const ProductCategorySchema = z.enum([
+  'clothing_accessories',
+  'local_food_beverages',
+  'digital_products_services',
+  'other'
+]);
+
+export const ProductDraftPayloadSchema = z.object({
+  name: z.string().trim().min(1, 'Product name is required').max(150),
+  category: ProductCategorySchema,
+  stage: ProductStageSchema,
+  summary: z.string().trim().min(5, 'Summary must be at least 5 characters').max(1000),
+  intended_buyer: z.string().trim().max(500).default(''),
+  feedback_question: z.string().trim().max(300).default('What should we change before launch?'),
+  price: z.number().finite().nonnegative('Price cannot be negative').nullable().optional(),
+  currency: z.string().trim().default('INR'),
+  availability_markets: z.union([
+    z.array(z.string().trim().min(1).max(100)),
+    z.literal('not_decided')
+  ]).default('not_decided'),
+  fulfillment_mode: z.string().trim().max(200).default('not_decided'),
+  images: z.array(ImageMetadataSchema).max(3, 'At most 3 images allowed').default([]),
+  category_data: z.record(z.any()).default({}),
+  status: z.enum(['draft', 'published']).default('draft')
+});
+
+export const ProductPublishPayloadSchema = ProductDraftPayloadSchema.superRefine((data, ctx) => {
+  if (!data.name || data.name.trim().length < 3) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['name'], message: 'Product name must be at least 3 characters' });
+  }
+  if (!data.summary || data.summary.trim().length < 15) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['summary'], message: 'Summary must be at least 15 characters' });
+  }
+  if (!data.intended_buyer || data.intended_buyer.trim().length < 5) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['intended_buyer'], message: 'Intended buyer description is required' });
+  }
+  if (!data.feedback_question || data.feedback_question.trim().length < 5) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['feedback_question'], message: 'Feedback question is required' });
+  }
+  // At least 1 image or visual/functional description in summary / category_data
+  const hasImage = data.images && data.images.length > 0;
+  const hasDescription = data.summary.trim().length >= 20 || (data.category_data && Object.keys(data.category_data).length > 0);
+  if (!hasImage && !hasDescription) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['images'], message: 'Provide at least one image or a detailed visual/functional description' });
+  }
+});
+
+export const CommunityFeedbackSubmissionSchema = z.object({
+  choice: z.enum(['yes', 'maybe', 'no']),
+  factor: z.enum(['price', 'design_fit', 'quality_details', 'availability_delivery', 'usefulness', 'other']),
+  reason: z.string().max(500, 'Reason cannot exceed 500 characters').transform(val => val ? val.replace(/<[^>]*>?/gm, '').trim() : undefined).optional()
+});
+
+export const SupportProposalSubmissionSchema = z.object({
+  amount: z.number().finite().positive('Proposed amount must be a positive number'),
+  currency: z.string().trim().min(1).default('INR'),
+  message: z.string().trim().min(3, 'Message must be at least 3 characters').max(1000, 'Message cannot exceed 1000 characters')
+});

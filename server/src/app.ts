@@ -7,19 +7,29 @@ import { testRouter } from './routes/testRoutes.js';
 import { runRouter } from './routes/runRoutes.js';
 import { uploadRouter } from './routes/uploadRoutes.js';
 import { feedbackRouter } from './routes/feedbackRoutes.js';
+import { authRouter } from './routes/authRoutes.js';
+import { productRouter } from './routes/productRoutes.js';
+import { authenticate } from './middleware/authMiddleware.js';
 import { initDatabase } from './db/database.js';
+import { seedDemoData } from './db/seed.js';
 
 export function createApp(): Express {
   const app = express();
 
-  // Initialize SQLite database
+  // Initialize SQLite database & seed demo data
   initDatabase();
+  try {
+    seedDemoData();
+  } catch (seedErr) {
+    console.warn('Demo seed notice:', seedErr);
+  }
 
   // Middleware
   app.use(cors());
   app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(authenticate);
 
   // Serve static uploads
   app.use('/uploads', express.static(config.uploadDir));
@@ -35,6 +45,8 @@ export function createApp(): Express {
   });
 
   // API Routes
+  app.use('/api/auth', authRouter);
+  app.use('/api/products', productRouter);
   app.use('/api/tests', runRouter);
   app.use('/api/tests', testRouter);
   app.use('/api/simulation', runRouter);

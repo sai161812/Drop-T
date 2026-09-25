@@ -133,12 +133,122 @@ export function runMigrations(db: DatabaseSync): void {
       FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
     );
 
+    -- DROPTEST v2: Users table
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL, -- 'user' | 'sponsor' | 'startup'
+      display_name TEXT NOT NULL,
+      startup_name TEXT,
+      startup_description TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- DROPTEST v2: Sessions table
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    -- DROPTEST v2: Products table
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL, -- 'clothing_accessories' | 'local_food_beverages' | 'digital_products_services' | 'other'
+      stage TEXT NOT NULL, -- 'idea' | 'prototype' | 'preparing_to_launch' | 'launched'
+      summary TEXT NOT NULL,
+      intended_buyer TEXT NOT NULL,
+      feedback_question TEXT NOT NULL,
+      price REAL, -- NULL means 'not_set'
+      currency TEXT NOT NULL DEFAULT 'INR',
+      availability_markets TEXT NOT NULL DEFAULT '"not_decided"', -- JSON array or 'not_decided'
+      fulfillment_mode TEXT NOT NULL DEFAULT 'not_decided',
+      images TEXT NOT NULL DEFAULT '[]', -- JSON array of ImageMetadata
+      category_data TEXT NOT NULL DEFAULT '{}', -- JSON object with material, sizes, etc.
+      status TEXT NOT NULL DEFAULT 'draft', -- 'draft' | 'published'
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    -- DROPTEST v2: Product saves table
+    CREATE TABLE IF NOT EXISTS product_saves (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(user_id, product_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
+    -- DROPTEST v2: Product community feedback table
+    CREATE TABLE IF NOT EXISTS product_feedback (
+      id TEXT PRIMARY KEY,
+      author_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      choice TEXT NOT NULL, -- 'yes' | 'maybe' | 'no'
+      factor TEXT NOT NULL,
+      reason TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(author_id, product_id),
+      FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
+    -- DROPTEST v2: Support proposals table
+    CREATE TABLE IF NOT EXISTS support_proposals (
+      id TEXT PRIMARY KEY,
+      sender_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      recipient_id TEXT NOT NULL,
+      amount REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'INR',
+      message TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(sender_id, product_id),
+      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    -- DROPTEST v2: Competitor references table (Synthetic Lab)
+    CREATE TABLE IF NOT EXISTS competitor_references (
+      id TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      query TEXT NOT NULL,
+      title TEXT NOT NULL,
+      url TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      snippet_or_fact TEXT NOT NULL,
+      source_type TEXT NOT NULL, -- 'automated' | 'founder_supplied'
+      selected INTEGER NOT NULL DEFAULT 1,
+      date_checked TEXT NOT NULL,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
     -- Indexes for efficient queries
     CREATE INDEX IF NOT EXISTS idx_options_test ON options(test_id);
     CREATE INDEX IF NOT EXISTS idx_profiles_test ON profiles(test_id);
     CREATE INDEX IF NOT EXISTS idx_runs_test ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_evaluations_run ON evaluations(run_id);
     CREATE INDEX IF NOT EXISTS idx_human_responses_test ON human_responses(test_id);
+    CREATE INDEX IF NOT EXISTS idx_products_owner ON products(owner_id);
+    CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+    CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
+    CREATE INDEX IF NOT EXISTS idx_product_saves_user ON product_saves(user_id);
+    CREATE INDEX IF NOT EXISTS idx_product_saves_product ON product_saves(product_id);
+    CREATE INDEX IF NOT EXISTS idx_product_feedback_product ON product_feedback(product_id);
+    CREATE INDEX IF NOT EXISTS idx_support_proposals_recipient ON support_proposals(recipient_id);
+    CREATE INDEX IF NOT EXISTS idx_competitor_references_product ON competitor_references(product_id);
   `;
 
   db.exec(schema);
@@ -148,7 +258,9 @@ export function runMigrations(db: DatabaseSync): void {
     if (!columns.some(column => column.name === name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
   };
   addColumn('tests', 'panel_seed', 'INTEGER NOT NULL DEFAULT 12345');
+  addColumn('tests', 'product_id', 'TEXT REFERENCES products(id)');
   addColumn('runs', 'snapshot', 'TEXT');
+  addColumn('runs', 'mode', "TEXT NOT NULL DEFAULT 'single'");
   addColumn('offerings', 'sales_scenarios', 'TEXT');
   // Interrupted requests remain recoverable after a server restart.
   db.exec("UPDATE runs SET status = 'partial', error_message = 'Server restarted. Retry missing evaluations.' WHERE status IN ('pending', 'running')");

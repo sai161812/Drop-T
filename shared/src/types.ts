@@ -586,3 +586,184 @@ export interface ComparisonAnalysis {
     option_b: FinancialCalculationResult;
   };
 }
+
+// ==========================================
+// DROPTEST v2 Community, Auth & Product Contracts
+// ==========================================
+
+export type UserRole = 'user' | 'sponsor' | 'startup';
+export const USER_ROLES: readonly UserRole[] = ['user', 'sponsor', 'startup'] as const;
+
+export interface User {
+  id: string;
+  email: string;
+  role: UserRole;
+  display_name: string;
+  startup_name?: string;
+  startup_description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublicUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  display_name: string;
+  startup_name?: string;
+  startup_description?: string;
+}
+
+export interface SignUpPayload {
+  email: string;
+  password: string;
+  role: UserRole;
+  display_name: string;
+  startup_name?: string;
+  startup_description?: string;
+}
+
+export interface SignInPayload {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  user: PublicUser;
+  token: string;
+}
+
+export type ProductStage = 'idea' | 'prototype' | 'preparing_to_launch' | 'launched';
+export const PRODUCT_STAGES: readonly ProductStage[] = ['idea', 'prototype', 'preparing_to_launch', 'launched'] as const;
+
+export type ProductCategory = DomainId | 'other';
+export const PRODUCT_CATEGORIES: readonly ProductCategory[] = [
+  'clothing_accessories',
+  'local_food_beverages',
+  'digital_products_services',
+  'other'
+] as const;
+
+export type ProductStatus = 'draft' | 'published';
+
+export interface Product {
+  id: string;
+  owner_id: string;
+  name: string;
+  category: ProductCategory;
+  stage: ProductStage;
+  summary: string;
+  intended_buyer: string;
+  feedback_question: string;
+  price: number | null; // null represents explicitly 'not_set'
+  currency: string;
+  availability_markets: string[] | 'not_decided';
+  fulfillment_mode: string | 'not_decided';
+  images: ImageMetadata[];
+  category_data: Record<string, any>;
+  status: ProductStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductPublicSummary {
+  id: string;
+  owner_id: string;
+  owner_name: string;
+  startup_name?: string;
+  name: string;
+  category: ProductCategory;
+  stage: ProductStage;
+  summary: string;
+  price: number | null;
+  currency: string;
+  images: ImageMetadata[];
+  save_count: number;
+  feedback_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductPublicDetail extends Product {
+  owner: PublicUser;
+  save_count: number;
+  is_saved?: boolean;
+  feedback_summary: {
+    total: number;
+    counts: { yes: number; maybe: number; no: number };
+    user_feedback?: {
+      choice: CommunityFeedbackChoice;
+      factor: CommunityFeedbackFactor;
+      reason?: string;
+    };
+  };
+  user_proposal?: {
+    id: string;
+    amount: number;
+    currency: string;
+    message: string;
+    created_at: string;
+  };
+}
+
+export type CommunityFeedbackChoice = 'yes' | 'maybe' | 'no';
+export const COMMUNITY_FEEDBACK_CHOICES: readonly CommunityFeedbackChoice[] = ['yes', 'maybe', 'no'] as const;
+
+export type CommunityFeedbackFactor = 
+  | 'price' 
+  | 'design_fit' 
+  | 'quality_details' 
+  | 'availability_delivery' 
+  | 'usefulness' 
+  | 'other';
+
+export const COMMUNITY_FEEDBACK_FACTORS: readonly CommunityFeedbackFactor[] = [
+  'price',
+  'design_fit',
+  'quality_details',
+  'availability_delivery',
+  'usefulness',
+  'other'
+] as const;
+
+export interface ProductFeedback {
+  id: string;
+  author_id: string;
+  product_id: string;
+  choice: CommunityFeedbackChoice;
+  factor: CommunityFeedbackFactor;
+  reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupportProposal {
+  id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_role: UserRole;
+  sender_startup_name?: string;
+  product_id: string;
+  product_name: string;
+  recipient_id: string;
+  amount: number;
+  currency: string;
+  message: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompetitorReference {
+  id: string;
+  product_id: string;
+  query: string;
+  title: string;
+  url: string;
+  domain: string;
+  snippet_or_fact: string;
+  source_type: 'automated' | 'founder_supplied';
+  selected: boolean;
+  date_checked: string;
+}
+
+export type LabRunMode = 'single' | 'comparison';
