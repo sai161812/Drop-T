@@ -9,7 +9,7 @@ import {
 } from '@droptest/shared';
 import { initDatabase, closeDatabase } from '../src/db/database.js';
 import { TestRepository } from '../src/db/testRepository.js';
-import { GroqEvaluator } from '../src/simulation/groqEvaluator.js';
+import { buildGroqResponseSchema, GroqEvaluator } from '../src/simulation/groqEvaluator.js';
 import { generatePanelProfiles } from '../src/simulation/profileGenerator.js';
 
 describe('Phase 3: Groq Evaluator, Gating & Incomplete Run Recovery Tests', () => {
@@ -66,6 +66,27 @@ describe('Phase 3: Groq Evaluator, Gating & Incomplete Run Recovery Tests', () =
 
     const invalidParse = GroqBatchEvaluationResponseSchema.safeParse(invalidBatch);
     assert.strictEqual(invalidParse.success, false);
+  });
+
+  it('builds a strict provider schema with every property required at every object level', () => {
+    const schema = buildGroqResponseSchema(['prof_01'], ['price', 'use_case']);
+    const assertStrictObjects = (node: any) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'object') {
+        const propertyNames = Object.keys(node.properties || {}).sort();
+        assert.deepEqual([...(node.required || [])].sort(), propertyNames);
+        assert.equal(node.additionalProperties, false);
+      }
+      for (const value of Object.values(node)) {
+        if (Array.isArray(value)) value.forEach(assertStrictObjects);
+        else if (value && typeof value === 'object') assertStrictObjects(value);
+      }
+    };
+
+    assertStrictObjects(schema);
+    const itemSchema = (schema.properties.evaluations as any).items;
+    assert.deepEqual(itemSchema.properties.source_ids.type, 'array');
+    assert.equal(itemSchema.properties.primary_objection.type[1], 'null');
   });
 
   it('reports explicit configuration state and smoke test failure when GROQ_API_KEY is not configured', async () => {

@@ -1,12 +1,12 @@
 # DROPTEST final audit
 
-Date: 2026-09-26. Scope: current working tree for DT-01 through DT-29, v2 product contract, test suite, build, local HTTP availability, and project documentation. Test data was isolated under `.cache/final-audit-20260926-final/`; no app database was reset or modified by the test run.
+Date: 2026-09-26 (refreshed after provider-schema fix). Scope: current working tree for DT-01 through DT-29, v2 product contract, test suite, build, local HTTP availability, and project documentation. The successful suite was isolated under `.cache/audit-post-schema-20260926/`.
 
 ## Overall verdict
 
-**Implementation is broadly in place; verification is incomplete.** The isolated automated suite passed 111 tests (21 shared + 90 server), the three-workspace production build passed, and local UI/API HTTP endpoints responded. No failing acceptance check remains from those runs.
+**Implementation is broadly in place; verification is incomplete.** The refreshed isolated automated suite passed 112 tests (21 shared + 91 server), and the three-workspace production build passed. A strict Groq structured-output schema defect was found and corrected; the post-fix live smoke could not complete because the request returned `Connection error`. No current live-provider acceptance is claimed.
 
-This is not a claim that every user-facing flow is verified: computer-use returned no available browser and could not open either the in-app browser or Chrome. Therefore route refresh/Back/Forward, modal focus behavior, Explore save interaction, edit round trips, and responsive/keyboard behavior are **UNVERIFIED** in an actual browser. No live Groq run was performed; deterministic mocks and failure handling do not certify current external provider credentials or availability. The production build still has a non-blocking Vite warning for a minified JS chunk over 500 kB.
+This is not a claim that every user-facing flow is verified: computer-use returned no available browser and could not open either the in-app browser or Chrome. Therefore route refresh/Back/Forward, modal focus behavior, Explore save interaction, edit round trips, and responsive/keyboard behavior are **UNVERIFIED** in an actual browser. One post-fix live Groq smoke was attempted but returned `Connection error`; deterministic mocks and schema tests do not certify current external provider credentials or availability. The production build still has a non-blocking Vite warning for a minified JS chunk over 500 kB.
 
 ## Issue-by-issue result
 
@@ -21,7 +21,7 @@ This is not a claim that every user-facing flow is verified: computer-use return
 | DT-07 | PASS | `prd.test.ts` and `e2e_demo_walkthrough.test.ts`: domain publishing/validation and persisted product flow. Browser form inspection remains part of the overall UI gap. |
 | DT-08 | PASS | `stage4_synthetic_lab.test.ts`: missing-price run; `finance.test.ts`: explicit missing/zero/positive arithmetic. |
 | DT-09 | PASS | `stage4_synthetic_lab.test.ts`: unknown audience inputs stay for founder confirmation; profile budget/coverage tests. |
-| DT-10 | PASS | `groqEvaluator.test.ts` and `prd.test.ts`: provider failures remain explicit, incomplete runs retry without fabricated evaluations. |
+| DT-10 | UNVERIFIED | Automated retry/failure behavior passes in `groqEvaluator.test.ts` and `prd.test.ts`; a new regression asserts every strict-schema property is required. A pre-fix live request exposed missing nested `source_ids` in `required`, now fixed. Post-fix `GroqEvaluator.smokeTest()` returned `Connection error`, so live schema acceptance remains unverified. |
 | DT-11 | PASS | `stage5_search_research.test.ts`: persistent attempts, failure/retry, and reference snapshots. |
 | DT-12 | PASS | `sequence4_research_integrity.test.ts` and Stage 5 tests: exact aliases/IDs, invalid references rejected, citations checked. |
 | DT-13 | PASS | Stage 5 tests: empty/failure/no-research behavior and source snapshots covered. |
@@ -50,6 +50,13 @@ This is not a claim that every user-facing flow is verified: computer-use return
 - Read-only local HTTP checks: `GET http://localhost:5173/` returned 200; `GET http://localhost:3001/api/health` returned healthy; public feed returned 71 products and a boolean anonymous `is_saved` value. These requests did not submit writes.
 - Live Groq: not run. Live search: not certified; deterministic integration tests are not proof of external availability.
 - Browser: unavailable (`cua.getState()` returned no browsers; attempts to open IAB and Chrome reported unavailable). No visual artifacts were captured.
+
+## Refreshed audit (supersedes earlier test totals and provider status above)
+
+- The current isolated suite passed 112 tests (21 shared + 91 server) using `DATA_DIR=.cache/audit-post-schema-20260926/data` and `UPLOAD_DIR=.cache/audit-post-schema-20260926/uploads`; `npm run build` exited 0. The existing Vite >500 kB warning remains.
+- `server/src/simulation/groqEvaluator.ts` now centralizes strict response-schema construction and marks all object properties required, including nested `source_ids`; `server/test/groqEvaluator.test.ts` recursively asserts this invariant and nullable `primary_objection`.
+- Post-fix live `GroqEvaluator.smokeTest()` was attempted once and returned `Connection error`. The previous pre-fix 400 identified the omitted nested `source_ids` requirement. The fix is unit-tested, but DT-10 live acceptance remains UNVERIFIED. Live search also remains uncertified.
+- A prior interrupted test invocation ran with the default server test data path before isolation was applied. It encountered pre-existing engagement in `server/data/droptest.sqlite` and was stopped; tests also emitted an upload under `server/uploads`. No cleanup/restoration was attempted, to avoid destructive changes to existing local application data. Successful final verification was isolated.
 
 ## Audit notes
 

@@ -52,7 +52,7 @@ Update the relevant row and add a dated entry to the execution log. Do not erase
 | DT-07 | P1 | IMPLEMENTED | Codex / working tree | Category-aware publish facts, explicit undecided values, availability rules and image/description checks added |
 | DT-08 | P1 | IMPLEMENTED | Codex / working tree | Unknown public price remains null; lab trial price is private and concept-only suppresses price finance |
 | DT-09 | P1 | IMPLEMENTED | Codex / working tree | Lab prefills no inferred coverage, fulfillment, audience markets, adjacent group or price-derived budgets |
-| DT-10 | P1 | VERIFIED | Codex / working tree | Forced failure persists and returns Retry/Continue before zero evaluator calls; boolean skip and restore state tested |
+| DT-10 | P1 | IMPLEMENTED | Codex / working tree | Forced failure and retry contracts pass; fixed the missing strict-schema `source_ids` requirement. Post-fix live Groq smoke returned `Connection error`, so live model execution remains unverified. |
 | DT-11 | P1 | VERIFIED | Codex / working tree | Fingerprinted attempts persist independently with linked sources and reusable no-match/completed states |
 | DT-12 | P1 | VERIFIED | Codex / working tree | Exact aliases/full IDs only; invalid citation records retry and result citations link to frozen sources |
 | DT-13 | P1 | VERIFIED | Codex / working tree | Empty source snapshots remain immutable; invalid legacy snapshots require a new review |
@@ -457,6 +457,16 @@ Verification commands, exit codes, counts and evidence paths: Isolated `$env:DAT
 Browser/live checks actually performed: Computer-use surface returned no browsers and refused IAB/Chrome; no screenshot/keyboard/390px validation could be performed. No live Groq certification; tests use controlled provider behavior. No live search certification claimed.
 Remaining limitations/blockers: DT-14, DT-17, DT-19, DT-22, DT-27 and DT-29 require remaining browser/E2E acceptance described in `verification_results.md`; live provider status is unverified. Vite large-bundle warning remains non-blocking. `prompts_v2.md` and `bp_reference_v2.md` were not present.
 Dependencies or handoff for next agent: Before claiming fully verified, run the owner/community flow in separate browser sessions; refresh/back/forward edit/lab/results routes; exercise sign-in, publish/edit, save/unsave, feedback/support and lab failure/retry at desktop and ~390 px with keyboard. Separately smoke-test configured Groq and one actual search provider without describing mocks as live evidence.
+
+Date / agent / branch or revision: 2026-09-26 / Codex / main working tree (post-audit continuation)
+Assigned issue IDs: DT-10 and final verification refresh
+Status changes: DT-10 VERIFIED -> IMPLEMENTED pending live provider acceptance; browser-dependent issues remain IMPLEMENTED.
+Current reproduction and root cause: An attempted live Groq smoke initially returned HTTP 400 because the strict structured-output schema declared `source_ids` but omitted it from the nested object's `required` list. After the fix, the bounded smoke returned `Connection error`, so current provider connectivity/schema acceptance could not be confirmed.
+Files and API/schema/migration contracts changed: `server/src/simulation/groqEvaluator.ts` now builds its response schema through `buildGroqResponseSchema` and requires every property at every object level; `server/test/groqEvaluator.test.ts` recursively asserts strict schema properties and optional-value nullability.
+Verification commands, exit codes, counts and evidence paths: Focused `node --import tsx --test server/test/groqEvaluator.test.ts` exit 0 (5/5). Isolated `$env:DATA_DIR='.cache/audit-post-schema-20260926/data'; $env:UPLOAD_DIR='.cache/audit-post-schema-20260926/uploads'; npm test` exit 0 (21 shared + 91 server = 112; 0 failed). `npm run build` exit 0; Vite retains the non-blocking >500 kB chunk warning. Isolated evidence data is under `.cache/audit-post-schema-20260926/`.
+Browser/live checks actually performed: One post-fix `GroqEvaluator.smokeTest()` call was attempted without printing credentials and returned `Connection error`; no real full-profile run was performed. Browser automation remains unavailable as recorded in `verification_results.md`.
+Remaining limitations/blockers: Live Groq acceptance and live external search remain unverified; DT-14, DT-17, DT-19, DT-22, DT-27 and DT-29 still require browser/E2E acceptance. An earlier test invocation accidentally used the default server test database before it was stopped; pre-existing engagement caused clean-demo assertions to fail. That invocation also wrote a test upload in `server/uploads`. No database, WAL, or upload cleanup/restoration was attempted to avoid destructive changes to application data.
+Dependencies or handoff for next agent: Use only isolated `DATA_DIR`/`UPLOAD_DIR` for server tests. Review/restore any intended local demo fixture state separately if needed; run a post-fix Groq smoke and live search only when provider networking is available, then complete browser checks before promoting remaining statuses.
 
 Append entries in this format:
 
