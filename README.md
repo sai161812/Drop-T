@@ -21,13 +21,16 @@ The Vite client runs at [http://localhost:5173](http://localhost:5173) and the A
 ```powershell
 npm test
 npm run build
+npm run test:e2e
+# Or run all three with fresh isolated server data:
+npm run test:acceptance
 ```
 
-The current workspace test suite contains 21 shared and 90 server tests (111 total; last run 2026-09-26). Use disposable `DATA_DIR` and `UPLOAD_DIR` values when running tests or reproducing behavior; tests otherwise use the configured local data directory.
+The current workspace test suite contains 21 shared and 91 server tests (112 total). The Playwright suite adds 8 real browser journeys across desktop Chromium and a 393px mobile profile. Use disposable `DATA_DIR` and `UPLOAD_DIR` values when running server tests or reproducing behavior; Playwright automatically uses `.cache/playwright-acceptance/`.
 
 ## Configuration
 
-See [.env.example](.env.example). `PORT`, `DATA_DIR`, and `UPLOAD_DIR` have defaults. `GROQ_API_KEY` is required for actual LLM evaluations; if absent or the provider fails, the app reports an unavailable/failed run and does not substitute heuristic responses. `GROQ_MODEL`, `GROQ_VISION_MODEL`, `GROQ_TEMPERATURE`, and `GROQ_MAX_RETRIES` configure the server-side Groq integration.
+See [.env.example](.env.example). `PORT`, `DATA_DIR`, and `UPLOAD_DIR` have defaults. `GROQ_API_KEY` is required for actual LLM evaluations; if absent or the provider fails, the app reports an unavailable/failed run and does not substitute heuristic responses. `GROQ_MODEL`, `GROQ_TEMPERATURE`, and `GROQ_MAX_RETRIES` configure the server-side Groq integration.
 
 Comparable-product search chooses the first configured provider in this order: Brave (`BRAVE_SEARCH_API_KEY`), Tavily (`TAVILY_API_KEY`), Serper (`SERPER_API_KEY`), then unauthenticated DuckDuckGo HTML search. It does not automatically cascade to another provider after a selected provider errors. Search failures remain explicit and the founder can retry, add a manual reference, or continue without research. Automated results are retrieved snippets with source URLs and dates; the app does not claim to have read or verified the full source page.
 

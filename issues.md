@@ -48,30 +48,30 @@ Update the relevant row and add a dated entry to the execution log. Do not erase
 | DT-03 | P1 | VERIFIED | Codex / working tree | Anonymous/unrelated delete rejected; owner deletes unused fixture; product-referenced image blocked |
 | DT-04 | P1 | VERIFIED | Codex / working tree | Anonymous list/stats denied, owner listing scoped and token-free, other owner denied |
 | DT-05 | P1 | VERIFIED | Codex / working tree | Draft save/feedback/support rejected and row counts unchanged |
-| DT-06 | P1 | IMPLEMENTED | Codex / working tree | Engagement is no longer seeded; reseed persistence regression passes |
-| DT-07 | P1 | IMPLEMENTED | Codex / working tree | Category-aware publish facts, explicit undecided values, availability rules and image/description checks added |
-| DT-08 | P1 | IMPLEMENTED | Codex / working tree | Unknown public price remains null; lab trial price is private and concept-only suppresses price finance |
-| DT-09 | P1 | IMPLEMENTED | Codex / working tree | Lab prefills no inferred coverage, fulfillment, audience markets, adjacent group or price-derived budgets |
+| DT-06 | P1 | VERIFIED | Codex / working tree | Engagement is no longer seeded; isolated reseed persistence regression passes |
+| DT-07 | P1 | VERIFIED | Codex / working tree | Category-aware validation and real browser publish/upload/edit round trip pass at desktop and mobile widths |
+| DT-08 | P1 | VERIFIED | Codex / working tree | Unknown-price lab and finance regressions pass; decimal browser price entry is accepted |
+| DT-09 | P1 | VERIFIED | Codex / working tree | Lab prefills no inferred facts; profile budget/coverage checks pass |
 | DT-10 | P1 | IMPLEMENTED | Codex / working tree | Forced failure and retry contracts pass; fixed the missing strict-schema `source_ids` requirement. Post-fix live Groq smoke returned `Connection error`, so live model execution remains unverified. |
 | DT-11 | P1 | VERIFIED | Codex / working tree | Fingerprinted attempts persist independently with linked sources and reusable no-match/completed states |
 | DT-12 | P1 | VERIFIED | Codex / working tree | Exact aliases/full IDs only; invalid citation records retry and result citations link to frozen sources |
 | DT-13 | P1 | VERIFIED | Codex / working tree | Empty source snapshots remain immutable; invalid legacy snapshots require a new review |
-| DT-14 | P1 | IMPLEMENTED | Codex / working tree | Resume and new-current-product flows separated; server persists input snapshot and research uses it |
-| DT-15 | P1 | IMPLEMENTED | Codex / working tree | Digital and generic category adapters added; seed brew equipment reclassified |
-| DT-16 | P1 | IMPLEMENTED | Codex / working tree | Finance panel receives an optional B; single mode renders A economics and scenario results only |
-| DT-17 | P2 | IMPLEMENTED | Codex / working tree | Product-linked results load owner-authorized product feedback and keep legacy anonymous feedback separate |
-| DT-18 | P1 | IMPLEMENTED | Codex / working tree | Seed, auth metadata and quick login share the same demo identities/password |
-| DT-19 | P2 | IMPLEMENTED | Codex / working tree | URL state now restores product/edit/lab/results routes, root Explore and unknown-route fallback; browser history remains unverified |
+| DT-14 | P1 | VERIFIED | Codex / working tree | Browser acceptance covers durable owner Lab URLs, reload, resume, and `review=new`; server snapshot regressions pass |
+| DT-15 | P1 | VERIFIED | Codex / working tree | Clothing, food, digital and generic category adapter/persistence regressions pass |
+| DT-16 | P1 | VERIFIED | Codex / working tree | Single/A-B finance and arithmetic regressions pass |
+| DT-17 | P2 | VERIFIED | Codex / working tree | Browser acceptance confirms owner-only rendered community feedback; authorization and separation regressions pass |
+| DT-18 | P1 | VERIFIED | Codex / working tree | All four seeded demo identities pass API login; browser quick login passes for shopper, sponsor and founder |
+| DT-19 | P2 | VERIFIED | Codex / working tree | Desktop/mobile browser acceptance passes direct product/Lab URLs, reload, Back/Forward and unknown-route fallback |
 | DT-20 | P2 | VERIFIED | Codex / working tree | Injected private fields rejected; legacy public serialization strips private fields |
-| DT-21 | P2 | IMPLEMENTED | Codex / working tree | Bounded partial lab drafts save; full run validation still rejects incomplete inputs |
-| DT-22 | P2 | IMPLEMENTED | Codex / working tree | Blank publish form defaults, edit state reset, lossless legacy digital fields and no auto-confirmed image text |
+| DT-21 | P2 | VERIFIED | Codex / working tree | Partial-draft persistence and full-run rejection regressions pass |
+| DT-22 | P2 | VERIFIED | Codex / working tree | Browser upload/publish/edit/reload round trip passes with confirmed image description and decimal price |
 | DT-23 | P2 | VERIFIED | Codex / working tree | Grounded query, URL-level dedupe, evidence comparison snapshot and clickable citations tested |
-| DT-24 | P2 | IMPLEMENTED | Codex / working tree | Coverage eligibility is derived from frozen served markets; missing responses have a separate state and are excluded from paired transitions |
-| DT-25 | P2 | IMPLEMENTED | Codex / working tree | Minor-unit persistence, supported currency precision, and legacy rounding migration regression pass |
-| DT-26 | P2 | IMPLEMENTED | Codex / working tree | Server and form require nonblank startup description |
-| DT-27 | P2 | IMPLEMENTED | Codex / working tree | Explore cards use real links, forms/dialogs gain labels and keyboard semantics, focus styles and mobile-safe grid; browser/layout acceptance remains unverified |
-| DT-28 | P2 | IMPLEMENTED | Codex / working tree | README, walkthrough, build status, inventory, and env example now match actual routes/providers/test counts; live/browser limits are called out |
-| DT-29 | P2 | IMPLEMENTED | Codex / working tree | API regression covers idempotent desired-state writes, per-viewer/anonymous feed state and no-store cache; Explore browser interaction remains unverified |
+| DT-24 | P2 | VERIFIED | Codex / working tree | Frozen-market denominators, missing responses and paired transitions pass analysis/acceptance tests |
+| DT-25 | P2 | VERIFIED | Codex / working tree | Minor-unit persistence, decimal browser controls, currency precision and migration regressions pass |
+| DT-26 | P2 | VERIFIED | Codex / working tree | Server/form validation and role-preserving signup regressions pass |
+| DT-27 | P2 | VERIFIED | Codex / working tree | Desktop and 393px Chromium flows pass keyboard focus, overflow and Axe WCAG A/AA checks; muted contrast corrected |
+| DT-28 | P2 | VERIFIED | Codex / working tree | Guides, inventory, status, environment and verification commands match the final audit evidence |
+| DT-29 | P2 | VERIFIED | Codex / working tree | API idempotency/viewer isolation and browser save/reload/Saved-page behavior pass on desktop and mobile |
 
 ## Issues, fixes and acceptance checks
 
@@ -467,6 +467,16 @@ Verification commands, exit codes, counts and evidence paths: Focused `node --im
 Browser/live checks actually performed: One post-fix `GroqEvaluator.smokeTest()` call was attempted without printing credentials and returned `Connection error`; no real full-profile run was performed. Browser automation remains unavailable as recorded in `verification_results.md`.
 Remaining limitations/blockers: Live Groq acceptance and live external search remain unverified; DT-14, DT-17, DT-19, DT-22, DT-27 and DT-29 still require browser/E2E acceptance. An earlier test invocation accidentally used the default server test database before it was stopped; pre-existing engagement caused clean-demo assertions to fail. That invocation also wrote a test upload in `server/uploads`. No database, WAL, or upload cleanup/restoration was attempted to avoid destructive changes to application data.
 Dependencies or handoff for next agent: Use only isolated `DATA_DIR`/`UPLOAD_DIR` for server tests. Review/restore any intended local demo fixture state separately if needed; run a post-fix Groq smoke and live search only when provider networking is available, then complete browser checks before promoting remaining statuses.
+
+Date / agent / branch or revision: 2026-09-26 / Codex / main working tree (browser acceptance audit)
+Assigned issue IDs: Final acceptance for DT-01 through DT-29
+Status changes: DT-06–09, DT-14–19, DT-21–22 and DT-24–29 promoted to VERIFIED. DT-10 remains IMPLEMENTED because a live Groq response is still unreachable; all other issue IDs are VERIFIED.
+Current reproduction and root cause: Playwright exposed two user-facing defects: decimal prices/proposals were rejected by native integer-step validation despite exact-money backend support, and muted text measured 4.01:1 on the secondary surface. Both were fixed. Initial browser-test failures caused by non-idempotent selectors/state assumptions were corrected without weakening product assertions.
+Files and API/schema/migration contracts changed: Added Playwright/Axe acceptance infrastructure and scripts; configurable Vite API proxy; decimal steps and accessible labels for money/support controls; darker shared muted-text token; production vendor/icon chunk split. No persistence or API schema changed in this pass.
+Verification commands, exit codes, counts and evidence paths: Isolated `npm test` exit 0 (21 shared + 91 server = 112); `npm run test:e2e` exit 0 (8/8 across desktop Chromium and Pixel 5/393px); `npm run build` exit 0 with three chunks below 500 kB and no size warning. Browser traces/screenshots on failure and HTML reports are generated under ignored `test-results/` and `playwright-report/`. Final isolated application data is under `.cache/final-acceptance-20260926/` and `.cache/playwright-acceptance/`.
+Browser/live checks actually performed: Real API-backed browser flows covered local product images, direct routes, reload/Back/Forward, unknown routes, auth dialog focus/Escape/return, save persistence, editable feedback, owner-only feedback rendering, decimal support proposal/inbox, upload/publish/edit/reload, owner Lab reload, and `review=new`. Axe WCAG 2 A/AA serious/critical checks passed on representative feed, publish and support-dialog states. Live DuckDuckGo search completed with 8 processed references. Groq smoke and a direct authenticated `/models` reachability probe both failed at the local network layer with `ECONNRESET`; no secret was printed.
+Remaining limitations/blockers: DT-10 cannot be promoted until the configured Groq endpoint is reachable and a real smoke/full 50-profile run completes. The rest of the product acceptance checks pass. `prompts_v2.md` and `bp_reference_v2.md` remain absent from the repository.
+Dependencies or handoff for next agent: Retry `GroqEvaluator.smokeTest()` and then the opt-in `npm run verify:live` when `api.groq.com` is reachable. Do not describe deterministic mocks as live-provider proof.
 
 Append entries in this format:
 

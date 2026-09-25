@@ -38,4 +38,4 @@ See [.env.example](.env.example). Demo credentials are development-only and defi
 
 ## Verification baseline
 
-As of 2026-09-26, isolated `npm test` passed 21 shared and 90 server tests (111 total), and `npm run build` passed. Browser/keyboard layout, live Groq service and deployed-environment checks were not performed; see [verification_results.md](verification_results.md) and the ledger in [issues.md](issues.md). `prompts_v2.md` and `bp_reference_v2.md` were not present in the supplied repository.
+As of 2026-09-26, isolated `npm test` passed 21 shared and 91 server tests (112 total), `npm run test:e2e` passed 8 desktop/mobile Chromium journeys, and `npm run build` passed without warnings. Live DuckDuckGo research passed; live Groq remains unverified because local provider connections reset before a response. See [verification_results.md](verification_results.md) and [issues.md](issues.md). `prompts_v2.md` and `bp_reference_v2.md` were not present in the supplied repository.

@@ -49,6 +49,7 @@ Search selects one provider in priority order: Brave, Tavily, Serper, then DuckD
 ```powershell
 npm test
 npm run build
+npm run test:e2e
 ```
 
-The last isolated suite run on 2026-09-26 passed 21 shared + 90 server tests (111 total); the production build passed. Tests should be run with disposable `DATA_DIR` and `UPLOAD_DIR` paths because the default configuration is persistent. Browser/keyboard acceptance is tracked separately in [issues.md](issues.md); an unavailable browser-control surface means those checks must remain unverified.
+The final isolated suite run on 2026-09-26 passed 21 shared + 91 server tests (112 total). The production build passed without warnings, and 8 Playwright journeys passed in desktop Chromium and a Pixel 5/393px mobile profile. Server tests should use disposable `DATA_DIR` and `UPLOAD_DIR` paths because the default configuration is persistent; Playwright uses `.cache/playwright-acceptance/` automatically. Live Groq remains externally blocked by `ECONNRESET`; live DuckDuckGo research passed.

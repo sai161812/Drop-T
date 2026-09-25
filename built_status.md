@@ -1,6 +1,6 @@
 # DROPTEST current build status
 
-Updated: 2026-09-26. This file is the current handoff, not a record that every acceptance item has been browser-verified. The requirements are in [update_prd_v2.md](update_prd_v2.md); issue-level evidence is in [issues.md](issues.md) and [verification_results.md](verification_results.md).
+Updated: 2026-09-26. This file is the current handoff. The requirements are in [update_prd_v2.md](update_prd_v2.md); issue-level evidence is in [issues.md](issues.md) and [verification_results.md](verification_results.md).
 
 ## Product state
 
@@ -16,14 +16,14 @@ Simulation output is model-assisted, not survey evidence or demand prediction. W
 
 ## Verification snapshot
 
-- `npm test`: **111 passed** (21 shared + 90 server), isolated with disposable `DATA_DIR` and `UPLOAD_DIR`, 2026-09-26.
-- `npm run build`: passed for shared, server and client on 2026-09-26. Vite reports a >500 kB minified JavaScript chunk; build succeeds.
-- Browser checks: not completed. The available computer-use surface returned no browser instances and could not open IAB or Chrome. Do not describe URL refresh/history, keyboard trapping, or mobile layout as visually verified.
-- Live Groq run: not performed as part of this audit. Provider configuration and failure/recovery paths are covered by deterministic tests; that is not proof of current live credentials or provider availability.
+- `npm test`: **112 passed** (21 shared + 91 server), isolated with disposable `DATA_DIR` and `UPLOAD_DIR`, 2026-09-26.
+- `npm run test:e2e`: **8 passed** across desktop Chromium and Pixel 5/393px, including routing, role flows, uploads, decimal money, private Lab, keyboard focus, mobile overflow and representative Axe WCAG checks.
+- `npm run build`: passed for shared, server and client without warnings. Application, React vendor and icon chunks are each below 500 kB.
+- Live search: DuckDuckGo completed with 8 processed references. Live Groq remains unverified because both SDK smoke and direct provider reachability failed locally with `ECONNRESET`.
 
 ## Remaining acceptance work
 
-DT-19 and DT-27 need browser/keyboard verification at desktop and about 390 px. DT-29 server behavior is covered by tests, while actual Explore save interaction still needs browser verification. See the issue ledger for other items whose implementation is tested but whose complete acceptance remains unverified.
+Only DT-10 live Groq acceptance remains: retry the smoke and then `npm run verify:live` when `api.groq.com` is reachable. All other DT-01 through DT-29 acceptance rows are verified.
 
 ## Local commands
 
@@ -34,6 +34,8 @@ npm run seed
 npm run dev
 npm test
 npm run build
+npm run test:e2e
+npm run test:acceptance
 ```
 
 Use Node.js 22.5+ and npm 10+. Do not reuse a personal `DATA_DIR` for regression runs. Optional `GROQ_API_KEY`, `BRAVE_SEARCH_API_KEY`, `TAVILY_API_KEY`, and `SERPER_API_KEY` behavior is described in [.env.example](.env.example) and [README.md](README.md). No JWT `SESSION_SECRET` is used; authentication uses stored server-side session tokens.

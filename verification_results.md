@@ -1,65 +1,68 @@
-# DROPTEST final audit
+# DROPTEST final acceptance audit
 
-Date: 2026-09-26 (refreshed after provider-schema fix). Scope: current working tree for DT-01 through DT-29, v2 product contract, test suite, build, local HTTP availability, and project documentation. The successful suite was isolated under `.cache/audit-post-schema-20260926/`.
+Date: 2026-09-26. Scope: DT-01 through DT-29, the v2 product contract, isolated automated tests, real browser journeys, accessibility, production build, and bounded live-provider checks.
 
 ## Overall verdict
 
-**Implementation is broadly in place; verification is incomplete.** The refreshed isolated automated suite passed 112 tests (21 shared + 91 server), and the three-workspace production build passed. A strict Groq structured-output schema defect was found and corrected; the post-fix live smoke could not complete because the request returned `Connection error`. No current live-provider acceptance is claimed.
+**The application passes its local product acceptance gate; external Groq execution remains blocked by network reachability.** The isolated suite passes 112 tests (21 shared + 91 server), all 8 Playwright journeys pass in desktop Chromium and a Pixel 5/393px mobile profile, and the production build passes without warnings. Live DuckDuckGo research completed with eight processed references.
 
-This is not a claim that every user-facing flow is verified: computer-use returned no available browser and could not open either the in-app browser or Chrome. Therefore route refresh/Back/Forward, modal focus behavior, Explore save interaction, edit round trips, and responsive/keyboard behavior are **UNVERIFIED** in an actual browser. One post-fix live Groq smoke was attempted but returned `Connection error`; deterministic mocks and schema tests do not certify current external provider credentials or availability. The production build still has a non-blocking Vite warning for a minified JS chunk over 500 kB.
+The configured Groq endpoint could not be certified from this machine. A post-fix smoke request returned `Connection error`, and a direct authenticated request to `https://api.groq.com/openai/v1/models` failed with `ECONNRESET`. The strict-schema defect found earlier is fixed and regression-tested, but DT-10 remains UNVERIFIED until the network permits a real smoke and 50-profile run.
 
 ## Issue-by-issue result
 
 | ID | Result | Evidence / remaining check |
 | --- | --- | --- |
-| DT-01 | PASS | `security_privacy_regressions.test.ts`: stored ownership, relation changes, legacy claim, valid owner update. |
-| DT-02 | PASS | Same suite: cross-product reference access/update/delete is scoped. |
-| DT-03 | PASS | Same suite: authenticated upload mutation and product-referenced upload protection. |
-| DT-04 | PASS | Same suite: owner-scoped listings/stats and token-free serialization. |
-| DT-05 | PASS | Same suite: unpublished product engagement writes rejected. |
-| DT-06 | PASS | `sequence2_regressions.test.ts`: repeat seed preserves deliberate unsave, feedback edits, proposals, and counts. |
-| DT-07 | PASS | `prd.test.ts` and `e2e_demo_walkthrough.test.ts`: domain publishing/validation and persisted product flow. Browser form inspection remains part of the overall UI gap. |
-| DT-08 | PASS | `stage4_synthetic_lab.test.ts`: missing-price run; `finance.test.ts`: explicit missing/zero/positive arithmetic. |
-| DT-09 | PASS | `stage4_synthetic_lab.test.ts`: unknown audience inputs stay for founder confirmation; profile budget/coverage tests. |
-| DT-10 | UNVERIFIED | Automated retry/failure behavior passes in `groqEvaluator.test.ts` and `prd.test.ts`; a new regression asserts every strict-schema property is required. A pre-fix live request exposed missing nested `source_ids` in `required`, now fixed. Post-fix `GroqEvaluator.smokeTest()` returned `Connection error`, so live schema acceptance remains unverified. |
-| DT-11 | PASS | `stage5_search_research.test.ts`: persistent attempts, failure/retry, and reference snapshots. |
-| DT-12 | PASS | `sequence4_research_integrity.test.ts` and Stage 5 tests: exact aliases/IDs, invalid references rejected, citations checked. |
-| DT-13 | PASS | Stage 5 tests: empty/failure/no-research behavior and source snapshots covered. |
-| DT-14 | UNVERIFIED | Server tests cover product-linked prefill/snapshot. The exact UI distinction between resuming a prior review and starting a new review on current product was not exercised in a browser. |
-| DT-15 | PASS | `prd.test.ts` covers clothing, food, digital and generic `other` adapter/persistence paths. |
-| DT-16 | PASS | `analysis.test.ts`, `finance.test.ts`, and lab tests cover single/A-B finance and arithmetic. |
-| DT-17 | UNVERIFIED | Product-linked real feedback is implemented in results UI, but no dedicated end-to-end assertion or browser walk confirmed owner-only feedback rendering and separation from legacy anonymous feedback in the rendered page. |
-| DT-18 | PASS | `sequence2_regressions.test.ts`: all four demo account identities/passwords sign in as their seeded roles. |
-| DT-19 | UNVERIFIED | URL parser/navigation implemented; refresh, unknown-route rendering and Back/Forward not browser-tested. |
-| DT-20 | PASS | `security_privacy_regressions.test.ts`: unknown category fields rejected and legacy public serialization strips private fields. |
-| DT-21 | PASS | Draft/publish contract tests cover bounded partial draft persistence and full-run validation. |
-| DT-22 | UNVERIFIED | Blank defaults/lossless adapters are implemented; multi-save publish/edit round trip and image-description confirmation were not completed in the browser. |
-| DT-23 | PASS | `sequence4_research_integrity.test.ts` and Stage 5 tests cover entered-fact queries, canonical URL dedupe, supported snippet facts, and evidence IDs. Live external research availability is not certified. |
-| DT-24 | PASS | `analysis.test.ts` and PRD acceptance tests cover eligibility denominators, missing evaluations and paired movement behavior. |
-| DT-25 | PASS | `sequence2_regressions.test.ts` and `finance.test.ts`: minor-unit persistence, precision, limits and scenario calculations. |
-| DT-26 | PASS | `sequence2_regressions.test.ts`: trimmed startup description required while other roles remain valid. |
-| DT-27 | UNVERIFIED | Accessible links/labels, dialog focus management, focus styling and responsive grid implemented; no browser/keyboard/390 px inspection possible in this environment. |
-| DT-28 | PASS | README, walkthrough, build status, inventory, and `.env.example` reconciled to current config/routes/provider behavior and latest test count; commands/build/tests above passed. |
-| DT-29 | UNVERIFIED | Added assertions to `stage2_saves_feedback.test.ts`: explicit desired-state repeat is idempotent; authenticated viewer A/B and anonymous feed state differ correctly; private response is no-store. Explore interaction/state after refresh still needs browser verification. |
+| DT-01 | PASS | `security_privacy_regressions.test.ts`: stored ownership, relation changes, legacy claim and valid owner update. |
+| DT-02 | PASS | Cross-product reference access/update/delete remains owner-scoped. |
+| DT-03 | PASS | Authenticated upload mutation, cross-user rejection and referenced-image protection pass. |
+| DT-04 | PASS | Owner-scoped listings/stats and token-free serialization pass. |
+| DT-05 | PASS | Engagement writes against unpublished products are rejected. |
+| DT-06 | PASS | Repeat seeding preserves deliberate unsaves, edited feedback, proposals and counts. |
+| DT-07 | PASS | Domain validation plus browser product publish/upload/edit/reload pass. |
+| DT-08 | PASS | Unknown-price Lab and finance regressions pass; decimal browser price entry is accepted. |
+| DT-09 | PASS | Unknown audience facts remain explicit and profile budget/coverage checks pass. |
+| DT-10 | UNVERIFIED | Retry/failure handling and strict response schema pass automated checks. Live Groq is blocked by local `ECONNRESET`; no successful provider response or full live run was obtained. |
+| DT-11 | PASS | Persistent research attempts, retry/failure states and frozen reference snapshots pass. |
+| DT-12 | PASS | Exact aliases/full IDs, invalid citation rejection and frozen-source links pass. |
+| DT-13 | PASS | Empty/failure/no-research behavior and immutable snapshots pass. |
+| DT-14 | PASS | Browser checks cover owner Lab direct URL, reload, resume and `review=new`; server snapshot tests pass. |
+| DT-15 | PASS | Clothing, food, digital and generic `other` adapters persist correctly. |
+| DT-16 | PASS | Single/A-B finance, arithmetic and scenario regressions pass. |
+| DT-17 | PASS | Browser founder session renders private registered-user feedback; shopper session cannot see it. Server authorization/separation checks pass. |
+| DT-18 | PASS | All four demo credentials pass API checks; browser quick-login paths pass for shopper, sponsor and founder. |
+| DT-19 | PASS | Browser direct routes, reload, Back/Forward and unknown-route fallback pass. |
+| DT-20 | PASS | Unknown category fields are rejected and legacy public serialization strips private fields. |
+| DT-21 | PASS | Bounded partial drafts save while incomplete full runs are rejected. |
+| DT-22 | PASS | Browser blank-form, image upload/description, publish, edit and reload round trip pass. |
+| DT-23 | PASS | Query grounding, URL canonicalization, evidence IDs and comparison snapshots pass; live DuckDuckGo returned 8 processed references. |
+| DT-24 | PASS | Frozen eligibility denominators, missing evaluations and paired movement behavior pass. |
+| DT-25 | PASS | Minor-unit persistence, decimal browser inputs, currency precision and scenario calculations pass. |
+| DT-26 | PASS | Trimmed startup description remains required without breaking other roles. |
+| DT-27 | PASS | Desktop/mobile overflow, dialog focus/Escape/return, labels and representative Axe WCAG 2 A/AA checks pass. Muted text contrast was corrected from 4.01:1. |
+| DT-28 | PASS | README, walkthrough, build status, inventory, environment and test commands match current behavior/evidence. |
+| DT-29 | PASS | Idempotent desired-state API writes and browser save/reload/Saved-page behavior pass; viewer-specific state remains private/no-store. |
 
-## Build and tests
+## Verification evidence
 
-- `$env:DATA_DIR='.cache/final-audit-20260926-final/data'; $env:UPLOAD_DIR='.cache/final-audit-20260926-final/uploads'; npm.cmd test` — exit 0; shared 21/21, server 90/90; 111 total, 0 failed, 0 skipped.
-- `npm.cmd run build` — exit 0; shared/server TypeScript and client TypeScript/Vite build passed. Vite warns that the minified JS bundle exceeds 500 kB.
-- `git diff --check` — no whitespace errors; Git emitted line-ending normalization warnings for CRLF-configured files.
-- Read-only local HTTP checks: `GET http://localhost:5173/` returned 200; `GET http://localhost:3001/api/health` returned healthy; public feed returned 71 products and a boolean anonymous `is_saved` value. These requests did not submit writes.
-- Live Groq: not run. Live search: not certified; deterministic integration tests are not proof of external availability.
-- Browser: unavailable (`cua.getState()` returned no browsers; attempts to open IAB and Chrome reported unavailable). No visual artifacts were captured.
+- `$env:DATA_DIR='.cache/final-acceptance-20260926/data'; $env:UPLOAD_DIR='.cache/final-acceptance-20260926/uploads'; npm test` — exit 0; shared 21/21 and server 91/91, 112 total, 0 failed/skipped.
+- `npm run test:e2e` — exit 0; 8/8 Playwright tests. Projects: desktop Chromium and Pixel 5 (393px). The suite runs real server/client processes against `.cache/playwright-acceptance/`.
+- Browser coverage: local/fallback images, direct product routes, refresh/history, unknown path fallback, auth focus/Escape, save persistence, editable feedback, owner-only feedback, exact decimal support proposal, founder inbox, upload/publish/edit/reload, Lab URL/reload and new-review route.
+- Accessibility: Axe WCAG 2 A/AA serious/critical scan passes on the public feed, publish form and support dialog; mobile horizontal overflow assertion passes.
+- `npm run build` — exit 0 for shared/server/client. Output is split into application (386.13 kB), React vendor (223.22 kB) and icons (33.83 kB); the previous >500 kB warning is gone.
+- Live search — completed through DuckDuckGo with 8 processed references across independent product domains/pages.
+- Live Groq — failed at network transport (`ECONNRESET`) both through the SDK smoke and direct `/models` probe. Credentials were not printed. A real 50-profile provider run was not attempted after reachability failed.
+- `npm audit` during dependency installation reported 0 vulnerabilities.
+- `git diff --check` is part of the final pre-commit gate.
 
-## Refreshed audit (supersedes earlier test totals and provider status above)
+## Defects found and fixed during browser acceptance
 
-- The current isolated suite passed 112 tests (21 shared + 91 server) using `DATA_DIR=.cache/audit-post-schema-20260926/data` and `UPLOAD_DIR=.cache/audit-post-schema-20260926/uploads`; `npm run build` exited 0. The existing Vite >500 kB warning remains.
-- `server/src/simulation/groqEvaluator.ts` now centralizes strict response-schema construction and marks all object properties required, including nested `source_ids`; `server/test/groqEvaluator.test.ts` recursively asserts this invariant and nullable `primary_objection`.
-- Post-fix live `GroqEvaluator.smokeTest()` was attempted once and returned `Connection error`. The previous pre-fix 400 identified the omitted nested `source_ids` requirement. The fix is unit-tested, but DT-10 live acceptance remains UNVERIFIED. Live search also remains uncertified.
-- A prior interrupted test invocation ran with the default server test data path before isolation was applied. It encountered pre-existing engagement in `server/data/droptest.sqlite` and was stopped; tests also emitted an upload under `server/uploads`. No cleanup/restoration was attempted, to avoid destructive changes to existing local application data. Successful final verification was isolated.
+1. Decimal product prices and support proposals were blocked by the browser because numeric controls inherited the default integer step. Both now use a `0.01` step; the support amount minimum is `0.01`, matching exact-money validation.
+2. Support amount/message controls lacked explicit label associations and the dialog close control lacked an accessible name. IDs, `htmlFor`, and an `aria-label` were added.
+3. Muted small text measured 4.01:1 on the secondary surface. The shared muted token was darkened; Axe now passes the audited states.
+4. The production client emitted a >500 kB chunk warning. React and icon dependencies are now split into stable chunks; the clean build has no warning.
 
-## Audit notes
+## Remaining external blocker
 
-- `update_prd_v2.md` remains the active product contract; `DROPTEST_PRD.md` is background for preserved simulation/finance guarantees. `prompts_v2.md` and `bp_reference_v2.md` remain absent and were not invented.
-- Documentation no longer claims a heuristic Groq fallback, automatic multi-provider cascading, JWT `SESSION_SECRET`, stale local routes, or the earlier 38/46/74 test counts as current.
-- The “PASS” results above describe automated/server contract evidence. The four UNVERIFIED items and live provider checks should be completed in a browser/provider-enabled environment before claiming full end-to-end acceptance.
+Only DT-10 live-provider acceptance remains. When Groq connectivity returns, run the one-profile smoke first, then the opt-in `npm run verify:live` full-domain exercise. The deterministic tests prove schema, persistence, retry and incomplete-run behavior, but they are not represented as proof of live model availability.
+
+`update_prd_v2.md` remains the active product contract. `prompts_v2.md` and `bp_reference_v2.md` were not present and were not invented.
