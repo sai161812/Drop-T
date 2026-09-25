@@ -64,7 +64,8 @@ describe('Stage 3: Support Proposals, Role Enforcement & Incoming Inbox Tests', 
         password: 'password123',
         role: 'startup',
         display_name: 'Maya Founder B',
-        startup_name: 'Maya Bakery Labs'
+        startup_name: 'Maya Bakery Labs',
+        startup_description: 'A bakery exploring customer-supported product launches.'
       })
     });
     assert.equal(fbRes.status, 201);

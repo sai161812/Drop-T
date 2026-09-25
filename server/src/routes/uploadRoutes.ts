@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config.js';
 import { ImageMetadata } from '@droptest/shared';
 import { getDatabase } from '../db/database.js';
+import { AuthenticatedRequest, requireAuth } from '../middleware/authMiddleware.js';
 
 export const uploadRouter = Router();
 
@@ -41,7 +42,7 @@ const upload = multer({
   }
 });
 
-uploadRouter.post('/', upload.single('image'), (req: Request, res: Response) => {
+uploadRouter.post('/', requireAuth, upload.single('image'), (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
@@ -57,14 +58,28 @@ uploadRouter.post('/', upload.single('image'), (req: Request, res: Response) => 
       return res.status(400).json({ error: 'File contents do not match a supported image type.' });
     }
 
+    const uploadedAt = new Date().toISOString();
     const imageMetadata: ImageMetadata = {
       id: path.parse(req.file.filename).name,
       filename: req.file.originalname,
       url: `/uploads/${req.file.filename}`,
       size_bytes: req.file.size,
       mime_type: req.file.mimetype,
-      uploaded_at: new Date().toISOString()
+      uploaded_at: uploadedAt
     };
+
+    getDatabase().prepare(`
+      INSERT INTO uploads (id, owner_id, server_filename, original_filename, mime_type, size_bytes, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      imageMetadata.id,
+      req.user!.id,
+      req.file.filename,
+      req.file.originalname,
+      req.file.mimetype,
+      req.file.size,
+      uploadedAt
+    );
 
     res.status(201).json(imageMetadata);
   } catch (error: any) {
@@ -72,16 +87,33 @@ uploadRouter.post('/', upload.single('image'), (req: Request, res: Response) => 
   }
 });
 
-uploadRouter.delete('/:filename', (req: Request, res: Response) => {
+uploadRouter.delete('/:filename', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const filename = path.basename(String(req.params.filename));
-    const filePath = path.join(config.uploadDir, filename);
-    const used = getDatabase().prepare('SELECT 1 FROM options WHERE images LIKE ? LIMIT 1').get(`%/uploads/${filename}%`);
-    if (used) return res.status(409).json({ error: 'This image is used by a saved test. Remove it from an editable draft first.' });
+    const requestedFilename = String(req.params.filename);
+    const filename = path.basename(requestedFilename);
+    if (filename !== requestedFilename) return res.status(400).json({ error: 'Invalid upload filename' });
+
+    const db = getDatabase();
+    const uploadRow = db.prepare('SELECT owner_id FROM uploads WHERE server_filename = ?').get(filename) as { owner_id: string } | undefined;
+    if (!uploadRow) return res.status(403).json({ error: 'This upload has no verified owner and cannot be deleted through the public API.' });
+    if (uploadRow.owner_id !== req.user!.id) return res.status(403).json({ error: 'Only the upload owner can delete this image.' });
+
+    const urlPattern = `%/uploads/${filename}%`;
+    const usedByOption = db.prepare('SELECT 1 FROM options WHERE images LIKE ? LIMIT 1').get(urlPattern);
+    const usedByProduct = db.prepare('SELECT 1 FROM products WHERE images LIKE ? LIMIT 1').get(urlPattern);
+    const usedByRun = db.prepare('SELECT 1 FROM runs WHERE snapshot LIKE ? LIMIT 1').get(urlPattern);
+    if (usedByOption || usedByProduct || usedByRun) {
+      return res.status(409).json({ error: 'This image is still referenced by a product, lab draft, or historical run.' });
+    }
+
+    const resolvedUploadDir = path.resolve(config.uploadDir);
+    const filePath = path.resolve(resolvedUploadDir, filename);
+    if (path.dirname(filePath) !== resolvedUploadDir) return res.status(400).json({ error: 'Invalid upload path' });
 
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
+    db.prepare('DELETE FROM uploads WHERE server_filename = ? AND owner_id = ?').run(filename, req.user!.id);
     res.json({ success: true, filename });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to delete image', message: error.message });

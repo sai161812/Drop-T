@@ -17,8 +17,25 @@ import {
   PublicUser
 } from '@droptest/shared';
 import { AuthRepository } from './authRepository.js';
+import { fromMinorUnits, toMinorUnits } from '@droptest/shared';
 
 export class ProductRepository {
+  private static sanitizePublicCategoryData(category: ProductCategory, value: Record<string, any>): Record<string, unknown> {
+    const allowed: Record<ProductCategory, ReadonlySet<string>> = {
+      clothing_accessories: new Set(['item_type', 'material', 'fit', 'sizes', 'fulfillment_details', 'visual_description']),
+      local_food_beverages: new Set(['item_name', 'portion', 'ingredients_allergens', 'pickup_delivery_mode', 'availability_window', 'visual_description']),
+      digital_products_services: new Set(['main_function', 'core_use_case', 'platform', 'language', 'platform_language', 'pricing_type', 'service_support_availability', 'visual_description']),
+      other: new Set(['specs', 'specification_text', 'visual_description'])
+    };
+    return Object.fromEntries(Object.entries(value || {}).filter(([key]) => allowed[category].has(key)));
+  }
+
+  private static requirePublished(product: Product): void {
+    if (product.status !== 'published') {
+      throw Object.assign(new Error('Product not found'), { status: 404 });
+    }
+  }
+
   /**
    * Create a new product (draft or published)
    */
@@ -57,6 +74,13 @@ export class ProductRepository {
     );
 
     return this.getRawById(id)!;
+  }
+
+  /**
+   * Get raw product entity by ID
+   */
+  static getById(productId: string): Product | null {
+    return this.getRawById(productId);
   }
 
   /**
@@ -206,11 +230,11 @@ export class ProductRepository {
     // Get current user's proposal if any
     let userProposal: { id: string; amount: number; currency: string; message: string; created_at: string; updated_at?: string } | undefined;
     if (currentUserId) {
-      const propRow = db.prepare('SELECT id, amount, currency, message, created_at, updated_at FROM support_proposals WHERE product_id = ? AND sender_id = ?').get(productId, currentUserId) as any;
+      const propRow = db.prepare('SELECT id, amount_minor, currency, message, created_at, updated_at FROM support_proposals WHERE product_id = ? AND sender_id = ?').get(productId, currentUserId) as any;
       if (propRow) {
         userProposal = {
           id: propRow.id,
-          amount: propRow.amount,
+          amount: propRow.amount_minor !== null ? fromMinorUnits(propRow.amount_minor, propRow.currency) : 0,
           currency: propRow.currency,
           message: propRow.message,
           created_at: propRow.created_at,
@@ -220,7 +244,23 @@ export class ProductRepository {
     }
 
     return {
-      ...product,
+      id: product.id,
+      owner_id: product.owner_id,
+      name: product.name,
+      category: product.category,
+      stage: product.stage,
+      summary: product.summary,
+      intended_buyer: product.intended_buyer,
+      feedback_question: product.feedback_question,
+      price: product.price,
+      currency: product.currency,
+      availability_markets: product.availability_markets,
+      fulfillment_mode: product.fulfillment_mode,
+      images: product.images,
+      category_data: this.sanitizePublicCategoryData(product.category, product.category_data),
+      status: product.status,
+      created_at: product.created_at,
+      updated_at: product.updated_at,
       owner,
       save_count: saveCount,
       is_saved: isSaved,
@@ -334,6 +374,14 @@ export class ProductRepository {
     const existing = db.prepare('SELECT 1 FROM product_saves WHERE user_id = ? AND product_id = ?').get(userId, productId);
     let isSaved: boolean;
 
+    if (product.status !== 'published') {
+      if (existing && targetState === false) {
+        db.prepare('DELETE FROM product_saves WHERE user_id = ? AND product_id = ?').run(userId, productId);
+        return { is_saved: false, save_count: 0 };
+      }
+      throw Object.assign(new Error('Product not found'), { status: 404 });
+    }
+
     if (targetState === undefined) {
       isSaved = !existing;
     } else {
@@ -407,6 +455,7 @@ export class ProductRepository {
     if (!product) {
       throw Object.assign(new Error('Product not found'), { status: 404 });
     }
+    this.requirePublished(product);
 
     const now = new Date().toISOString();
     const existing = db.prepare('SELECT id, created_at FROM product_feedback WHERE author_id = ? AND product_id = ?').get(authorId, productId) as any;
@@ -562,6 +611,7 @@ export class ProductRepository {
     if (!product) {
       throw Object.assign(new Error('Product not found'), { status: 404 });
     }
+    this.requirePublished(product);
 
     const sender = AuthRepository.getUserById(senderId);
     if (!sender) {
@@ -580,6 +630,12 @@ export class ProductRepository {
       throw Object.assign(new Error('Proposed amount must be a positive number'), { status: 400 });
     }
 
+    const currency = payload.currency?.toUpperCase() || 'INR';
+    const amountMinor = toMinorUnits(payload.amount, currency);
+    if (amountMinor === null) {
+      throw Object.assign(new Error('Enter a positive amount using supported currency precision (INR, USD, EUR, GBP, or JPY).'), { status: 400 });
+    }
+
     const now = new Date().toISOString();
     const existing = db.prepare('SELECT id, created_at FROM support_proposals WHERE sender_id = ? AND product_id = ?').get(senderId, productId) as any;
 
@@ -591,15 +647,15 @@ export class ProductRepository {
       createdAt = existing.created_at;
       db.prepare(`
         UPDATE support_proposals
-        SET amount = ?, currency = ?, message = ?, updated_at = ?
+        SET amount_minor = ?, currency = ?, message = ?, updated_at = ?
         WHERE sender_id = ? AND product_id = ?
-      `).run(payload.amount, payload.currency || 'INR', payload.message.trim(), now, senderId, productId);
+      `).run(amountMinor, currency, payload.message.trim(), now, senderId, productId);
     } else {
       proposalId = uuidv4();
       createdAt = now;
       db.prepare(`
         INSERT INTO support_proposals (
-          id, sender_id, product_id, recipient_id, amount, currency, message, created_at, updated_at
+          id, sender_id, product_id, recipient_id, amount_minor, currency, message, created_at, updated_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
@@ -607,8 +663,8 @@ export class ProductRepository {
         senderId,
         productId,
         product.owner_id,
-        payload.amount,
-        payload.currency || 'INR',
+        amountMinor,
+        currency,
         payload.message.trim(),
         createdAt,
         now
@@ -625,7 +681,7 @@ export class ProductRepository {
       product_name: product.name,
       recipient_id: product.owner_id,
       amount: payload.amount,
-      currency: payload.currency || 'INR',
+      currency,
       message: payload.message.trim(),
       created_at: createdAt,
       updated_at: now
@@ -656,7 +712,7 @@ export class ProductRepository {
       product_id: r.product_id,
       product_name: r.product_name,
       recipient_id: r.recipient_id,
-      amount: r.amount,
+      amount: r.amount_minor !== null ? fromMinorUnits(r.amount_minor, r.currency) : 0,
       currency: r.currency,
       message: r.message,
       created_at: r.created_at,

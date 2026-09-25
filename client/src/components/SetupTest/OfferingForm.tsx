@@ -204,6 +204,7 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
           {domainId === 'clothing_accessories' && 'Apparel Specifications'}
           {domainId === 'local_food_beverages' && 'Food / Beverage Specifications'}
           {domainId === 'digital_products_services' && 'Digital Offering Specifications'}
+          {domainId === 'other' && 'Founder-Described Specifications'}
         </h3>
 
         {domainId === 'clothing_accessories' && (
@@ -349,6 +350,19 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
               </div>
             </div>
           </>
+        )}
+
+        {domainId === 'other' && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="other-specification">Product specifications</label>
+            <textarea
+              id="other-specification"
+              className="form-textarea"
+              placeholder="Describe the product facts and intended function without assuming another category."
+              value={domainSpecificData?.specification_text || ''}
+              onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, specification_text: e.target.value })}
+            />
+          </div>
         )}
       </div>
 

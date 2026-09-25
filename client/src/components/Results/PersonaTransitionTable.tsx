@@ -8,13 +8,14 @@ import {
 import { 
   Search, 
   ChevronDown, 
-  ChevronUp 
+  ChevronUp, 
+  Users
 } from 'lucide-react';
 
 interface PersonaTransitionTableProps {
   transitions: ProfileTransition[];
   nameA: string;
-  nameB: string;
+  nameB?: string;
 }
 
 export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
@@ -22,6 +23,7 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
   nameA,
   nameB
 }) => {
+  const isComparison = Boolean(nameB);
   const [searchQuery, setSearchQuery] = useState('');
   const [segmentFilter, setSegmentFilter] = useState<'all' | AudienceSegment>('all');
   const [marketFilter, setMarketFilter] = useState<string>('all');
@@ -36,14 +38,14 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
     return transitions.filter(t => {
       if (segmentFilter !== 'all' && t.segment !== segmentFilter) return false;
       if (marketFilter !== 'all' && t.market !== marketFilter) return false;
-      if (transitionFilter !== 'all' && t.transition_type !== transitionFilter) return false;
+      if (isComparison && transitionFilter !== 'all' && t.transition_type !== transitionFilter) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesId = t.profile_id.toLowerCase().includes(q);
         const matchesUseCase = t.use_case.toLowerCase().includes(q);
         const matchesReasonA = t.reason_a.toLowerCase().includes(q);
-        const matchesReasonB = t.reason_b.toLowerCase().includes(q);
+        const matchesReasonB = isComparison && t.reason_b ? t.reason_b.toLowerCase().includes(q) : false;
         const matchesObjA = (t.primary_objection_a || '').toLowerCase().includes(q);
         const matchesObjB = (t.primary_objection_b || '').toLowerCase().includes(q);
         const matchesMarket = t.market.toLowerCase().includes(q);
@@ -55,7 +57,7 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
 
       return true;
     });
-  }, [transitions, segmentFilter, marketFilter, transitionFilter, searchQuery]);
+  }, [transitions, segmentFilter, marketFilter, transitionFilter, searchQuery, isComparison]);
 
   const getResponseBadge = (resp: ResponseCategory) => {
     switch (resp) {
@@ -98,11 +100,9 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
         return <span className="badge" style={{ background: '#EFF6FF', color: '#1D4ED8', fontSize: '10px' }}>Access Opened</span>;
       case 'access_closed':
         return <span className="badge" style={{ background: '#FEF2F2', color: '#B91C1C', fontSize: '10px' }}>Access Closed</span>;
-      case 'remained_unavailable':
-        return <span className="badge" style={{ background: '#F8FAFC', color: '#64748B', fontSize: '10px' }}>Unserved in Both</span>;
       case 'remained_hesitant':
       default:
-        return <span className="badge" style={{ background: '#F8FAFC', color: '#64748B', fontSize: '10px' }}>Hesitant</span>;
+        return <span className="badge" style={{ background: '#F1F5F9', color: '#64748B', fontSize: '10px' }}>Remained Hesitant</span>;
     }
   };
 
@@ -116,17 +116,21 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
         padding: 'var(--space-4)'
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)', flexWrap: 'wrap', gap: '12px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: 'var(--space-3)' }}>
         <div>
-          <h4 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Inspect Individual Persona Responses
+          <h4 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Users size={16} />
+            <span>{isComparison ? '50-Persona Paired Response Drill-Down' : '50 Simulated Persona Evaluations'}</span>
           </h4>
           <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-            50 distinct synthetic personas keyed by stable IDs — click any row to inspect traits, reasons, and referenced facts
+            {isComparison 
+              ? 'Examine how every individual buyer persona shifted their decision between Option A and Option B.'
+              : 'Inspect each individual buyer persona\'s simulated evaluation, top objection, and decision rationale.'}
           </p>
         </div>
 
-        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+        <span className="badge" style={{ background: 'var(--color-surface-subtle)', color: 'var(--color-text-secondary)', fontSize: '11px' }}>
           Showing {filteredTransitions.length} of {transitions.length} Personas
         </span>
       </div>
@@ -172,21 +176,23 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
           ))}
         </select>
 
-        {/* Transition Filter */}
-        <select
-          className="select"
-          value={transitionFilter}
-          onChange={e => setTransitionFilter(e.target.value as any)}
-          style={{ width: 'auto', fontSize: '12px', height: '32px' }}
-        >
-          <option value="all">All Transitions</option>
-          <option value="became_interested">+ Became Interested</option>
-          <option value="lost_interest">- Lost Interest</option>
-          <option value="remained_interested">Stable Interest</option>
-          <option value="remained_hesitant">Remained Hesitant</option>
-          <option value="access_opened">Access Opened</option>
-          <option value="access_closed">Access Closed</option>
-        </select>
+        {/* Transition Filter (Comparison Mode only) */}
+        {isComparison && (
+          <select
+            className="select"
+            value={transitionFilter}
+            onChange={e => setTransitionFilter(e.target.value as any)}
+            style={{ width: 'auto', fontSize: '12px', height: '32px' }}
+          >
+            <option value="all">All Transitions</option>
+            <option value="became_interested">+ Became Interested</option>
+            <option value="lost_interest">- Lost Interest</option>
+            <option value="remained_interested">Stable Interest</option>
+            <option value="remained_hesitant">Remained Hesitant</option>
+            <option value="access_opened">Access Opened</option>
+            <option value="access_closed">Access Closed</option>
+          </select>
+        )}
       </div>
 
       {/* 50-Row Persona Table */}
@@ -196,9 +202,11 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
             <tr style={{ background: 'var(--color-surface-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
               <th style={{ padding: '8px 12px', fontWeight: 600, width: '70px' }}>ID</th>
               <th style={{ padding: '8px 12px', fontWeight: 600, width: '130px' }}>Segment / Market</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, width: '30%' }}>Option A ({nameA})</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, width: '30%' }}>Option B ({nameB})</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, width: '110px', textAlign: 'right' }}>Shift</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, width: isComparison ? '35%' : '70%' }}>
+                {isComparison ? `Option A (${nameA})` : `Evaluation Response (${nameA})`}
+              </th>
+              {isComparison && <th style={{ padding: '8px 12px', fontWeight: 600, width: '35%' }}>Option B ({nameB})</th>}
+              {isComparison && <th style={{ padding: '8px 12px', fontWeight: 600, width: '110px', textAlign: 'right' }}>Shift</th>}
               <th style={{ padding: '8px 8px', width: '36px' }}></th>
             </tr>
           </thead>
@@ -208,11 +216,11 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
 
               return (
                 <React.Fragment key={t.profile_id}>
-                    <tr
-                      tabIndex={0}
-                      aria-expanded={isExpanded}
-                      aria-label={`Inspect ${t.profile_id}`}
-                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setExpandedProfileId(isExpanded ? null : t.profile_id); } }}
+                  <tr
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    aria-label={`Inspect ${t.profile_id}`}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setExpandedProfileId(isExpanded ? null : t.profile_id); } }}
                     style={{ 
                       borderBottom: '1px solid var(--color-border-subtle)', 
                       background: isExpanded ? '#F8FAFC' : idx % 2 === 0 ? 'var(--color-surface)' : 'var(--color-surface-subtle)',
@@ -246,27 +254,38 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
                       <p style={{ color: 'var(--color-text-primary)', fontSize: '11px', lineHeight: '1.4', margin: 0 }}>
                         {t.reason_a}
                       </p>
-                    </td>
-
-                    {/* Option B Cell */}
-                    <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        {getResponseBadge(t.response_b)}
-                        {t.primary_objection_b && (
-                          <span style={{ fontSize: '10px', color: '#991B1B', fontWeight: 500 }}>
-                            {t.primary_objection_b}
+                      {t.source_ids_a && t.source_ids_a.length > 0 && (
+                        <div style={{ marginTop: '4px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          <span className="badge" style={{ background: '#EFF6FF', color: '#1D4ED8', fontSize: '9px', fontWeight: 600 }}>
+                            🔗 Compares with market reference
                           </span>
-                        )}
-                      </div>
-                      <p style={{ color: 'var(--color-text-primary)', fontSize: '11px', lineHeight: '1.4', margin: 0 }}>
-                        {t.reason_b}
-                      </p>
+                        </div>
+                      )}
                     </td>
 
-                    {/* Transition Badge */}
-                    <td style={{ padding: '10px 12px', verticalAlign: 'top', textAlign: 'right' }}>
-                      {getTransitionBadge(t.transition_type)}
-                    </td>
+                    {/* Option B Cell (If comparison) */}
+                    {isComparison && (
+                      <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          {getResponseBadge(t.response_b)}
+                          {t.primary_objection_b && (
+                            <span style={{ fontSize: '10px', color: '#991B1B', fontWeight: 500 }}>
+                              {t.primary_objection_b}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ color: 'var(--color-text-primary)', fontSize: '11px', lineHeight: '1.4', margin: 0 }}>
+                          {t.reason_b}
+                        </p>
+                      </td>
+                    )}
+
+                    {/* Transition Badge (If comparison) */}
+                    {isComparison && (
+                      <td style={{ padding: '10px 12px', verticalAlign: 'top', textAlign: 'right' }}>
+                        {getTransitionBadge(t.transition_type)}
+                      </td>
+                    )}
 
                     {/* Expand Arrow */}
                     <td style={{ padding: '10px 8px', verticalAlign: 'middle', textAlign: 'center', color: 'var(--color-text-muted)' }}>
@@ -277,7 +296,7 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
                   {/* Expandable Drill-Down Details Drawer */}
                   {isExpanded && (
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--color-border)' }}>
-                      <td colSpan={6} style={{ padding: '14px 16px' }}>
+                      <td colSpan={isComparison ? 6 : 4} style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                           {/* Left: Persona Attributes */}
                           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
@@ -316,39 +335,39 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
 
                             <div style={{ marginBottom: '10px' }}>
                               <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>
-                                Option A Referenced Facts:
+                                {isComparison ? 'Option A Referenced Facts:' : 'Referenced Product Facts:'}
                               </div>
-                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                {t.referenced_fields_a.map((f, i) => (
-                                  <span key={i} className="badge" style={{ background: 'var(--color-surface-subtle)', border: '1px solid var(--color-border-subtle)', fontSize: '10px' }}>
-                                    {f}
-                                  </span>
-                                ))}
-                                {t.factor_tags_a.map((tag, i) => (
-                                  <span key={i} className="badge badge-intended" style={{ fontSize: '10px' }}>
-                                    tag: {tag}
-                                  </span>
-                                ))}
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {t.referenced_fields_a && t.referenced_fields_a.length > 0 ? (
+                                  t.referenced_fields_a.map((f, i) => (
+                                    <span key={i} className="badge" style={{ background: 'var(--color-surface-subtle)', color: 'var(--color-text-secondary)', fontSize: '10px' }}>
+                                      {f}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Core specification & price</span>
+                                )}
                               </div>
                             </div>
 
-                            <div>
-                              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-accent)', marginBottom: '4px' }}>
-                                Option B Referenced Facts:
+                            {isComparison && t.referenced_fields_b && (
+                              <div>
+                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>
+                                  Option B Referenced Facts:
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {t.referenced_fields_b.length > 0 ? (
+                                    t.referenced_fields_b.map((f, i) => (
+                                      <span key={i} className="badge" style={{ background: 'var(--color-surface-subtle)', color: 'var(--color-accent)', fontSize: '10px' }}>
+                                        {f}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Core specification & price</span>
+                                  )}
+                                </div>
                               </div>
-                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                {t.referenced_fields_b.map((f, i) => (
-                                  <span key={i} className="badge" style={{ background: 'var(--color-surface-subtle)', border: '1px solid var(--color-border-subtle)', fontSize: '10px' }}>
-                                    {f}
-                                  </span>
-                                ))}
-                                {t.factor_tags_b.map((tag, i) => (
-                                  <span key={i} className="badge badge-adjacent" style={{ fontSize: '10px' }}>
-                                    tag: {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
+                            )}
                           </div>
                         </div>
                       </td>

@@ -14,8 +14,10 @@ import { AlternativeBForm, OptionAData, OptionBData } from '../components/SetupT
 import { FinancialsForm } from '../components/SetupTest/FinancialsForm.js';
 import { AssumptionSummary } from '../components/SetupTest/AssumptionSummary.js';
 import { ProfileReviewPanel } from '../components/SetupTest/ProfileReviewPanel.js';
-import { DOMAIN_PRESETS, BLANK_PRESET } from '../config/templates.js';
-import { RotateCcw, Sparkles, FolderOpen } from 'lucide-react';
+import { PreflightLabCard } from '../components/SetupTest/PreflightLabCard.js';
+import { DOMAIN_PRESETS } from '../config/templates.js';
+import { FolderOpen } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.js';
 
 interface SetupTestPageProps {
   onSaveSuccess?: (savedData: any) => void;
@@ -34,6 +36,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   activeTestId,
   onTestIdChange
 }) => {
+  const { token } = useAuth();
   // Active test ID if saved
   const [testId, setTestId] = useState<string | undefined>(activeTestId);
   const [savedDraftsList, setSavedDraftsList] = useState<Test[]>([]);
@@ -41,6 +44,11 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const [panelSeed, setPanelSeed] = useState(12345);
   const [isLocked, setIsLocked] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Mode: Default to single-product review (50 evaluations)
+  const [mode, setMode] = useState<'single' | 'comparison'>('single');
+  const [linkedProduct, setLinkedProduct] = useState<any | null>(null);
+  const [trialPrice, setTrialPrice] = useState<number | undefined>(undefined);
 
   // Load initial preset (Clothing)
   const initialPreset = DOMAIN_PRESETS.clothing_accessories.payload;
@@ -70,17 +78,17 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   });
 
   // 4. Comparison Lever & Option B (Alternative)
-  const [comparisonLever, setComparisonLever] = useState<PrimaryLever>(initialPreset.comparison_lever);
+  const [comparisonLever, setComparisonLever] = useState<PrimaryLever>(initialPreset.comparison_lever || 'price');
   const [optionB, setOptionB] = useState<OptionBData>({
-    name: initialPreset.option_b.name,
-    price: initialPreset.option_b.price,
-    primary_message: initialPreset.option_b.primary_message,
-    served_markets: initialPreset.option_b.served_markets,
-    fulfillment_mode: initialPreset.option_b.fulfillment_mode,
-    images: initialPreset.option_b.images || [],
-    variable_cost_per_sale: initialPreset.option_b.variable_cost_per_sale,
-    fixed_launch_cost: initialPreset.option_b.fixed_launch_cost,
-    capacity_units: initialPreset.option_b.capacity_units
+    name: initialPreset.option_b?.name || `${initialPreset.option_a.name} (Alt)`,
+    price: initialPreset.option_b?.price ?? initialPreset.option_a.price,
+    primary_message: initialPreset.option_b?.primary_message || initialPreset.option_a.primary_message,
+    served_markets: initialPreset.option_b?.served_markets || initialPreset.option_a.served_markets,
+    fulfillment_mode: initialPreset.option_b?.fulfillment_mode || initialPreset.option_a.fulfillment_mode,
+    images: initialPreset.option_b?.images || initialPreset.option_a.images || [],
+    variable_cost_per_sale: initialPreset.option_b?.variable_cost_per_sale ?? initialPreset.option_a.variable_cost_per_sale,
+    fixed_launch_cost: initialPreset.option_b?.fixed_launch_cost ?? initialPreset.option_a.fixed_launch_cost,
+    capacity_units: initialPreset.option_b?.capacity_units ?? initialPreset.option_a.capacity_units
   });
 
   // 5. Audience & Location Config
@@ -93,7 +101,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   // 6. Financial scenarios
   const [fixedCost, setFixedCost] = useState<number | undefined>(initialPreset.option_a.fixed_launch_cost);
   const [varCostA, setVarCostA] = useState<number | undefined>(initialPreset.option_a.variable_cost_per_sale);
-  const [varCostB, setVarCostB] = useState<number | undefined>(initialPreset.option_b.variable_cost_per_sale);
+  const [varCostB, setVarCostB] = useState<number | undefined>(initialPreset.option_b?.variable_cost_per_sale);
   const [capacityUnits, setCapacityUnits] = useState<number | undefined>(initialPreset.option_a.capacity_units);
   const [lowerUnits, setLowerUnits] = useState<number | undefined>();
   const [centralUnits, setCentralUnits] = useState<number | undefined>();
@@ -106,7 +114,9 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   // Fetch saved drafts list from SQLite
   const fetchDraftsList = useCallback(async () => {
     try {
-      const res = await fetch('/api/tests');
+      const res = await fetch('/api/tests', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
         setSavedDraftsList(data.tests || []);
@@ -114,7 +124,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     } catch (e) {
       console.error('Error fetching drafts:', e);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     fetchDraftsList();
@@ -128,6 +138,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       setIsLocked(false);
       setRunState({ status: 'idle' });
     }
+    if (payload.mode) setMode(payload.mode);
     setPanelSeed(payload.panel_seed ?? 12345);
     setDomainId(payload.test.domain_id);
     setTitle(payload.test.title);
@@ -149,18 +160,20 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       capacity_units: payload.option_a.capacity_units
     });
 
-    setComparisonLever(payload.comparison_lever);
-    setOptionB({
-      name: payload.option_b.name,
-      price: payload.option_b.price,
-      primary_message: payload.option_b.primary_message,
-      served_markets: payload.option_b.served_markets,
-      fulfillment_mode: payload.option_b.fulfillment_mode,
-      images: payload.option_b.images || [],
-      variable_cost_per_sale: payload.option_b.variable_cost_per_sale,
-      fixed_launch_cost: payload.option_b.fixed_launch_cost,
-      capacity_units: payload.option_b.capacity_units
-    });
+    if (payload.comparison_lever) setComparisonLever(payload.comparison_lever);
+    if (payload.option_b) {
+      setOptionB({
+        name: payload.option_b.name,
+        price: payload.option_b.price,
+        primary_message: payload.option_b.primary_message,
+        served_markets: payload.option_b.served_markets,
+        fulfillment_mode: payload.option_b.fulfillment_mode,
+        images: payload.option_b.images || [],
+        variable_cost_per_sale: payload.option_b.variable_cost_per_sale,
+        fixed_launch_cost: payload.option_b.fixed_launch_cost,
+        capacity_units: payload.option_b.capacity_units
+      });
+    }
 
     setIntendedBuyer(payload.audience_config.intended_buyer_description);
     setAdjacentBuyer(payload.audience_config.adjacent_buyer_description);
@@ -170,28 +183,87 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
     setFixedCost(payload.option_a.fixed_launch_cost);
     setVarCostA(payload.option_a.variable_cost_per_sale);
-    setVarCostB(payload.option_b.variable_cost_per_sale);
+    setVarCostB(payload.option_b?.variable_cost_per_sale);
     setCapacityUnits(payload.option_a.capacity_units);
     setLowerUnits(payload.offering.sales_scenarios?.lower_units);
     setCentralUnits(payload.offering.sales_scenarios?.central_units);
     setHigherUnits(payload.offering.sales_scenarios?.higher_units);
   };
 
+  // Load product lab when URL has ?product=... or ?id=...
+  const loadProductLab = useCallback(async (productId: string) => {
+    setIsLoadingDraft(true);
+    try {
+      const review = new URLSearchParams(window.location.search).get('review');
+      setTrialPrice(undefined);
+      const res = await fetch(`/api/products/${productId}/lab${review === 'new' ? '?review=new' : ''}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLinkedProduct(data.product);
+        if (data.test) {
+          const full = data.test;
+          if (data.product.price === null && full.options.A.price > 0) setTrialPrice(full.options.A.price);
+          setTestId(full.test.id);
+          onTestIdChange?.(full.test.id);
+          setIsLocked(Boolean(data.run));
+          if (data.run) updateRunState(data.run);
+          else setRunState({ status: 'idle' });
+          const payload: TestDraftPayload = {
+            panel_seed: full.test.panel_seed,
+            mode: full.mode || (full.options.B ? 'comparison' : 'single'),
+            product_id: productId,
+            test: { id: full.test.id, title: full.test.title, domain_id: full.test.domain_id, product_id: productId },
+            offering: full.offering,
+            option_a: full.options.A,
+            option_b: full.options.B,
+            audience_config: full.audience_config,
+            comparison_lever: full.comparison_lever
+          };
+          applyPreset(payload, true);
+        } else if (data.prefilled_payload) {
+          applyPreset(data.prefilled_payload, false);
+          setMode('single');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load product lab:', err);
+    } finally {
+      setIsLoadingDraft(false);
+    }
+  }, [onTestIdChange, token]);
+
+  // Check URL on mount for product ID
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const pId = urlParams.get('product') || urlParams.get('product_id');
+    if (pId) {
+      void loadProductLab(pId);
+    }
+  }, [loadProductLab]);
+
   // Load a saved draft by ID from SQLite
   const loadDraftById = async (id: string) => {
     setIsLoadingDraft(true);
     try {
-      const res = await fetch(`/api/tests/${id}`);
+      const res = await fetch(`/api/tests/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const full = await res.json();
         setTestId(full.test.id);
         onTestIdChange?.(full.test.id);
-        const runData = await fetch(`/api/tests/${id}/runs/latest`).then(r => r.json());
+        const runData = await fetch(`/api/tests/${id}/runs/latest`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }).then(r => r.json());
         setIsLocked(Boolean(runData.run));
         if (runData.run) updateRunState(runData.run);
         else setRunState({ status: 'idle' });
         const payload: TestDraftPayload = {
           panel_seed: full.test.panel_seed,
+          mode: full.mode || (full.options.B ? 'comparison' : 'single'),
+          product_id: full.product_id,
           test: { id: full.test.id, title: full.test.title, domain_id: full.test.domain_id },
           offering: full.offering,
           option_a: full.options.A,
@@ -209,31 +281,44 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     }
   };
 
-  useEffect(() => { if (activeTestId) void loadDraftById(activeTestId); }, []);
+  useEffect(() => { 
+    if (activeTestId && !linkedProduct) void loadDraftById(activeTestId); 
+  }, [activeTestId]);
 
-  // Only the selected lever can diverge. Baseline edits propagate to the other fields.
+  // Only the selected lever can diverge in comparison mode. Baseline edits propagate to the other fields.
   useEffect(() => {
-    setOptionB(previous => ({ ...previous,
-      price: comparisonLever === 'price' ? previous.price : optionA.price,
-      primary_message: comparisonLever === 'message' ? previous.primary_message : optionA.primary_message,
-      served_markets: comparisonLever === 'served_markets' ? previous.served_markets : optionA.served_markets,
-      images: comparisonLever === 'creative' ? previous.images : optionA.images,
-      fulfillment_mode: optionA.fulfillment_mode
-    }));
-  }, [comparisonLever, optionA]);
+    if (mode === 'comparison') {
+      setOptionB(previous => ({ ...previous,
+        price: comparisonLever === 'price' ? previous.price : optionA.price,
+        primary_message: comparisonLever === 'message' ? previous.primary_message : optionA.primary_message,
+        served_markets: comparisonLever === 'served_markets' ? previous.served_markets : optionA.served_markets,
+        images: comparisonLever === 'creative' ? previous.images : optionA.images,
+        fulfillment_mode: optionA.fulfillment_mode
+      }));
+    }
+  }, [mode, comparisonLever, optionA]);
+
+  // Handle trial price change for option A if public price was not set
+  const handleTrialPriceChange = (price: number | undefined) => {
+    setTrialPrice(price);
+    setOptionA(prev => ({ ...prev, price: price ?? 0 }));
+  };
 
   // Synchronize header title
   useEffect(() => {
     if (onUpdateHeaderTitle) {
-      onUpdateHeaderTitle(title || 'New Test Draft');
+      onUpdateHeaderTitle(title || 'Synthetic Lab');
     }
   }, [title, onUpdateHeaderTitle]);
 
   // Construct current payload
   const currentPayload: TestDraftPayload = {
     panel_seed: panelSeed,
+    mode,
+    product_id: linkedProduct?.id || undefined,
     test: {
       id: testId,
+      product_id: linkedProduct?.id || undefined,
       title,
       domain_id: domainId
     },
@@ -243,7 +328,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       description,
       currency,
       period,
-      domain_specific_data: domainSpecificData
+      domain_specific_data: {
+        ...domainSpecificData,
+        ...(linkedProduct?.price === null ? { lab_price_status: trialPrice === undefined ? 'unknown' : 'known' } : {})
+      }
     },
     option_a: {
       name: optionA.name,
@@ -256,25 +344,27 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       fixed_launch_cost: fixedCost,
       capacity_units: capacityUnits
     },
-    option_b: {
-      name: optionB.name,
-      price: optionB.price,
-      primary_message: optionB.primary_message,
-      served_markets: optionB.served_markets,
-      fulfillment_mode: optionB.fulfillment_mode,
-      images: optionB.images,
-      variable_cost_per_sale: varCostB,
-      fixed_launch_cost: fixedCost,
-      capacity_units: capacityUnits
-    },
+    ...(mode === 'comparison' ? {
+      option_b: {
+        name: optionB.name,
+        price: optionB.price,
+        primary_message: optionB.primary_message,
+        served_markets: optionB.served_markets,
+        fulfillment_mode: optionB.fulfillment_mode,
+        images: optionB.images,
+        variable_cost_per_sale: varCostB,
+        fixed_launch_cost: fixedCost,
+        capacity_units: capacityUnits
+      },
+      comparison_lever: comparisonLever
+    } : {}),
     audience_config: {
       intended_buyer_description: intendedBuyer,
       adjacent_buyer_description: adjacentBuyer,
       expected_spend_min: expectedSpendMin,
       expected_spend_max: expectedSpendMax,
       audience_markets: audienceMarkets
-    },
-    comparison_lever: comparisonLever
+    }
   };
 
   // Live validation
@@ -294,7 +384,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     setValidationErrors(errors);
     setMissingInputs(missing);
   }, [
-    testId, title, domainId, shortValueProp, description, currency, period, domainSpecificData,
+    mode, testId, title, domainId, shortValueProp, description, currency, period, domainSpecificData,
     optionA, optionB, comparisonLever, intendedBuyer, adjacentBuyer,
     expectedSpendMin, expectedSpendMax, audienceMarkets, fixedCost, varCostA, varCostB, capacityUnits, lowerUnits, centralUnits, higherUnits
   ]);
@@ -305,7 +395,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     try {
       const res = await fetch('/api/tests', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(currentPayload)
       });
 
@@ -342,9 +435,14 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
   const updateRunState = (run: any) => {
     const running = run.status === 'running' || run.status === 'pending';
+    const expected = run.total_evaluations_expected || (mode === 'comparison' ? 100 : 50);
     setIsSubmitting(running);
-    setRunState({ status: running ? 'running' : run.status, runId: run.id, completedCount: run.total_evaluations_completed,
-      message: `${run.total_evaluations_completed} / 100 evaluations saved.${run.error_message ? ` ${run.error_message}` : running ? ' Evaluation is in progress.' : ''}` });
+    setRunState({ 
+      status: running ? 'running' : run.status, 
+      runId: run.id, 
+      completedCount: run.total_evaluations_completed,
+      message: `${run.total_evaluations_completed} / ${expected} evaluations saved.${run.error_message ? ` ${run.error_message}` : running ? ' Evaluation is in progress.' : ''}` 
+    });
   };
 
   useEffect(() => {
@@ -352,7 +450,9 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/tests/${testId}/runs/${runState.runId}`);
+        const res = await fetch(`/api/tests/${testId}/runs/${runState.runId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
         if (!res.ok) throw new Error('Progress unavailable');
         const data = await res.json();
         if (!cancelled) updateRunState(data.run);
@@ -363,11 +463,17 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     const timer = window.setInterval(poll, 1500);
     void poll();
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [testId, runState.status, runState.runId]);
+  }, [testId, runState.status, runState.runId, mode, token]);
 
   const requestRun = async (url: string) => {
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
       const data = await res.json();
       if (!res.ok || !data.run) throw new Error(data.error || 'Could not start the simulation.');
       setIsLocked(true);
@@ -405,6 +511,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData
       });
 
@@ -425,99 +532,37 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const handleDomainSelect = (newDomainId: DomainId) => {
     if (newDomainId === domainId) return;
     setDomainId(newDomainId);
-    // Automatically load matching domain template
     const preset = DOMAIN_PRESETS[newDomainId];
     if (preset) {
       applyPreset(preset.payload, false);
     }
   };
 
+  const isPriceNotSet = linkedProduct ? linkedProduct.price === null : false;
+
   return (
     <div className="workbench-grid">
       {/* 65% Main Setup Column */}
       <div className="setup-column">
         {saveError && <p role="alert">{saveError}</p>}
-        {isLocked && <div className="workbench-card"><p>This test is frozen. Its inputs, panel and feedback stay paired with this run.</p><button className="btn btn-secondary" onClick={() => { setTestId(undefined); onTestIdChange?.(undefined); setIsLocked(false); setRunState({ status: 'idle' }); }}>Create an editable copy</button></div>}
-        {/* First Fold Guidance Card */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
-            <div>
-              <h2 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>
-                Set up your comparative launch test
-              </h2>
-              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
-                Enter your offering details, choose <strong>Option A (Baseline)</strong> and <strong>Option B (Alternative)</strong>, configure your audience markets, and preview the <strong>50 distinct simulated personas</strong> before running the evaluation.
-              </p>
-            </div>
-            
-            {/* Saved Drafts Switcher */}
-            {savedDraftsList.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                <FolderOpen size={14} color="var(--color-text-muted)" />
-                <select
-                  className="form-select"
-                  style={{ fontSize: '11px', padding: '3px 8px', maxWidth: '180px' }}
-                  value={testId || ''}
-                  onChange={e => {
-                    if (e.target.value) {
-                      loadDraftById(e.target.value);
-                    }
-                  }}
-                  disabled={isLoadingDraft}
-                >
-                  <option value="" disabled>Load saved draft...</option>
-                  {savedDraftsList.map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.title.length > 20 ? `${d.title.substring(0, 20)}...` : d.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+        {isLocked && (
+          <div className="workbench-card">
+            <p>This test is frozen. Its inputs, panel and evaluations stay paired with this run.</p>
+            <button className="btn btn-secondary" onClick={() => { setTestId(undefined); onTestIdChange?.(undefined); setIsLocked(false); setRunState({ status: 'idle' }); }}>
+              Create an editable copy
+            </button>
           </div>
+        )}
 
-          {/* Quick Presets Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--color-border-subtle)', flexWrap: 'wrap', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-              <Sparkles size={13} />
-              <span>Quick Starter Presets:</span>
-            </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: '11px', padding: '3px 8px' }}
-                onClick={() => applyPreset(DOMAIN_PRESETS.clothing_accessories.payload)}
-              >
-                Apparel Preset
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: '11px', padding: '3px 8px' }}
-                onClick={() => applyPreset(DOMAIN_PRESETS.local_food_beverages.payload)}
-              >
-                Food Preset
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: '11px', padding: '3px 8px' }}
-                onClick={() => applyPreset(DOMAIN_PRESETS.digital_products_services.payload)}
-              >
-                Digital SaaS Preset
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: '11px', padding: '3px 8px', color: 'var(--color-danger)' }}
-                onClick={() => applyPreset(BLANK_PRESET)}
-              >
-                <RotateCcw size={11} /> Clear Form
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Stage 4 Preflight Lab Card */}
+        <PreflightLabCard
+          product={linkedProduct}
+          mode={mode}
+          onModeChange={setMode}
+          trialPrice={trialPrice}
+          onTrialPriceChange={handleTrialPriceChange}
+          isPriceNotSet={isPriceNotSet}
+        />
 
         {/* Simulation Execution State Banner */}
         {runState.status !== 'idle' && (
@@ -552,7 +597,8 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: '12px',
-            flexWrap: 'wrap'
+            flexWrap: 'wrap',
+            marginBottom: 'var(--space-4)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontWeight: 600 }}>
@@ -573,7 +619,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                   style={{ fontSize: '12px', padding: '4px 10px' }}
                   onClick={onNavigateToResults}
                 >
-                  View Comparative Results &rarr;
+                  View Simulated Results &rarr;
                 </button>
               )}
 
@@ -612,88 +658,120 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
-        <button className="btn btn-secondary" onClick={() => void handleSaveDraft()} disabled={isLocked || isSubmitting || runState.status === 'running'}>Save draft</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+          <button className="btn btn-secondary" onClick={() => void handleSaveDraft()} disabled={isLocked || isSubmitting || runState.status === 'running'}>
+            Save Lab Draft
+          </button>
+          
+          {savedDraftsList.length > 0 && !linkedProduct && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FolderOpen size={14} color="var(--color-text-muted)" />
+              <select
+                className="form-select"
+                style={{ fontSize: '11px', padding: '3px 8px', maxWidth: '180px' }}
+                value={testId || ''}
+                onChange={e => {
+                  if (e.target.value) {
+                    loadDraftById(e.target.value);
+                  }
+                }}
+                disabled={isLoadingDraft}
+              >
+                <option value="" disabled>Load saved draft...</option>
+                {savedDraftsList.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.title.length > 20 ? `${d.title.substring(0, 20)}...` : d.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
         <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        {/* Step 1: Domain */}
-        <DomainSelector
-          selectedDomain={domainId}
-          onSelectDomain={handleDomainSelect}
-        />
+          {/* Step 1: Domain */}
+          <DomainSelector
+            selectedDomain={domainId}
+            onSelectDomain={handleDomainSelect}
+          />
 
-        {/* Step 2: Audience & Location */}
-        <AudienceLocationForm
-          intendedBuyer={intendedBuyer}
-          onChangeIntendedBuyer={setIntendedBuyer}
-          adjacentBuyer={adjacentBuyer}
-          onChangeAdjacentBuyer={setAdjacentBuyer}
-          expectedSpendMin={expectedSpendMin}
-          onChangeExpectedSpendMin={setExpectedSpendMin}
-          expectedSpendMax={expectedSpendMax}
-          onChangeExpectedSpendMax={setExpectedSpendMax}
-          currency={currency}
-          audienceMarkets={audienceMarkets}
-          onChangeAudienceMarkets={setAudienceMarkets}
-          validationErrors={validationErrors}
-        />
+          {/* Step 2: Audience & Location */}
+          <AudienceLocationForm
+            intendedBuyer={intendedBuyer}
+            onChangeIntendedBuyer={setIntendedBuyer}
+            adjacentBuyer={adjacentBuyer}
+            onChangeAdjacentBuyer={setAdjacentBuyer}
+            expectedSpendMin={expectedSpendMin}
+            onChangeExpectedSpendMin={setExpectedSpendMin}
+            expectedSpendMax={expectedSpendMax}
+            onChangeExpectedSpendMax={setExpectedSpendMax}
+            currency={currency}
+            audienceMarkets={audienceMarkets}
+            onChangeAudienceMarkets={setAudienceMarkets}
+            validationErrors={validationErrors}
+          />
 
-        {/* Step 3: Offering & Baseline A */}
-        <OfferingForm
-          domainId={domainId}
-          title={title}
-          onChangeTitle={setTitle}
-          shortValueProp={shortValueProp}
-          onChangeShortValueProp={setShortValueProp}
-          description={description}
-          onChangeDescription={setDescription}
-          currency={currency}
-          onChangeCurrency={setCurrency}
-          period={period}
-          onChangePeriod={setPeriod}
-          domainSpecificData={domainSpecificData}
-          onChangeDomainSpecificData={setDomainSpecificData}
-          optionA={optionA}
-          onChangeOptionA={setOptionA}
-          audienceMarkets={audienceMarkets}
-          onUploadImage={handleUploadImage}
-          validationErrors={validationErrors}
-        />
+          {/* Step 3: Offering & Baseline A */}
+          <OfferingForm
+            domainId={domainId}
+            title={title}
+            onChangeTitle={setTitle}
+            shortValueProp={shortValueProp}
+            onChangeShortValueProp={setShortValueProp}
+            description={description}
+            onChangeDescription={setDescription}
+            currency={currency}
+            onChangeCurrency={setCurrency}
+            period={period}
+            onChangePeriod={setPeriod}
+            domainSpecificData={domainSpecificData}
+            onChangeDomainSpecificData={setDomainSpecificData}
+            optionA={optionA}
+            onChangeOptionA={setOptionA}
+            audienceMarkets={audienceMarkets}
+            onUploadImage={handleUploadImage}
+            validationErrors={validationErrors}
+          />
 
-        {/* Step 4: Alternative B & Comparison Lever */}
-        <AlternativeBForm
-          comparisonLever={comparisonLever}
-          onChangeComparisonLever={setComparisonLever}
-          optionB={optionB}
-          onChangeOptionB={setOptionB}
-          optionA={optionA}
-          currency={currency}
-          audienceMarkets={audienceMarkets}
-          onUploadImage={handleUploadImage}
-          validationErrors={validationErrors}
-        />
+          {/* Step 4: Alternative B & Comparison Lever (Only in Comparison Mode) */}
+          {mode === 'comparison' && (
+            <AlternativeBForm
+              comparisonLever={comparisonLever}
+              onChangeComparisonLever={setComparisonLever}
+              optionB={optionB}
+              onChangeOptionB={setOptionB}
+              optionA={optionA}
+              currency={currency}
+              audienceMarkets={audienceMarkets}
+              onUploadImage={handleUploadImage}
+              validationErrors={validationErrors}
+            />
+          )}
 
-        {/* Step 5: Deterministic Financials */}
-        <FinancialsForm
-          currency={currency}
-          period={period}
-          priceA={optionA.price}
-          priceB={optionB.price}
-          variableCostA={varCostA}
-          onChangeVariableCostA={setVarCostA}
-          variableCostB={varCostB}
-          onChangeVariableCostB={setVarCostB}
-          fixedCost={fixedCost}
-          onChangeFixedCost={setFixedCost}
-          capacityUnits={capacityUnits}
-          onChangeCapacityUnits={setCapacityUnits}
-          lowerUnits={lowerUnits}
-          onChangeLowerUnits={setLowerUnits}
-          centralUnits={centralUnits}
-          onChangeCentralUnits={setCentralUnits}
-          higherUnits={higherUnits}
-          onChangeHigherUnits={setHigherUnits}
-        />
-
+          {/* Step 5: Deterministic Financials */}
+          <FinancialsForm
+            currency={currency}
+            period={period}
+            priceA={optionA.price}
+            priceUnknown={linkedProduct?.price === null && trialPrice === undefined}
+            priceB={mode === 'comparison' ? optionB.price : undefined}
+            variableCostA={varCostA}
+            onChangeVariableCostA={setVarCostA}
+            variableCostB={mode === 'comparison' ? varCostB : undefined}
+            onChangeVariableCostB={setVarCostB}
+            fixedCost={fixedCost}
+            onChangeFixedCost={setFixedCost}
+            capacityUnits={capacityUnits}
+            onChangeCapacityUnits={setCapacityUnits}
+            lowerUnits={lowerUnits}
+            onChangeLowerUnits={setLowerUnits}
+            centralUnits={centralUnits}
+            onChangeCentralUnits={setCentralUnits}
+            higherUnits={higherUnits}
+            onChangeHigherUnits={setHigherUnits}
+          />
         </fieldset>
+
         {/* Step 6: 50-Profile Panel & Deterministic Eligibility Review */}
         <ProfileReviewPanel
           seed={panelSeed}
@@ -708,23 +786,24 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           audienceMarkets={audienceMarkets}
           currency={currency}
           optionA={{ name: optionA.name, served_markets: optionA.served_markets }}
-          optionB={{ name: optionB.name, served_markets: optionB.served_markets }}
+          optionB={mode === 'comparison' ? { name: optionB.name, served_markets: optionB.served_markets } : undefined}
         />
       </div>
 
       {/* 35% Sticky Sidebar Assumption Summary */}
       <AssumptionSummary
+        mode={mode}
         audienceMarkets={audienceMarkets}
         servedMarketsA={optionA.served_markets}
-        servedMarketsB={optionB.served_markets}
+        servedMarketsB={mode === 'comparison' ? optionB.served_markets : undefined}
         intendedBuyer={intendedBuyer}
         adjacentBuyer={adjacentBuyer}
         expectedSpendMin={expectedSpendMin}
         expectedSpendMax={expectedSpendMax}
         currency={currency}
-        comparisonLever={comparisonLever}
+        comparisonLever={mode === 'comparison' ? comparisonLever : undefined}
         priceA={optionA.price}
-        priceB={optionB.price}
+        priceB={mode === 'comparison' ? optionB.price : undefined}
         missingInputs={missingInputs}
         isValid={missingInputs.length === 0 && !isLocked}
         onRunSimulation={handleRunSimulation}

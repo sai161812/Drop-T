@@ -7,18 +7,21 @@
 export type DomainId = 
   | 'clothing_accessories'
   | 'local_food_beverages'
-  | 'digital_products_services';
+  | 'digital_products_services'
+  | 'other';
 
 export const DOMAIN_IDS: readonly DomainId[] = [
   'clothing_accessories',
   'local_food_beverages',
-  'digital_products_services'
+  'digital_products_services',
+  'other'
 ] as const;
 
 export const DOMAIN_LABELS: Record<DomainId, string> = {
   clothing_accessories: 'Clothing & Accessories',
   local_food_beverages: 'Local Food & Beverages',
-  digital_products_services: 'Digital Products & Services'
+  digital_products_services: 'Digital Products & Services',
+  other: 'Other'
 };
 
 // Option IDs
@@ -148,15 +151,20 @@ export interface FoodSpecifics {
 
 export interface DigitalSpecifics {
   core_use_case: string;
-  platform_language: string;
-  pricing_type: 'one_time' | 'subscription';
+  platform?: string;
+  language?: string;
+  platform_language?: string;
+  pricing_type?: 'one_time' | 'subscription' | 'not_decided';
   service_support_availability?: string;
 }
+
+export interface OtherSpecifics { specification_text: string }
 
 export type DomainSpecificData = 
   | ClothingSpecifics 
   | FoodSpecifics 
   | DigitalSpecifics 
+  | OtherSpecifics
   | Record<string, unknown>;
 
 // Domain Entities
@@ -239,9 +247,11 @@ export interface Run {
   model_id?: string;
   created_at: string;
   completed_at?: string;
-  total_evaluations_expected: number; // 100
+  total_evaluations_expected: number; // 50 in single mode, 100 in comparison mode
   total_evaluations_completed: number;
   error_message?: string;
+  mode?: LabRunMode;
+  research_status?: 'without_research' | 'completed' | 'no_matches' | 'failed' | 'skipped';
 }
 
 export interface Evaluation {
@@ -256,6 +266,7 @@ export interface Evaluation {
   primary_objection?: string;
   factor_tags: FactorTag[];
   referenced_fields: string[];
+  source_ids?: string[];
   created_at: string;
 }
 
@@ -266,6 +277,7 @@ export interface GroqEvaluationItem {
   primary_objection?: string | null;
   factor_tags: FactorTag[];
   referenced_fields: string[];
+  source_ids?: string[];
 }
 
 export interface GroqBatchEvaluationResponse {
@@ -318,6 +330,7 @@ export interface PublicFeedbackViewData {
 
 // Financial Inputs & Scenario Contracts (PRD Section 8)
 export interface FinancialInputs {
+  price_unknown?: boolean;
   currency: string;
   period: string;
   fixed_launch_cost?: number;
@@ -357,8 +370,11 @@ export interface FinancialCalculationResult {
 // Aggregate Test Payload (for Setup & Persistence)
 export interface TestDraftPayload {
   panel_seed?: number;
+  mode?: LabRunMode;
+  product_id?: string;
   test: {
     id?: string;
+    product_id?: string;
     title: string;
     domain_id: DomainId;
     feedback_token?: string;
@@ -382,7 +398,7 @@ export interface TestDraftPayload {
     fixed_launch_cost?: number;
     capacity_units?: number;
   };
-  option_b: {
+  option_b?: {
     name: string;
     price: number;
     primary_message: string;
@@ -400,15 +416,17 @@ export interface TestDraftPayload {
     expected_spend_max: number;
     audience_markets: string[];
   };
-  comparison_lever: PrimaryLever;
+  comparison_lever?: PrimaryLever;
 }
 
 export interface FullTestResponse {
-  test: Test;
+  test: Test & { product_id?: string };
+  product_id?: string;
+  mode: LabRunMode;
   offering: Offering;
   options: {
     A: Option;
-    B: Option;
+    B?: Option;
   };
   audience_config: AudienceConfig;
   comparison_lever: PrimaryLever;
@@ -488,6 +506,8 @@ export interface ProfileTransition {
   factor_tags_b: FactorTag[];
   referenced_fields_a: string[];
   referenced_fields_b: string[];
+  source_ids_a?: string[];
+  source_ids_b?: string[];
   transition_type: TransitionType;
 }
 
@@ -552,7 +572,13 @@ export interface SingleLeverDiffData {
 
 export interface ComparisonAnalysis {
   test_id: string;
+  product_id?: string;
   run_id: string;
+  mode: LabRunMode;
+  research_status: 'without_research' | 'completed' | 'no_matches' | 'failed' | 'skipped';
+  references?: CompetitorReference[];
+  selected_references?: CompetitorReference[];
+  reference_summary?: string;
   run_status: RunStatus;
   primary_lever: PrimaryLever;
   model_id?: string;
@@ -566,7 +592,7 @@ export interface ComparisonAnalysis {
       fixed_launch_cost?: number;
       capacity_units?: number;
     };
-    B: {
+    B?: {
       name: string;
       price: number;
       variable_cost_per_sale?: number;
@@ -575,15 +601,15 @@ export interface ComparisonAnalysis {
     };
   };
   option_a_summary: OptionResultSummary;
-  option_b_summary: OptionResultSummary;
+  option_b_summary?: OptionResultSummary;
   eligibility_changes: EligibilityChangeSummary[];
   transitions: ProfileTransition[];
-  transition_matrix: TransitionMatrix;
+  transition_matrix?: TransitionMatrix;
   decision_card: DecisionCardData;
-  single_lever_diff: SingleLeverDiffData;
+  single_lever_diff?: SingleLeverDiffData;
   finance_analysis: {
     option_a: FinancialCalculationResult;
-    option_b: FinancialCalculationResult;
+    option_b?: FinancialCalculationResult;
   };
 }
 
@@ -618,7 +644,7 @@ export interface SignUpPayload {
   email: string;
   password: string;
   role: UserRole;
-  display_name: string;
+  display_name?: string;
   startup_name?: string;
   startup_description?: string;
 }
@@ -779,6 +805,8 @@ export interface SupportProposal {
   updated_at: string;
 }
 
+export type EvidenceType = 'retrieved_snippet' | 'retrieved_page' | 'founder_manual_note';
+
 export interface CompetitorReference {
   id: string;
   product_id: string;
@@ -788,8 +816,20 @@ export interface CompetitorReference {
   domain: string;
   snippet_or_fact: string;
   source_type: 'automated' | 'founder_supplied';
+  evidence_type: EvidenceType;
+  supported_facts: string[];
+  founder_note?: string;
   selected: boolean;
   date_checked: string;
+  created_at?: string;
+}
+
+export interface SearchProviderStatus {
+  is_configured: boolean;
+  provider: 'brave' | 'tavily' | 'serper' | 'duckduckgo' | 'none';
+  required_credential?: string;
+  credential_present: boolean;
+  message?: string;
 }
 
 export type LabRunMode = 'single' | 'comparison';

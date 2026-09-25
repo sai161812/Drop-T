@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { PublicFeedbackViewData, HumanChoice } from '@droptest/shared';
 import { EmptyState } from '../components/Common/EmptyState.js';
+import { useAuth } from '../context/AuthContext.js';
 
 interface PublicFeedbackPageProps {
   tokenOrId?: string;
@@ -27,6 +28,7 @@ export const PublicFeedbackPage: React.FC<PublicFeedbackPageProps> = ({
   isStandalone = false, 
   onNavigateToSetup 
 }) => {
+  const { token: authToken } = useAuth();
   const [data, setData] = useState<PublicFeedbackViewData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -60,7 +62,9 @@ export const PublicFeedbackPage: React.FC<PublicFeedbackPageProps> = ({
     try {
       let token = tokenOrId;
       if (!isStandalone) {
-        const stats = await fetch(`/api/tests/${tokenOrId}/feedback-stats`).then(r => r.json());
+        const stats = await fetch(`/api/tests/${tokenOrId}/feedback-stats`, {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+        }).then(r => r.json());
         if (!stats.feedback_token) throw new Error('Complete the comparison before collecting feedback.');
         token = stats.feedback_token;
       }
@@ -86,7 +90,7 @@ export const PublicFeedbackPage: React.FC<PublicFeedbackPageProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [tokenOrId, isStandalone]);
+  }, [tokenOrId, isStandalone, authToken]);
 
   useEffect(() => {
     fetchFeedbackData();

@@ -67,7 +67,7 @@ export class AuthRepository {
       payload.email.trim(),
       passwordHash,
       payload.role,
-      payload.display_name.trim(),
+      (payload.display_name?.trim() || payload.startup_name?.trim() || 'Founder'),
       payload.role === 'startup' ? (payload.startup_name?.trim() || null) : null,
       payload.role === 'startup' ? (payload.startup_description?.trim() || null) : null,
       now,

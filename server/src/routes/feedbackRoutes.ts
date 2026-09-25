@@ -53,12 +53,12 @@ feedbackRouter.get('/:tokenOrId', (req: Request, res: Response) => {
         },
         B: {
           id: 'B',
-          name: test.options.B.name,
-          price: test.options.B.price,
-          primary_message: test.options.B.primary_message,
-          served_markets: test.options.B.served_markets,
-          fulfillment_mode: test.options.B.fulfillment_mode,
-          images: test.options.B.images
+          name: test.options.B?.name || test.options.A.name,
+          price: test.options.B?.price ?? test.options.A.price,
+          primary_message: test.options.B?.primary_message || test.options.A.primary_message,
+          served_markets: test.options.B?.served_markets || test.options.A.served_markets,
+          fulfillment_mode: test.options.B?.fulfillment_mode || test.options.A.fulfillment_mode,
+          images: test.options.B?.images || test.options.A.images
         }
       }
     };

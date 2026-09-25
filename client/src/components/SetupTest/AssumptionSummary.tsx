@@ -14,17 +14,18 @@ import {
 } from '@droptest/shared';
 
 interface AssumptionSummaryProps {
+  mode?: 'single' | 'comparison';
   audienceMarkets: string[];
   servedMarketsA: string[];
-  servedMarketsB: string[];
+  servedMarketsB?: string[];
   intendedBuyer: string;
   adjacentBuyer: string;
   expectedSpendMin: number;
   expectedSpendMax: number;
   currency: string;
-  comparisonLever: PrimaryLever;
+  comparisonLever?: PrimaryLever;
   priceA: number;
-  priceB: number;
+  priceB?: number;
   missingInputs: string[];
   isValid: boolean;
   onRunSimulation?: () => void;
@@ -32,15 +33,16 @@ interface AssumptionSummaryProps {
 }
 
 export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
+  mode = 'single',
   audienceMarkets,
   servedMarketsA,
-  servedMarketsB,
+  servedMarketsB = [],
   intendedBuyer: _intendedBuyer,
   adjacentBuyer: _adjacentBuyer,
   expectedSpendMin,
   expectedSpendMax,
   currency,
-  comparisonLever,
+  comparisonLever = 'price',
   priceA,
   priceB,
   missingInputs,
@@ -48,6 +50,8 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
   onRunSimulation,
   isSubmitting
 }) => {
+  const isSingle = mode === 'single';
+
   return (
     <aside className="sidebar-column" aria-label="Simulated Panel Assumptions">
       {/* Primary 50 Profile Panel Preview */}
@@ -136,11 +140,13 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
                   <span className="panel-stat-label" style={{ fontSize: '12px' }}>{market}</span>
                   <div style={{ display: 'flex', gap: '6px', fontSize: '10px' }}>
                     <span style={{ padding: '1px 4px', borderRadius: '2px', background: inA ? '#DCFCE7' : '#FEE2E2', color: inA ? '#166534' : '#991B1B' }}>
-                      A: {inA ? 'Served' : 'Unserved'}
+                      {isSingle ? (inA ? 'Served' : 'Unserved') : `A: ${inA ? 'Served' : 'Unserved'}`}
                     </span>
-                    <span style={{ padding: '1px 4px', borderRadius: '2px', background: inB ? '#DCFCE7' : '#FEE2E2', color: inB ? '#166534' : '#991B1B' }}>
-                      B: {inB ? 'Served' : 'Unserved'}
-                    </span>
+                    {!isSingle && (
+                      <span style={{ padding: '1px 4px', borderRadius: '2px', background: inB ? '#DCFCE7' : '#FEE2E2', color: inB ? '#166534' : '#991B1B' }}>
+                        B: {inB ? 'Served' : 'Unserved'}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -149,25 +155,27 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
         )}
       </div>
 
-      {/* Comparison Lever Overview */}
-      <div className="workbench-card">
-        <div className="card-header" style={{ marginBottom: 'var(--space-2)' }}>
-          <h2 className="card-title" style={{ fontSize: 'var(--font-size-sm)' }}>
-            <Sliders size={16} />
-            <span>Decision Lever</span>
-          </h2>
-          <span className="badge" style={{ background: '#FEF3C7', color: '#92400E' }}>
-            {PRIMARY_LEVER_LABELS[comparisonLever]}
-          </span>
-        </div>
+      {/* Comparison Lever Overview (only in comparison mode) */}
+      {!isSingle && (
+        <div className="workbench-card">
+          <div className="card-header" style={{ marginBottom: 'var(--space-2)' }}>
+            <h2 className="card-title" style={{ fontSize: 'var(--font-size-sm)' }}>
+              <Sliders size={16} />
+              <span>Decision Lever</span>
+            </h2>
+            <span className="badge" style={{ background: '#FEF3C7', color: '#92400E' }}>
+              {PRIMARY_LEVER_LABELS[comparisonLever]}
+            </span>
+          </div>
 
-        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-          {comparisonLever === 'price' && `Testing price elasticity: Option A (${currency} ${priceA}) vs Option B (${currency} ${priceB}).`}
-          {comparisonLever === 'message' && 'Testing value proposition and positioning message resonance.'}
-          {comparisonLever === 'served_markets' && 'Testing geographic accessibility and fulfillment coverage trade-offs.'}
-          {comparisonLever === 'creative' && 'Testing packaging, presentation, and visual creative appeal.'}
-        </p>
-      </div>
+          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+            {comparisonLever === 'price' && `Testing price elasticity: Option A (${currency} ${priceA}) vs Option B (${currency} ${priceB}).`}
+            {comparisonLever === 'message' && 'Testing value proposition and positioning message resonance.'}
+            {comparisonLever === 'served_markets' && 'Testing geographic accessibility and fulfillment coverage trade-offs.'}
+            {comparisonLever === 'creative' && 'Testing packaging, presentation, and visual creative appeal.'}
+          </p>
+        </div>
+      )}
 
       {/* Checklist & Run Action Card */}
       <div className="workbench-card" style={{ background: isValid ? 'var(--color-surface)' : 'var(--color-surface-subtle)' }}>
@@ -203,14 +211,16 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
           style={{ marginTop: 'var(--space-4)' }}
           disabled={!isValid || isSubmitting}
           onClick={onRunSimulation}
-          title={!isValid ? 'Fill all mandatory inputs above to enable simulation' : 'Run 50 simulated profiles'}
+          title={!isValid ? 'Fill all mandatory inputs above to enable simulation' : isSingle ? 'Run product review (50 simulated profiles)' : 'Run comparative review (100 simulated profiles)'}
         >
           {!isValid ? <Lock size={15} /> : <Play size={16} />}
-          <span>Run 50 simulated profiles</span>
+          <span>{isSingle ? 'Run product review' : 'Run 50 simulated profiles'}</span>
         </button>
 
         <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '8px', lineHeight: '1.3' }}>
-          Executes 100 evaluations (Option A & Option B across the same 50 personas).
+          {isSingle 
+            ? 'Evaluates 50 simulated profiles against your product.' 
+            : 'Executes 100 evaluations (Option A & Option B across the same 50 personas).'}
         </p>
       </div>
     </aside>

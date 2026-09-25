@@ -98,9 +98,10 @@ const MainApp: React.FC = () => {
     window.history.pushState({}, '', `/publish?edit=${productId}`);
   };
 
-  const handleOpenSyntheticLab = (productId: string) => {
+  const handleOpenSyntheticLab = (productId: string, review: 'resume' | 'new' = 'resume') => {
     setActiveTab('setup');
-    window.history.pushState({}, '', `/lab?product=${productId}`);
+    setActiveTestId(undefined);
+    window.history.pushState({}, '', `/lab?product=${productId}${review === 'new' ? '&review=new' : ''}`);
   };
 
   // If in standalone public feedback view

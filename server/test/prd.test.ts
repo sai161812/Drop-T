@@ -86,7 +86,7 @@ describe('PRD acceptance and regression checks', () => {
       assert.equal(publicView.data.domain_specific_data.unit_prep_delivery_cost, undefined);
       assert.equal((await request(`/api/feedback/${token}`, { choice: 'B', client_token: 'anonymous', reason: '<b>Useful</b>' })).status, 201);
       await request(`/api/feedback/${token}`, { choice: 'A', client_token: 'anonymous' });
-      const stats = await request(`/api/tests/${id}/feedback-stats`);
+      const stats = await request(`/api/feedback/${token}/stats`);
       assert.equal(stats.data.total, 1);
       assert.equal(stats.data.counts.A, 1);
       const analysis = await request(`/api/tests/${id}/analysis`);
@@ -158,12 +158,24 @@ describe('PRD acceptance and regression checks', () => {
   });
 
   it('rejects disguised uploads, preserves uploaded images and serves the production feedback route', async () => {
+    const signup = await fetch(`${base}/api/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: `upload-${randomUUID()}@example.com`,
+        password: 'Password123!',
+        role: 'user',
+        display_name: 'Upload Test User'
+      })
+    });
+    const { token: uploadToken } = await signup.json() as any;
+    const authHeaders = { Authorization: `Bearer ${uploadToken}` };
     const bad = new FormData();
     bad.append('image', new Blob(['<html>not an image</html>'], { type: 'image/png' }), 'pretend.png');
-    assert.equal((await fetch(`${base}/api/upload`, { method: 'POST', body: bad })).status, 400);
+    assert.equal((await fetch(`${base}/api/upload`, { method: 'POST', headers: authHeaders, body: bad })).status, 400);
     const good = new FormData();
     good.append('image', new Blob([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aY9sAAAAASUVORK5CYII=', 'base64')], { type: 'image/png' }), 'renamed.html');
-    const uploaded = await fetch(`${base}/api/upload`, { method: 'POST', body: good });
+    const uploaded = await fetch(`${base}/api/upload`, { method: 'POST', headers: authHeaders, body: good });
     assert.equal(uploaded.status, 201);
     const image = await uploaded.json();
     assert.ok(image.url.endsWith('.png'));

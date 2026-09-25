@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { SignUpPayloadSchema, SignInPayloadSchema } from '@droptest/shared';
+import { SignUpPayloadSchema, SignInPayloadSchema, DEMO_ACCOUNTS } from '@droptest/shared';
 import { AuthRepository } from '../db/authRepository.js';
 import { AuthenticatedRequest, requireAuth } from '../middleware/authMiddleware.js';
 
@@ -101,33 +101,13 @@ authRouter.get('/me', (req: AuthenticatedRequest, res: Response) => {
 // GET /api/auth/demo-accounts - List available demo accounts for quick testing
 authRouter.get('/demo-accounts', (_req: Request, res: Response) => {
   res.json({
-    accounts: [
-      {
-        email: 'founder@ecothreads.in',
-        role: 'startup',
-        display_name: 'Aarav Sharma',
-        startup_name: 'EcoThreads Apparel',
-        description: 'Founder (Clothing & Apparel)'
-      },
-      {
-        email: 'founder@artisanbake.in',
-        role: 'startup',
-        display_name: 'Maya Patel',
-        startup_name: 'Artisan Breads & Co',
-        description: 'Founder (Local Food & Bakery)'
-      },
-      {
-        email: 'sponsor@indiagrowth.vc',
-        role: 'sponsor',
-        display_name: 'Vikram Mehta',
-        description: 'Sponsor / Angel Backer'
-      },
-      {
-        email: 'riya@gmail.com',
-        role: 'user',
-        display_name: 'Riya Verma',
-        description: 'Shopper / Community Member'
-      }
-    ]
+    accounts: DEMO_ACCOUNTS.map(({ email, password, role, display_name, startup_name, description }) => ({
+      email,
+      password,
+      role,
+      display_name,
+      startup_name,
+      description: description || (role === 'startup' ? startup_name : role === 'sponsor' ? 'Sponsor account' : 'Community member')
+    }))
   });
 });

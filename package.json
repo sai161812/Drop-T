@@ -14,6 +14,7 @@
     "dev:client": "npm run dev -w @droptest/client",
     "build": "npm run build -w @droptest/shared && npm run build -w @droptest/server && npm run build -w @droptest/client",
     "test": "npm run test -w @droptest/shared && npm run test -w @droptest/server",
+    "seed": "node --import tsx server/src/db/seed.ts",
     "verify:live": "node --import tsx server/scripts/verify-live.ts",
     "start": "npm run start -w @droptest/server",
     "postinstall": "node -e \"const fs = require('fs'); if (fs.existsSync('node_modules/@rollup/wasm-node/dist') && fs.existsSync('node_modules/rollup/dist')) { fs.cpSync('node_modules/@rollup/wasm-node/dist', 'node_modules/rollup/dist', {recursive: true, force: true}); }\""

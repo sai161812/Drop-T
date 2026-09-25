@@ -16,6 +16,9 @@ export interface ServerConfig {
   groqVisionModel: string;
   groqTemperature: number;
   groqMaxRetries: number;
+  braveSearchApiKey: string;
+  tavilyApiKey: string;
+  serperApiKey: string;
 }
 
 export const config: ServerConfig = {
@@ -28,4 +31,7 @@ export const config: ServerConfig = {
   groqVisionModel: process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview',
   groqTemperature: parseFloat(process.env.GROQ_TEMPERATURE || '0.2'),
   groqMaxRetries: parseInt(process.env.GROQ_MAX_RETRIES || '5', 10),
+  braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY || '',
+  tavilyApiKey: process.env.TAVILY_API_KEY || '',
+  serperApiKey: process.env.SERPER_API_KEY || '',
 };

@@ -7,7 +7,9 @@ import { FinancialInputs, FinancialCalculationResult, ScenarioCalculation } from
 export function calculateFinancials(inputs: FinancialInputs): FinancialCalculationResult {
   const missingFields: string[] = [];
 
-  if (!Number.isFinite(inputs.price) || inputs.price < 0) {
+  if (inputs.price_unknown) {
+    missingFields.push('Price (not set; pricing analysis suppressed)');
+  } else if (!Number.isFinite(inputs.price) || inputs.price < 0) {
     missingFields.push('Price (P)');
   }
   if (inputs.variable_cost_per_sale === undefined || !Number.isFinite(inputs.variable_cost_per_sale) || inputs.variable_cost_per_sale < 0) {

@@ -105,7 +105,8 @@ describe('Stage 2: Saved Products, Save/Unsave Toggle & Structured Community Fee
         category_data: {
           item_type: 'Bag',
           material: '100% Hemp Canvas',
-          fit: 'Standard 18L Tote'
+          fit: 'Standard 18L Tote',
+          sizes: 'not_decided'
         },
         status: 'published'
       })

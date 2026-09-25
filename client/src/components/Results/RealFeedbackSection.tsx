@@ -8,12 +8,14 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { HumanFeedbackStats, HumanChoice } from '@droptest/shared';
+import { useAuth } from '../../context/AuthContext.js';
 
 interface RealFeedbackSectionProps {
   testId?: string;
 }
 
 export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId }) => {
+  const { token } = useAuth();
   const [stats, setStats] = useState<HumanFeedbackStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -23,7 +25,9 @@ export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId
     if (!testId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/tests/${testId}/feedback-stats`);
+      const res = await fetch(`/api/tests/${testId}/feedback-stats`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data: HumanFeedbackStats = await res.json();
         setStats(data);
@@ -33,7 +37,7 @@ export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId
     } finally {
       setIsLoading(false);
     }
-  }, [testId]);
+  }, [testId, token]);
 
   useEffect(() => {
     fetchStats();

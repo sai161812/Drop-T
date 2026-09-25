@@ -22,6 +22,8 @@ import {
 } from './types.js';
 import { calculateFinancials } from './finance.js';
 
+const priceUnknown = (test: FullTestResponse) => (test.offering.domain_specific_data as any)?.lab_price_status === 'unknown';
+
 /**
  * Compute aggregate results and breakdowns for a single Option (A or B)
  */
@@ -276,6 +278,8 @@ export function computeProfileTransitions(
       factor_tags_b: evalB?.factor_tags || [],
       referenced_fields_a: evalA?.referenced_fields || [],
       referenced_fields_b: evalB?.referenced_fields || [],
+      source_ids_a: evalA?.source_ids || [],
+      source_ids_b: evalB?.source_ids || [],
       transition_type: transitionType
     };
   });
@@ -345,48 +349,50 @@ export function computeTransitionMatrix(transitions: ProfileTransition[]): Trans
 export function computeSingleLeverDiff(
   fullTest: FullTestResponse
 ): SingleLeverDiffData {
-  const lever = fullTest.comparison_lever;
+  const lever = fullTest.comparison_lever || 'price';
   const optA = fullTest.options.A;
   const optB = fullTest.options.B;
 
   const diffs: SingleLeverDiffData['field_diffs'] = [];
 
-  if (lever === 'price') {
-    diffs.push({
-      field: 'price',
-      label: 'Price per unit',
-      val_a: `$${optA.price}`,
-      val_b: `$${optB.price}`
-    });
-  } else if (lever === 'message') {
-    diffs.push({
-      field: 'primary_message',
-      label: 'Primary messaging / Headline',
-      val_a: optA.primary_message,
-      val_b: optB.primary_message
-    });
-  } else if (lever === 'served_markets') {
-    diffs.push({
-      field: 'served_markets',
-      label: 'Served audience markets',
-      val_a: optA.served_markets,
-      val_b: optB.served_markets
-    });
-  } else if (lever === 'creative') {
-    const descA = optA.images.map(image => `${image.filename}: ${image.confirmed_visual_description || 'No confirmed description'}`).join('; ');
-    const descB = optB.images.map(image => `${image.filename}: ${image.confirmed_visual_description || 'No confirmed description'}`).join('; ');
-    diffs.push({
-      field: 'creative_description',
-      label: 'Creative & visual positioning',
-      val_a: descA,
-      val_b: descB
-    });
+  if (optB) {
+    if (lever === 'price') {
+      diffs.push({
+        field: 'price',
+        label: 'Price per unit',
+        val_a: `${fullTest.offering.currency} ${optA.price}`,
+        val_b: `${fullTest.offering.currency} ${optB.price}`
+      });
+    } else if (lever === 'message') {
+      diffs.push({
+        field: 'primary_message',
+        label: 'Primary messaging / Headline',
+        val_a: optA.primary_message,
+        val_b: optB.primary_message
+      });
+    } else if (lever === 'served_markets') {
+      diffs.push({
+        field: 'served_markets',
+        label: 'Served audience markets',
+        val_a: optA.served_markets,
+        val_b: optB.served_markets
+      });
+    } else if (lever === 'creative') {
+      const descA = optA.images.map(image => `${image.filename}: ${image.confirmed_visual_description || 'No confirmed description'}`).join('; ');
+      const descB = optB.images.map(image => `${image.filename}: ${image.confirmed_visual_description || 'No confirmed description'}`).join('; ');
+      diffs.push({
+        field: 'creative_description',
+        label: 'Creative & visual positioning',
+        val_a: descA,
+        val_b: descB
+      });
+    }
   }
 
   const varCostA = optA.variable_cost_per_sale;
-  const varCostB = optB.variable_cost_per_sale;
+  const varCostB = optB?.variable_cost_per_sale;
   const fixedCostA = optA.fixed_launch_cost;
-  const fixedCostB = optB.fixed_launch_cost;
+  const fixedCostB = optB?.fixed_launch_cost;
   const hasCostVariance = (varCostA !== varCostB) || (fixedCostA !== fixedCostB);
 
   return {
@@ -409,28 +415,86 @@ export function generateDecisionCard(
   fullTest: FullTestResponse,
   run: Run,
   summaryA: OptionResultSummary,
-  summaryB: OptionResultSummary,
-  matrix: TransitionMatrix,
-  eligibilityChanges: EligibilityChangeSummary[]
+  summaryB?: OptionResultSummary,
+  _matrix?: TransitionMatrix,
+  eligibilityChanges: EligibilityChangeSummary[] = []
 ): DecisionCardData {
-  const isComplete = run.status === 'completed' && run.total_evaluations_completed === 100 && run.total_evaluations_expected === 100;
+  const isComparison = (run.mode === 'comparison' || fullTest.mode === 'comparison' || (!run.mode && Boolean(summaryB))) && Boolean(summaryB);
+  const expectedCount = isComparison ? 100 : 50;
+  const isComplete = run.status === 'completed' && run.total_evaluations_completed === expectedCount;
 
   if (!isComplete) {
     return {
       is_run_complete: false,
       total_completed: run.total_evaluations_completed,
-      total_expected: run.total_evaluations_expected,
+      total_expected: expectedCount,
       winner_declared: false,
-      status_headline: `Simulation is incomplete (${run.total_evaluations_completed}/${run.total_evaluations_expected} evaluations completed).`,
-      recommended_next_test: 'Resume or retry missing evaluations before drawing launch conclusions.',
-      key_simulated_observation: `Only ${run.total_evaluations_completed} of 100 evaluations were saved. Partial results should not be used to pick a winner.`,
+      status_headline: `Simulation is incomplete (${run.total_evaluations_completed}/${expectedCount} evaluations completed).`,
+      recommended_next_test: 'Resume or retry missing evaluations before drawing conclusions.',
+      key_simulated_observation: `Only ${run.total_evaluations_completed} of ${expectedCount} evaluations were saved. Partial results should not be used as final launch assessment.`,
       leading_objection: 'Incomplete run state',
       location_access_caveat: 'Coverage cannot be fully evaluated with missing records.',
-      missing_evidence: 'Complete all 50 persona evaluations for both Option A and Option B.'
+      missing_evidence: isComparison 
+        ? 'Complete all 50 persona evaluations for both Option A and Option B.'
+        : 'Complete all 50 persona evaluations for Option A.'
     };
   }
 
-  // Calculate segment comparisons
+  const optA = fullTest.options.A;
+
+  if (!isComparison || !summaryB) {
+    // Single Product Mode Decision Card
+    const intendedA = summaryA.by_segment.intended.interested;
+    const adjacentA = summaryA.by_segment.adjacent.interested;
+    const contrastingA = summaryA.by_segment.contrasting.interested;
+    const totalA = summaryA.interested_total;
+
+    const topObjection = summaryA.dominant_objections[0];
+    const leadingObjectionText = topObjection
+      ? `${topObjection.tag.toUpperCase()} (${topObjection.count} hesitant personas): "${topObjection.sample_objections[0] || 'Hesitation / friction'}"`
+      : 'No dominant objections recorded across simulated personas';
+
+    const locationCaveat = summaryA.unserved_count > 0
+      ? `${summaryA.unserved_count} profiles unserved by current availability (${(optA.served_markets || []).join(', ')}).`
+      : 'All 50 panel profiles are in served markets.';
+
+    const financeA = calculateFinancials({
+      price_unknown: priceUnknown(fullTest),
+      sales_scenarios: fullTest.offering.sales_scenarios,
+      currency: fullTest.offering.currency,
+      period: fullTest.offering.period,
+      price: optA.price,
+      fixed_launch_cost: optA.fixed_launch_cost,
+      variable_cost_per_sale: optA.variable_cost_per_sale,
+      capacity_units: optA.capacity_units
+    });
+
+    return {
+      is_run_complete: true,
+      total_completed: run.total_evaluations_completed,
+      total_expected: 50,
+      winner_declared: false,
+      status_headline: `${totalA} / 50 simulated personas showed interest in ${optA.name}`,
+      recommended_next_test: topObjection
+        ? `Review the top simulated friction on ${topObjection.tag} and gather real community feedback.`
+        : 'Share product with real prospective buyers to test actual willingness to pay.',
+      key_simulated_observation: `Intended buyers: ${intendedA}/20 interested (${summaryA.by_segment.intended.unsure} unsure, ${summaryA.by_segment.intended.not_interested} not interested). Adjacent buyers: ${adjacentA}/20 interested. Contrasting: ${contrastingA}/10 interested.`,
+      leading_objection: leadingObjectionText,
+      location_access_caveat: locationCaveat,
+      missing_evidence: 'Real willingness-to-pay, genuine purchase conversion, and unguided browsing behavior cannot be proven by AI simulation alone.',
+      finance_comparison: financeA.has_sufficient_inputs ? {
+        has_finance: true,
+        break_even_a: financeA.break_even_units,
+        break_even_status_a: financeA.break_even_status_message,
+        note: `Break-even requires ${financeA.break_even_units ?? 'N/A'} units at ${fullTest.offering.currency} ${optA.price} to cover fixed launch costs.`
+      } : {
+        has_finance: false,
+        note: 'Add optional fixed launch and unit costs in Synthetic Lab to calculate break-even targets.'
+      }
+    };
+  }
+
+  // Comparison Mode
   const intendedA = summaryA.by_segment.intended.interested;
   const intendedB = summaryB.by_segment.intended.interested;
   const intendedDiff = intendedB - intendedA;
@@ -439,9 +503,8 @@ export function generateDecisionCard(
   const totalB = summaryB.interested_total;
   const totalDiff = totalB - totalA;
 
-  const lever = fullTest.comparison_lever;
-  const optA = fullTest.options.A;
-  const optB = fullTest.options.B;
+  const lever = fullTest.comparison_lever || 'price';
+  const optB = fullTest.options.B!;
 
   // Check for conflicting signals
   const hasConflictingSignal = (intendedDiff > 0 && totalDiff < 0) || 
@@ -499,6 +562,7 @@ export function generateDecisionCard(
 
   // Finance comparison integration
   const financeA = calculateFinancials({
+    price_unknown: priceUnknown(fullTest),
     sales_scenarios: fullTest.offering.sales_scenarios,
     currency: fullTest.offering.currency,
     period: fullTest.offering.period,
@@ -509,6 +573,7 @@ export function generateDecisionCard(
   });
 
   const financeB = calculateFinancials({
+    price_unknown: priceUnknown(fullTest),
     sales_scenarios: fullTest.offering.sales_scenarios,
     currency: fullTest.offering.currency,
     period: fullTest.offering.period,
@@ -539,7 +604,7 @@ export function generateDecisionCard(
   return {
     is_run_complete: true,
     total_completed: run.total_evaluations_completed,
-    total_expected: run.total_evaluations_expected,
+    total_expected: 100,
     winner_declared: winnerDeclared,
     status_headline: headline,
     recommended_next_test: nextTest,
@@ -560,16 +625,58 @@ export function computeComparisonAnalysis(
   profiles: Profile[],
   evaluations: Evaluation[]
 ): ComparisonAnalysis {
+  const isComparison = (run.mode === 'comparison' || fullTest.mode === 'comparison' || (!run.mode && Boolean(fullTest.options.B))) && Boolean(fullTest.options.B);
   const evaluationsA = evaluations.filter(e => e.option_id === 'A');
-  const evaluationsB = evaluations.filter(e => e.option_id === 'B');
+  const evaluationsB = isComparison ? evaluations.filter(e => e.option_id === 'B') : [];
 
   const summaryA = computeOptionSummary('A', fullTest.options.A, profiles, evaluations);
-  const summaryB = computeOptionSummary('B', fullTest.options.B, profiles, evaluations);
+  const summaryB = isComparison && fullTest.options.B ? computeOptionSummary('B', fullTest.options.B, profiles, evaluations) : undefined;
 
-  const eligibilityChanges = computeEligibilityChanges(profiles, fullTest.options.A, fullTest.options.B);
-  const transitions = computeProfileTransitions(profiles, evaluationsA, evaluationsB);
-  const transitionMatrix = computeTransitionMatrix(transitions);
-  const singleLeverDiff = computeSingleLeverDiff(fullTest);
+  const eligibilityChanges = isComparison && fullTest.options.B 
+    ? computeEligibilityChanges(profiles, fullTest.options.A, fullTest.options.B)
+    : [];
+
+  let transitions: ProfileTransition[];
+  let transitionMatrix: TransitionMatrix | undefined;
+  let singleLeverDiff: SingleLeverDiffData | undefined;
+
+  if (isComparison && fullTest.options.B) {
+    transitions = computeProfileTransitions(profiles, evaluationsA, evaluationsB);
+    transitionMatrix = computeTransitionMatrix(transitions);
+    singleLeverDiff = computeSingleLeverDiff(fullTest);
+  } else {
+    // In single-product mode, map 50 profiles directly
+    const mapA = new Map<string, Evaluation>();
+    for (const e of evaluationsA) mapA.set(e.profile_id, e);
+    transitions = profiles.map(p => {
+      const evalA = mapA.get(p.id);
+      return {
+        profile_id: p.id,
+        segment: p.segment,
+        market: p.market,
+        budget_min: p.budget_min,
+        budget_max: p.budget_max,
+        use_case: p.use_case,
+        constraints: p.constraints,
+        priorities: p.priorities,
+        access_mode: p.access_mode,
+        response_a: evalA?.response || 'unavailable',
+        response_b: 'unavailable',
+        access_status_a: evalA?.access_status || 'unserved',
+        access_status_b: 'unserved',
+        reason_a: evalA?.reason || 'Evaluation missing or unserved',
+        reason_b: 'Single product review',
+        primary_objection_a: evalA?.primary_objection,
+        factor_tags_a: evalA?.factor_tags || [],
+        factor_tags_b: [],
+        referenced_fields_a: evalA?.referenced_fields || [],
+        referenced_fields_b: [],
+        source_ids_a: evalA?.source_ids || [],
+        source_ids_b: [],
+        transition_type: evalA?.response === 'interested' ? 'remained_interested' : 'remained_hesitant'
+      };
+    });
+  }
 
   const decisionCard = generateDecisionCard(
     fullTest,
@@ -581,6 +688,7 @@ export function computeComparisonAnalysis(
   );
 
   const financeA = calculateFinancials({
+    price_unknown: priceUnknown(fullTest),
     sales_scenarios: fullTest.offering.sales_scenarios,
     currency: fullTest.offering.currency,
     period: fullTest.offering.period,
@@ -590,7 +698,8 @@ export function computeComparisonAnalysis(
     capacity_units: fullTest.options.A.capacity_units
   });
 
-  const financeB = calculateFinancials({
+  const financeB = isComparison && fullTest.options.B ? calculateFinancials({
+    price_unknown: priceUnknown(fullTest),
     sales_scenarios: fullTest.offering.sales_scenarios,
     currency: fullTest.offering.currency,
     period: fullTest.offering.period,
@@ -598,13 +707,23 @@ export function computeComparisonAnalysis(
     fixed_launch_cost: fullTest.options.B.fixed_launch_cost,
     variable_cost_per_sale: fullTest.options.B.variable_cost_per_sale,
     capacity_units: fullTest.options.B.capacity_units
-  });
+  }) : undefined;
+
+  const snapshot = (run as any).snapshot ? (typeof (run as any).snapshot === 'string' ? JSON.parse((run as any).snapshot) : (run as any).snapshot) : null;
+  const references = (run as any).references || snapshot?.references || [];
+  const selectedReferences = references.filter((r: any) => r.selected !== false);
 
   return {
     test_id: fullTest.test.id,
+    product_id: fullTest.product_id || fullTest.test.product_id,
     run_id: run.id,
+    mode: isComparison ? 'comparison' : 'single',
+    research_status: run.research_status || snapshot?.research_status || 'without_research',
+    references,
+    selected_references: selectedReferences,
+    reference_summary: snapshot?.reference_summary,
     run_status: run.status,
-    primary_lever: fullTest.comparison_lever,
+    primary_lever: fullTest.comparison_lever || 'price',
     model_id: run.model_id,
     currency: fullTest.offering.currency || 'USD',
     period: fullTest.offering.period || 'launch_batch',
@@ -616,13 +735,15 @@ export function computeComparisonAnalysis(
         fixed_launch_cost: fullTest.options.A.fixed_launch_cost,
         capacity_units: fullTest.options.A.capacity_units
       },
-      B: {
-        name: fullTest.options.B.name,
-        price: fullTest.options.B.price,
-        variable_cost_per_sale: fullTest.options.B.variable_cost_per_sale,
-        fixed_launch_cost: fullTest.options.B.fixed_launch_cost,
-        capacity_units: fullTest.options.B.capacity_units
-      }
+      ...(isComparison && fullTest.options.B ? {
+        B: {
+          name: fullTest.options.B.name,
+          price: fullTest.options.B.price,
+          variable_cost_per_sale: fullTest.options.B.variable_cost_per_sale,
+          fixed_launch_cost: fullTest.options.B.fixed_launch_cost,
+          capacity_units: fullTest.options.B.capacity_units
+        }
+      } : {})
     },
     option_a_summary: summaryA,
     option_b_summary: summaryB,

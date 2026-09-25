@@ -43,6 +43,11 @@ const DOMAIN_TRAITS: Record<DomainId, { constraints: string[][]; priorities: str
     constraints: [['Needs supported platforms confirmed'], ['Limited time to learn a new tool'], ['Needs language support information'], ['Wants clear billing terms'], ['Needs privacy information'], ['Has an existing alternative'], ['Needs support availability'], ['Has a fixed spending limit']],
     priorities: [['Core use case', 'Ease of use'], ['Time required', 'Clarity'], ['Price', 'Billing terms'], ['Compatibility', 'Reliability information'], ['Support', 'Accessibility'], ['Data handling', 'Transparency'], ['Useful outcome', 'Workflow fit'], ['Trial evidence', 'Switching effort']],
     access_modes: ['Online access if supported', 'Supported platform required', 'Language support required']
+  },
+  other: {
+    constraints: [['Needs specification details'], ['Needs delivery or access terms'], ['Has a fixed spending limit'], ['Needs use instructions'], ['Wants materials confirmed'], ['Needs availability clarified'], ['Has an existing alternative'], ['Needs dimensions or compatibility details']],
+    priorities: [['Practical utility', 'Specification clarity'], ['Reliability', 'Use case fit'], ['Price', 'Durability'], ['Availability', 'Convenience'], ['Quality details', 'Transparency'], ['Ease of use', 'Support'], ['Distinctive value', 'Compatibility'], ['Evidence', 'Low risk']],
+    access_modes: ['As described by founder', 'Availability to be confirmed', 'Founder-stated fulfillment']
   }
 };
 

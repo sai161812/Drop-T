@@ -45,7 +45,7 @@ interface ProfileReviewPanelProps {
   audienceMarkets: string[];
   currency: string;
   optionA: { name: string; served_markets: string[] };
-  optionB: { name: string; served_markets: string[] };
+  optionB?: { name: string; served_markets: string[] };
 }
 
 export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
@@ -137,7 +137,7 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
       fetchPanel();
     }, 250);
     return () => clearTimeout(handler);
-  }, [domainId, intendedBuyer, adjacentBuyer, expectedSpendMin, expectedSpendMax, audienceMarkets, optionA.served_markets, optionB.served_markets, currentSeed]);
+  }, [domainId, intendedBuyer, adjacentBuyer, expectedSpendMin, expectedSpendMax, audienceMarkets, optionA.served_markets, optionB?.served_markets, currentSeed]);
 
   // Handle manual panel regeneration with new seed
   const handleRegenerate = () => {
@@ -345,28 +345,30 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
               </div>
             </div>
 
-            {/* 4. Option B Eligibility */}
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Option B Access Coverage
-                </span>
-                <span className="badge" style={{ background: statsB && statsB.unserved_count === 0 ? 'var(--color-success-bg)' : 'var(--color-warning-bg)', color: statsB && statsB.unserved_count === 0 ? 'var(--color-success)' : 'var(--color-warning)', fontSize: '10px' }}>
-                  {statsB ? `${statsB.eligible_count} / ${statsB.total} Served` : 'Calculating...'}
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', marginTop: '6px', color: 'var(--color-text-secondary)' }}>
-                {statsB && statsB.unserved_count > 0 ? (
-                  <span style={{ color: 'var(--color-warning)' }}>
-                    <strong>{statsB.unserved_count} unserved</strong> (outside Option B markets)
+            {/* 4. Option B Eligibility (Only if optionB provided) */}
+            {optionB && (
+              <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Option B Access Coverage
                   </span>
-                ) : (
-                  <span style={{ color: 'var(--color-success)' }}>
-                    100% of panel in served markets
+                  <span className="badge" style={{ background: statsB && statsB.unserved_count === 0 ? 'var(--color-success-bg)' : 'var(--color-warning-bg)', color: statsB && statsB.unserved_count === 0 ? 'var(--color-success)' : 'var(--color-warning)', fontSize: '10px' }}>
+                    {statsB ? `${statsB.eligible_count} / ${statsB.total} Served` : 'Calculating...'}
                   </span>
-                )}
+                </div>
+                <div style={{ fontSize: '12px', marginTop: '6px', color: 'var(--color-text-secondary)' }}>
+                  {statsB && statsB.unserved_count > 0 ? (
+                    <span style={{ color: 'var(--color-warning)' }}>
+                      <strong>{statsB.unserved_count} unserved</strong> (outside Option B markets)
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--color-success)' }}>
+                      100% of panel in served markets
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Filter Bar */}
@@ -564,20 +566,22 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
                               }}
                               title={isServedA ? 'Option A: Served' : elig?.a.reason_if_unserved || 'Option A: Unserved'}
                             >
-                              A: {isServedA ? 'Served' : 'Unserved'}
+                              {optionB ? `A: ${isServedA ? 'Served' : 'Unserved'}` : isServedA ? 'Served' : 'Unserved'}
                             </span>
-                            <span 
-                              className="badge" 
-                              style={{ 
-                                background: isServedB ? 'var(--color-success-bg)' : 'var(--color-danger-bg)', 
-                                color: isServedB ? 'var(--color-success)' : 'var(--color-danger)', 
-                                fontSize: '10px',
-                                padding: '1px 5px'
-                              }}
-                              title={isServedB ? 'Option B: Served' : elig?.b.reason_if_unserved || 'Option B: Unserved'}
-                            >
-                              B: {isServedB ? 'Served' : 'Unserved'}
-                            </span>
+                            {optionB && (
+                              <span 
+                                className="badge" 
+                                style={{ 
+                                  background: isServedB ? 'var(--color-success-bg)' : 'var(--color-danger-bg)', 
+                                  color: isServedB ? 'var(--color-success)' : 'var(--color-danger)', 
+                                  fontSize: '10px',
+                                  padding: '1px 5px'
+                                }}
+                                title={isServedB ? 'Option B: Served' : elig?.b?.reason_if_unserved || 'Option B: Unserved'}
+                              >
+                                B: {isServedB ? 'Served' : 'Unserved'}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>

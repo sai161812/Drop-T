@@ -99,7 +99,8 @@ describe('Stage 1: Role-based Auth, Product Publishing & Explore Feed Tests', ()
         password: 'password123',
         role: 'startup',
         display_name: 'Maya Other Founder',
-        startup_name: 'Other Startup Bakery'
+        startup_name: 'Other Startup Bakery',
+        startup_description: 'A small bakery testing new local products.'
       })
     });
     assert.equal(otherStartupRes.status, 201);

@@ -7,10 +7,39 @@ import {
   PRIMARY_LEVERS,
   DOMAIN_IDS,
   HumanResponseSubmissionSchema,
-  HUMAN_CHOICES
+  HUMAN_CHOICES,
+  ProductDraftPayloadSchema,
+  ProductPublishPayloadSchema
 } from '../src/index.js';
 
 describe('DROPTEST Shared Contracts & Logic', () => {
+  it('accepts a bounded partial product draft but requires explicit category and availability facts to publish', () => {
+    const draft = ProductDraftPayloadSchema.safeParse({ name: 'Draft only' });
+    assert.equal(draft.success, true);
+    if (draft.success) assert.equal(draft.data.summary, '');
+
+    const base: any = {
+      name: 'Sample apparel', category: 'clothing_accessories', stage: 'idea',
+      summary: 'A sufficiently clear description of this everyday apparel proposal.',
+      intended_buyer: 'People buying everyday apparel', feedback_question: 'What would you change?',
+      price: null, currency: 'INR', availability_markets: ['Bengaluru'], fulfillment_mode: 'Courier delivery',
+      images: [], category_data: {
+        material: 'not_decided', fit: 'not_decided', sizes: 'not_decided',
+        visual_description: 'A relaxed everyday garment with a simple, functional cut.'
+      }, status: 'published'
+    };
+    assert.equal(ProductPublishPayloadSchema.safeParse(base).success, true);
+    assert.equal(ProductPublishPayloadSchema.safeParse({ ...base, availability_markets: [] }).success, false);
+    assert.equal(ProductPublishPayloadSchema.safeParse({ ...base, category_data: { material: 'cotton', fit: '', sizes: [], unrelated: 'bypass' } }).success, false);
+  });
+
+  it('supports digital and generic other category adapters and suppresses unknown-price finance', () => {
+    const unknown = calculateFinancials({ currency: 'INR', period: 'launch_batch', price: 0, price_unknown: true, variable_cost_per_sale: 1, fixed_launch_cost: 10 });
+    assert.equal(unknown.has_sufficient_inputs, false);
+    assert.ok(unknown.missing_fields.includes('Price (not set; pricing analysis suppressed)'));
+    assert.equal(DOMAIN_IDS.includes('other'), true);
+  });
+
   it('enforces fixed 50-profile constants and 20/20/10 split', () => {
     assert.strictEqual(PANEL_CONSTANTS.TOTAL_PROFILES, 50);
     assert.strictEqual(PANEL_CONSTANTS.INTENDED_COUNT, 20);

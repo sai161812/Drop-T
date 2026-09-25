@@ -115,6 +115,21 @@ export const DOMAIN_PRESETS: Record<DomainId, DomainPreset> = {
     }
   },
 
+  other: {
+    id: 'other',
+    label: 'Other',
+    payload: {
+      test: { title: 'General product concept review', domain_id: 'other' },
+      offering: {
+        short_value_prop: 'A founder-described product concept for a specific buyer need',
+        description: 'Review the founder-provided product specifications and stated use case without assuming an apparel, food, or software category.',
+        currency: 'INR', period: 'launch_batch', domain_specific_data: { specification_text: 'Founder-supplied specification' }
+      },
+      option_a: { name: 'Current proposal', price: 0, primary_message: 'Evaluate the founder-provided product proposal', served_markets: ['Market to be confirmed'], fulfillment_mode: 'Founder-stated fulfillment', images: [], variable_cost_per_sale: 0, fixed_launch_cost: 0, capacity_units: 100 },
+      option_b: { name: 'Alternative specification', price: 1, primary_message: 'Evaluate the founder-provided product proposal', served_markets: ['Market to be confirmed'], fulfillment_mode: 'Founder-stated fulfillment', images: [], variable_cost_per_sale: 0, fixed_launch_cost: 0, capacity_units: 100 },
+      audience_config: { intended_buyer_description: 'People described by the founder as the intended buyers', adjacent_buyer_description: 'Adjacent buyers to be specified by the founder', expected_spend_min: 0, expected_spend_max: 0, audience_markets: ['Market to be confirmed'] }
+    }
+  },
   digital_products_services: {
     id: 'digital_products_services',
     label: 'Digital Products & Services',

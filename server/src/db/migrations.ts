@@ -209,7 +209,7 @@ export function runMigrations(db: DatabaseSync): void {
       sender_id TEXT NOT NULL,
       product_id TEXT NOT NULL,
       recipient_id TEXT NOT NULL,
-      amount REAL NOT NULL,
+      amount_minor INTEGER NOT NULL,
       currency TEXT NOT NULL DEFAULT 'INR',
       message TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -230,9 +230,26 @@ export function runMigrations(db: DatabaseSync): void {
       domain TEXT NOT NULL,
       snippet_or_fact TEXT NOT NULL,
       source_type TEXT NOT NULL, -- 'automated' | 'founder_supplied'
+      evidence_type TEXT DEFAULT 'retrieved_snippet',
+      supported_facts TEXT DEFAULT '[]',
+      founder_note TEXT,
+      created_at TEXT,
       selected INTEGER NOT NULL DEFAULT 1,
       date_checked TEXT NOT NULL,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
+    -- Authenticated local uploads. Pre-migration files intentionally remain
+    -- unowned and cannot be claimed through the public API.
+    CREATE TABLE IF NOT EXISTS uploads (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      server_filename TEXT NOT NULL UNIQUE,
+      original_filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE RESTRICT
     );
 
     -- Indexes for efficient queries
@@ -249,19 +266,90 @@ export function runMigrations(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_product_feedback_product ON product_feedback(product_id);
     CREATE INDEX IF NOT EXISTS idx_support_proposals_recipient ON support_proposals(recipient_id);
     CREATE INDEX IF NOT EXISTS idx_competitor_references_product ON competitor_references(product_id);
+    CREATE INDEX IF NOT EXISTS idx_uploads_owner ON uploads(owner_id);
   `;
 
   db.exec(schema);
 
   const addColumn = (table: string, name: string, definition: string) => {
-    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-    if (!columns.some(column => column.name === name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    try {
+      const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+      if (!columns.some(column => column.name === name)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+      }
+    } catch (_e) {
+      // Ignore if column already added or table locked
+    }
   };
   addColumn('tests', 'panel_seed', 'INTEGER NOT NULL DEFAULT 12345');
   addColumn('tests', 'product_id', 'TEXT REFERENCES products(id)');
+  addColumn('support_proposals', 'amount_minor', 'INTEGER');
   addColumn('runs', 'snapshot', 'TEXT');
   addColumn('runs', 'mode', "TEXT NOT NULL DEFAULT 'single'");
   addColumn('offerings', 'sales_scenarios', 'TEXT');
+  addColumn('evaluations', 'source_ids', 'TEXT DEFAULT "[]"');
+  addColumn('competitor_references', 'evidence_type', 'TEXT DEFAULT "retrieved_snippet"');
+  addColumn('competitor_references', 'supported_facts', 'TEXT DEFAULT "[]"');
+  addColumn('competitor_references', 'founder_note', 'TEXT');
+  addColumn('competitor_references', 'created_at', 'TEXT');
+
+  // Older releases stored proposals as REAL. Rebuild that table after an
+  // explicit one-time rounding conversion, preserving proposal identity and
+  // relationships while removing floating-point money from the active schema.
+  const proposalColumns = db.prepare('PRAGMA table_info(support_proposals)').all() as Array<{ name: string }>;
+  if (proposalColumns.some(column => column.name === 'amount')) {
+    const legacyRows = db.prepare('SELECT * FROM support_proposals').all() as any[];
+    let roundedLegacyProposalCount = 0;
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(`
+        CREATE TABLE support_proposals_exact (
+          id TEXT PRIMARY KEY,
+          sender_id TEXT NOT NULL,
+          product_id TEXT NOT NULL,
+          recipient_id TEXT NOT NULL,
+          amount_minor INTEGER NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'INR',
+          message TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(sender_id, product_id),
+          FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+          FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+      const insertExact = db.prepare(`
+        INSERT INTO support_proposals_exact
+        (id, sender_id, product_id, recipient_id, amount_minor, currency, message, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const row of legacyRows) {
+        const currency = String(row.currency || 'INR').toUpperCase();
+        const scale = currency === 'JPY' ? 1 : 100;
+        const existingMinor = row.amount_minor;
+        const minor = existingMinor === null || existingMinor === undefined
+          ? Math.round(Number(row.amount) * scale)
+          : Number(existingMinor);
+        if (!Number.isSafeInteger(minor) || minor <= 0) {
+          throw new Error(`Cannot safely migrate support proposal ${row.id}; its legacy amount is invalid or exceeds safe integer precision.`);
+        }
+        if ((existingMinor === null || existingMinor === undefined) && Math.abs(Number(row.amount) - minor / scale) > 1e-8) {
+          roundedLegacyProposalCount++;
+        }
+        insertExact.run(row.id, row.sender_id, row.product_id, row.recipient_id, minor, currency, row.message, row.created_at, row.updated_at);
+      }
+      db.exec('DROP TABLE support_proposals; ALTER TABLE support_proposals_exact RENAME TO support_proposals;');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_support_proposals_recipient ON support_proposals(recipient_id);');
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+    if (roundedLegacyProposalCount > 0) {
+      console.warn(`Rounded ${roundedLegacyProposalCount} legacy support proposal amount(s) to currency precision during migration.`);
+    }
+  }
   // Interrupted requests remain recoverable after a server restart.
   db.exec("UPDATE runs SET status = 'partial', error_message = 'Server restarted. Retry missing evaluations.' WHERE status IN ('pending', 'running')");
 

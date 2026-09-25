@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shirt, UtensilsCrossed, Monitor } from 'lucide-react';
+import { Shirt, UtensilsCrossed, Monitor, Package } from 'lucide-react';
 import { DomainId, DOMAIN_LABELS } from '@droptest/shared';
 
 interface DomainSelectorProps {
@@ -29,6 +29,12 @@ export const DomainSelector: React.FC<DomainSelectorProps> = ({
       label: DOMAIN_LABELS.digital_products_services,
       desc: 'Software, downloads, platform compatibility & first-period billing',
       icon: Monitor
+    },
+    {
+      id: 'other',
+      label: DOMAIN_LABELS.other,
+      desc: 'Founder-described specifications without apparel, food, or software assumptions',
+      icon: Package
     }
   ];
 

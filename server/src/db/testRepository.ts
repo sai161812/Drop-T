@@ -14,7 +14,8 @@ import {
   Profile,
   Run,
   Evaluation,
-  RunStatus
+  RunStatus,
+  CompetitorReference
 } from '@droptest/shared';
 
 export class TestRepository {
@@ -30,6 +31,7 @@ export class TestRepository {
     try {
     const now = new Date().toISOString();
     const testId = payload.test.id || uuidv4();
+    const productId = payload.product_id || payload.test.product_id || null;
 
     // Check if test exists
     const existingTestStmt = db.prepare('SELECT id, feedback_token FROM tests WHERE id = ?');
@@ -40,17 +42,17 @@ export class TestRepository {
       // Update existing test
       const updateTestStmt = db.prepare(`
         UPDATE tests 
-        SET title = ?, domain_id = ?, feedback_token = ?, updated_at = ? 
+        SET title = ?, domain_id = ?, feedback_token = ?, product_id = ?, updated_at = ? 
         WHERE id = ?
       `);
-      updateTestStmt.run(payload.test.title, payload.test.domain_id, feedbackToken, now, testId);
+      updateTestStmt.run(payload.test.title, payload.test.domain_id, feedbackToken, productId, now, testId);
     } else {
       // Insert new test
       const insertTestStmt = db.prepare(`
-        INSERT INTO tests (id, title, domain_id, feedback_token, created_at, updated_at, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'draft')
+        INSERT INTO tests (id, title, domain_id, feedback_token, product_id, created_at, updated_at, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'draft')
       `);
-      insertTestStmt.run(testId, payload.test.title, payload.test.domain_id, feedbackToken, now, now);
+      insertTestStmt.run(testId, payload.test.title, payload.test.domain_id, feedbackToken, productId, now, now);
     }
 
     // Save/Update Offering
@@ -93,10 +95,16 @@ export class TestRepository {
     // Save/Update Option A
     this.upsertOption(testId, 'A', payload.option_a, now);
 
-    // Save/Update Option B
-    this.upsertOption(testId, 'B', payload.option_b, now);
+    // Save/Update or remove Option B
+    const isComparison = payload.mode === 'comparison' || (payload.mode !== 'single' && Boolean(payload.option_b));
+    if (payload.option_b && isComparison) {
+      this.upsertOption(testId, 'B', payload.option_b, now);
+    } else {
+      db.prepare('DELETE FROM options WHERE test_id = ? AND id = ?').run(testId, 'B');
+    }
 
     // Save/Update AudienceConfig
+    const lever = payload.comparison_lever || 'price';
     const existingAudience = db.prepare('SELECT id FROM audience_configs WHERE test_id = ?').get(testId) as { id: string } | undefined;
     if (existingAudience) {
       const updateAudienceStmt = db.prepare(`
@@ -111,7 +119,7 @@ export class TestRepository {
         payload.audience_config.expected_spend_min,
         payload.audience_config.expected_spend_max,
         JSON.stringify(payload.audience_config.audience_markets),
-        payload.comparison_lever,
+        lever,
         now,
         testId
       );
@@ -132,7 +140,7 @@ export class TestRepository {
         payload.audience_config.expected_spend_min,
         payload.audience_config.expected_spend_max,
         JSON.stringify(payload.audience_config.audience_markets),
-        payload.comparison_lever,
+        lever,
         now,
         now
       );
@@ -156,7 +164,7 @@ export class TestRepository {
   private static upsertOption(
     testId: string, 
     optionId: 'A' | 'B', 
-    data: TestDraftPayload['option_a'] | TestDraftPayload['option_b'], 
+    data: TestDraftPayload['option_a'] | NonNullable<TestDraftPayload['option_b']>, 
     now: string
   ): void {
     const db = getDatabase();
@@ -227,10 +235,11 @@ export class TestRepository {
     const optionA = optionRows.find(r => r.id === 'A');
     const optionB = optionRows.find(r => r.id === 'B');
 
-    if (!optionA || !optionB) return null;
+    if (!optionA) return null;
 
-    const test: Test = {
+    const test: Test & { product_id?: string } = {
       id: testRow.id,
+      product_id: testRow.product_id || undefined,
       title: testRow.title,
       domain_id: testRow.domain_id,
       feedback_token: testRow.feedback_token,
@@ -287,10 +296,12 @@ export class TestRepository {
 
     return {
       test,
+      product_id: testRow.product_id || undefined,
+      mode: optionB ? 'comparison' : 'single',
       offering,
       options: {
         A: parseOption(optionA),
-        B: parseOption(optionB)
+        ...(optionB ? { B: parseOption(optionB) } : {})
       },
       audience_config,
       comparison_lever: (audienceRow.comparison_lever as PrimaryLever) || 'price'
@@ -323,6 +334,29 @@ export class TestRepository {
       created_at: r.created_at,
       updated_at: r.updated_at,
       status: r.status
+    }));
+  }
+
+  /**
+   * List product-linked tests owned by one founder. This intentionally omits
+   * feedback tokens and leaves unclaimed legacy tests out of account views.
+   */
+  static listByOwner(ownerId: string): Array<Omit<Test, 'feedback_token'> & { product_id: string }> {
+    const rows = getDatabase().prepare(`
+      SELECT t.id, t.title, t.domain_id, t.created_at, t.updated_at, t.status, t.product_id
+      FROM tests t
+      JOIN products p ON p.id = t.product_id
+      WHERE p.owner_id = ?
+      ORDER BY t.updated_at DESC
+    `).all(ownerId) as any[];
+    return rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      domain_id: row.domain_id,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      status: row.status,
+      product_id: row.product_id
     }));
   }
 
@@ -517,20 +551,45 @@ export class TestRepository {
   /**
    * Create a new simulation run
    */
-  static createRun(testId: string, primaryLever: PrimaryLever, profileSeed: number, modelId?: string): Run {
+  static createRun(
+    testId: string, 
+    primaryLever: PrimaryLever, 
+    profileSeed: number, 
+    modelId?: string,
+    mode?: 'single' | 'comparison',
+    researchStatus: 'without_research' | 'completed' | 'no_matches' | 'failed' | 'skipped' = 'without_research',
+    references: any[] = []
+  ): Run {
     const db = getDatabase();
     const id = uuidv4();
     const now = new Date().toISOString();
+    const fullTest = this.getById(testId);
+    const resolvedMode = mode || fullTest?.mode || (fullTest?.options?.B ? 'comparison' : 'single');
+    const expectedEvals = resolvedMode === 'comparison' ? 100 : 50;
 
     const stmt = db.prepare(`
       INSERT INTO runs (
         id, test_id, status, primary_lever, profile_seed, model_id,
-        created_at, total_evaluations_expected, total_evaluations_completed
+        mode, created_at, total_evaluations_expected, total_evaluations_completed
       )
-      VALUES (?, ?, 'running', ?, ?, ?, ?, 100, 0)
+      VALUES (?, ?, 'running', ?, ?, ?, ?, ?, ?, 0)
     `);
-    stmt.run(id, testId, primaryLever, profileSeed, modelId || null, now);
-    db.prepare('UPDATE runs SET snapshot = ? WHERE id = ?').run(JSON.stringify({ test: this.getById(testId), profiles: this.getProfiles(testId) }), id);
+    stmt.run(id, testId, primaryLever, profileSeed, modelId || null, resolvedMode, now, expectedEvals);
+    
+    const profiles = this.getProfiles(testId);
+    const selectedRefs = (references || []).filter(r => r.selected !== false).slice(0, 5);
+    const selectedRefIds = selectedRefs.map(r => r.id);
+    
+    const snapshot = {
+      mode: resolvedMode,
+      product_id: fullTest?.product_id,
+      research_status: researchStatus,
+      test: fullTest,
+      profiles,
+      references: selectedRefs,
+      selected_reference_ids: selectedRefIds
+    };
+    db.prepare('UPDATE runs SET snapshot = ? WHERE id = ?').run(JSON.stringify(snapshot), id);
 
     return {
       id,
@@ -540,8 +599,10 @@ export class TestRepository {
       profile_seed: profileSeed,
       model_id: modelId,
       created_at: now,
-      total_evaluations_expected: 100,
-      total_evaluations_completed: 0
+      total_evaluations_expected: expectedEvals,
+      total_evaluations_completed: 0,
+      mode: resolvedMode,
+      research_status: researchStatus
     };
   }
 
@@ -586,6 +647,8 @@ export class TestRepository {
     const row = db.prepare('SELECT * FROM runs WHERE id = ?').get(runId) as any;
     if (!row) return null;
 
+    const snapshot = row.snapshot ? JSON.parse(row.snapshot) : null;
+
     return {
       id: row.id,
       test_id: row.test_id,
@@ -597,7 +660,9 @@ export class TestRepository {
       completed_at: row.completed_at || undefined,
       total_evaluations_expected: row.total_evaluations_expected,
       total_evaluations_completed: row.total_evaluations_completed,
-      error_message: row.error_message || undefined
+      error_message: row.error_message || undefined,
+      mode: (row.mode as any) || snapshot?.mode || 'single',
+      research_status: snapshot?.research_status || 'without_research'
     };
   }
 
@@ -609,6 +674,8 @@ export class TestRepository {
     const row = db.prepare('SELECT * FROM runs WHERE test_id = ? ORDER BY created_at DESC LIMIT 1').get(testId) as any;
     if (!row) return null;
 
+    const snapshot = row.snapshot ? JSON.parse(row.snapshot) : null;
+
     return {
       id: row.id,
       test_id: row.test_id,
@@ -620,8 +687,20 @@ export class TestRepository {
       completed_at: row.completed_at || undefined,
       total_evaluations_expected: row.total_evaluations_expected,
       total_evaluations_completed: row.total_evaluations_completed,
-      error_message: row.error_message || undefined
+      error_message: row.error_message || undefined,
+      mode: (row.mode as any) || snapshot?.mode || 'single',
+      research_status: snapshot?.research_status || 'without_research'
     };
+  }
+
+  /**
+   * Find test draft linked to a product ID
+   */
+  static findTestByProductId(productId: string): FullTestResponse | null {
+    const db = getDatabase();
+    const row = db.prepare('SELECT id FROM tests WHERE product_id = ? ORDER BY updated_at DESC LIMIT 1').get(productId) as { id: string } | undefined;
+    if (!row) return null;
+    return this.getById(row.id);
   }
 
   /**
@@ -634,9 +713,9 @@ export class TestRepository {
     const insertStmt = db.prepare(`
       INSERT INTO evaluations (
         id, run_id, test_id, profile_id, option_id, access_status,
-        response, reason, primary_objection, factor_tags, referenced_fields, created_at
+        response, reason, primary_objection, factor_tags, referenced_fields, source_ids, created_at
       )
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE NOT EXISTS (SELECT 1 FROM evaluations WHERE run_id = ? AND profile_id = ? AND option_id = ?)
     `);
 
@@ -651,11 +730,12 @@ export class TestRepository {
           ev.option_id,
           ev.access_status,
           ev.response,
-          ev.reason,
+          ev.reason || '',
           ev.primary_objection || null,
-          JSON.stringify(ev.factor_tags),
-          JSON.stringify(ev.referenced_fields),
-          ev.created_at,
+          JSON.stringify(ev.factor_tags || ['other']),
+          JSON.stringify(ev.referenced_fields || ['price']),
+          JSON.stringify(ev.source_ids || []),
+          ev.created_at || new Date().toISOString(),
           ev.run_id, ev.profile_id, ev.option_id
         );
       }
@@ -685,6 +765,7 @@ export class TestRepository {
       primary_objection: r.primary_objection || undefined,
       factor_tags: JSON.parse(r.factor_tags || '[]'),
       referenced_fields: JSON.parse(r.referenced_fields || '[]'),
+      source_ids: JSON.parse(r.source_ids || '[]'),
       created_at: r.created_at
     }));
   }
@@ -693,6 +774,8 @@ export class TestRepository {
    * Check which evaluations are missing for a run
    */
   static getMissingEvaluations(runId: string, testId: string): { option_a_missing: string[]; option_b_missing: string[] } {
+    const run = this.getRunById(runId);
+    const isComparison = run?.mode === 'comparison';
     const existing = this.getEvaluationsByRunId(runId);
     const existingA = new Set(existing.filter(e => e.option_id === 'A').map(e => e.profile_id));
     const existingB = new Set(existing.filter(e => e.option_id === 'B').map(e => e.profile_id));
@@ -703,7 +786,7 @@ export class TestRepository {
 
     for (const p of profiles) {
       if (!existingA.has(p.id)) missingA.push(p.id);
-      if (!existingB.has(p.id)) missingB.push(p.id);
+      if (isComparison && !existingB.has(p.id)) missingB.push(p.id);
     }
 
     return {
@@ -712,7 +795,16 @@ export class TestRepository {
     };
   }
 
-  static getRunSnapshot(runId: string): { test: FullTestResponse; profiles: Profile[] } | null {
+  static getRunSnapshot(runId: string): { 
+    mode?: string; 
+    product_id?: string; 
+    research_status?: string; 
+    test: FullTestResponse; 
+    profiles: Profile[];
+    references?: CompetitorReference[];
+    selected_reference_ids?: string[];
+    reference_summary?: string;
+  } | null {
     const row = getDatabase().prepare('SELECT snapshot FROM runs WHERE id = ?').get(runId) as { snapshot?: string } | undefined;
     return row?.snapshot ? JSON.parse(row.snapshot) : null;
   }

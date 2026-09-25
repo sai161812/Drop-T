@@ -31,18 +31,18 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
   const [stage, setStage] = useState<ProductStage>('preparing_to_launch');
   const [summary, setSummary] = useState('');
   const [intendedBuyer, setIntendedBuyer] = useState('');
-  const [feedbackQuestion, setFeedbackQuestion] = useState('What should we change before launch?');
+  const [feedbackQuestion, setFeedbackQuestion] = useState('');
   
   // Price & Currency
   const [priceNotSet, setPriceNotSet] = useState(false);
-  const [price, setPrice] = useState<number | ''>(699);
+  const [price, setPrice] = useState<number | ''>('');
   const [currency, setCurrency] = useState('INR');
 
   // Availability & Delivery
   const [marketsNotDecided, setMarketsNotDecided] = useState(false);
-  const [marketInput, setMarketInput] = useState('Koramangala, Indiranagar, Whitefield, HSR Layout');
+  const [marketInput, setMarketInput] = useState('');
   const [fulfillmentNotDecided, setFulfillmentNotDecided] = useState(false);
-  const [fulfillmentMode, setFulfillmentMode] = useState('Standard postal shipping');
+  const [fulfillmentMode, setFulfillmentMode] = useState('');
 
   // Images
   const [images, setImages] = useState<ImageMetadata[]>([]);
@@ -50,22 +50,25 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
 
   // Category specific data
   // Clothing
-  const [clothingMaterial, setClothingMaterial] = useState('100% Organic Flax Linen');
-  const [clothingFit, setClothingFit] = useState('Relaxed Regular Fit');
-  const [clothingSizes, setClothingSizes] = useState('S, M, L, XL');
+  const [clothingMaterial, setClothingMaterial] = useState('');
+  const [clothingFit, setClothingFit] = useState('');
+  const [clothingSizes, setClothingSizes] = useState('');
 
   // Food
-  const [foodPortion, setFoodPortion] = useState('750g baked weight');
-  const [foodIngredients, setFoodIngredients] = useState('Stoneground wheat flour, water, sea salt');
-  const [foodMode, setFoodMode] = useState('Morning local delivery');
+  const [foodPortion, setFoodPortion] = useState('');
+  const [foodIngredients, setFoodIngredients] = useState('');
+  const [foodMode, setFoodMode] = useState('');
 
   // Digital
-  const [digitalPlatform, setDigitalPlatform] = useState('Web (Cloud)');
-  const [digitalLanguage, setDigitalLanguage] = useState('TypeScript / React');
-  const [digitalUseCase, setDigitalUseCase] = useState('Early launch decision simulation');
+  const [digitalPlatform, setDigitalPlatform] = useState('');
+  const [digitalLanguage, setDigitalLanguage] = useState('');
+  const [digitalUseCase, setDigitalUseCase] = useState('');
+  const [digitalPricingType, setDigitalPricingType] = useState<'one_time' | 'subscription' | 'not_decided'>('not_decided');
+  const [legacyPlatformLanguage, setLegacyPlatformLanguage] = useState('');
 
   // Other
   const [otherSpecs, setOtherSpecs] = useState('');
+  const [visualDescription, setVisualDescription] = useState('');
 
   // UI status
   const [isLoading, setIsLoading] = useState(false);
@@ -79,6 +82,12 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
 
     const loadProduct = async () => {
       setIsLoading(true);
+      setName(''); setCategory('clothing_accessories'); setStage('preparing_to_launch'); setSummary('');
+      setIntendedBuyer(''); setFeedbackQuestion(''); setPriceNotSet(false); setPrice('');
+      setMarketsNotDecided(false); setMarketInput(''); setFulfillmentNotDecided(false); setFulfillmentMode('');
+      setImages([]); setClothingMaterial(''); setClothingFit(''); setClothingSizes('');
+      setFoodPortion(''); setFoodIngredients(''); setFoodMode(''); setDigitalPlatform('');
+      setDigitalLanguage(''); setDigitalUseCase(''); setDigitalPricingType('not_decided'); setLegacyPlatformLanguage(''); setOtherSpecs(''); setVisualDescription('');
       try {
         const res = await fetch(`/api/products/${editProductId}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
@@ -121,15 +130,20 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
         setImages(p.images || []);
 
         if (p.category_data) {
-          if (p.category_data.material) setClothingMaterial(p.category_data.material);
-          if (p.category_data.fit) setClothingFit(p.category_data.fit);
-          if (p.category_data.sizes) setClothingSizes(Array.isArray(p.category_data.sizes) ? p.category_data.sizes.join(', ') : p.category_data.sizes);
-          if (p.category_data.portion) setFoodPortion(p.category_data.portion);
-          if (p.category_data.ingredients_allergens) setFoodIngredients(p.category_data.ingredients_allergens);
-          if (p.category_data.pickup_delivery_mode) setFoodMode(p.category_data.pickup_delivery_mode);
-          if (p.category_data.platform_language) setDigitalPlatform(p.category_data.platform_language);
-          if (p.category_data.core_use_case) setDigitalUseCase(p.category_data.core_use_case);
-          if (p.category_data.specs) setOtherSpecs(p.category_data.specs);
+          if (p.category_data.material) setClothingMaterial(p.category_data.material === 'not_decided' ? '' : p.category_data.material);
+          if (p.category_data.fit) setClothingFit(p.category_data.fit === 'not_decided' ? '' : p.category_data.fit);
+          if (p.category_data.sizes) setClothingSizes(p.category_data.sizes === 'not_decided' ? '' : Array.isArray(p.category_data.sizes) ? p.category_data.sizes.join(', ') : p.category_data.sizes);
+          if (p.category_data.portion) setFoodPortion(p.category_data.portion === 'not_decided' ? '' : p.category_data.portion);
+          if (p.category_data.ingredients_allergens) setFoodIngredients(p.category_data.ingredients_allergens === 'not_decided' ? '' : p.category_data.ingredients_allergens);
+          if (p.category_data.pickup_delivery_mode) setFoodMode(p.category_data.pickup_delivery_mode === 'not_decided' ? '' : p.category_data.pickup_delivery_mode);
+          if (p.category_data.platform) setDigitalPlatform(p.category_data.platform === 'not_decided' ? '' : p.category_data.platform);
+          else if (p.category_data.platform_language) setLegacyPlatformLanguage(p.category_data.platform_language);
+          if (p.category_data.language) setDigitalLanguage(p.category_data.language === 'not_decided' ? '' : p.category_data.language);
+          if (p.category_data.core_use_case) setDigitalUseCase(p.category_data.core_use_case === 'not_decided' ? '' : p.category_data.core_use_case);
+          if (['one_time', 'subscription', 'not_decided'].includes(p.category_data.pricing_type)) setDigitalPricingType(p.category_data.pricing_type);
+          if (p.category_data.specs) setOtherSpecs(p.category_data.specs === 'not_decided' ? '' : p.category_data.specs);
+          if (p.category_data.specification_text) setOtherSpecs(p.category_data.specification_text === 'not_decided' ? '' : p.category_data.specification_text);
+          if (p.category_data.visual_description) setVisualDescription(p.category_data.visual_description);
         }
       } catch (err: any) {
         setError(err.message || 'Failed to load product');
@@ -158,11 +172,11 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData
       });
       if (!res.ok) throw new Error('Image upload failed. Size limit is 5MB.');
       const meta: ImageMetadata = await res.json();
-      meta.confirmed_visual_description = meta.confirmed_visual_description || name || 'Product image';
       setImages(prev => [...prev, meta]);
     } catch (err: any) {
       alert(err.message || 'Failed to upload image');
@@ -186,27 +200,31 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
     if (category === 'clothing_accessories') {
       categoryData = {
         item_type: 'Apparel',
-        material: clothingMaterial.trim() || 'Not decided yet',
-        fit: clothingFit.trim() || 'Not decided yet',
-        sizes: clothingSizes.split(',').map(s => s.trim()).filter(Boolean)
+          material: clothingMaterial.trim() || 'not_decided',
+          fit: clothingFit.trim() || 'not_decided',
+          sizes: clothingSizes.trim() ? clothingSizes.split(',').map(s => s.trim()).filter(Boolean) : 'not_decided'
       };
     } else if (category === 'local_food_beverages') {
       categoryData = {
         item_name: name,
-        portion: foodPortion.trim() || 'Not decided yet',
-        ingredients_allergens: foodIngredients.trim() || 'Not decided yet',
-        pickup_delivery_mode: foodMode.trim() || 'Not decided yet'
+        portion: foodPortion.trim() || 'not_decided',
+        ingredients_allergens: foodIngredients.trim() || 'not_decided',
+        pickup_delivery_mode: foodMode.trim() || 'not_decided'
       };
     } else if (category === 'digital_products_services') {
       categoryData = {
-        platform_language: `${digitalPlatform.trim()} / ${digitalLanguage.trim()}` || 'Not decided yet',
-        core_use_case: digitalUseCase.trim() || 'Not decided yet'
+        ...(legacyPlatformLanguage && !digitalPlatform.trim() && !digitalLanguage.trim()
+          ? { platform_language: legacyPlatformLanguage }
+          : { platform: digitalPlatform.trim() || 'not_decided', language: digitalLanguage.trim() || 'not_decided' }),
+        core_use_case: digitalUseCase.trim() || 'not_decided',
+        pricing_type: digitalPricingType
       };
     } else {
       categoryData = {
-        specs: otherSpecs.trim() || 'Not decided yet'
+        specification_text: otherSpecs.trim() || 'not_decided'
       };
     }
+    if (visualDescription.trim()) categoryData.visual_description = visualDescription.trim();
 
     const markets = marketsNotDecided 
       ? 'not_decided' 
@@ -520,6 +538,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
             <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '6px' }}>
               4. Category Details ({category.replace(/_/g, ' ')})
             </h3>
+            <p className="form-help">Enter each known fact. A blank category field is saved explicitly as “Not decided yet”; it is not treated as a known product fact.</p>
 
             {category === 'clothing_accessories' && (
               <>
@@ -609,7 +628,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Language / Framework</label>
+                    <label className="form-label">Language</label>
                     <input
                       type="text"
                       className="form-input"
@@ -629,6 +648,15 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     />
                   </div>
                 </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="digital-pricing-type">Billing type</label>
+                  <select id="digital-pricing-type" className="form-select" value={digitalPricingType} onChange={e => setDigitalPricingType(e.target.value as 'one_time' | 'subscription' | 'not_decided')}>
+                    <option value="not_decided">Not decided yet</option>
+                    <option value="one_time">One-time purchase</option>
+                    <option value="subscription">Subscription</option>
+                  </select>
+                  {digitalPricingType === 'subscription' && <span className="form-help">Synthetic Lab finance will use the explicitly selected first operating period.</span>}
+                </div>
               </>
             )}
 
@@ -644,6 +672,19 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                 />
               </div>
             )}
+          </div>
+
+          {/* 5. Product Images */}
+          <div className="form-group">
+            <label className="form-label" htmlFor="visual-description">Visual / functional description (required if no image)</label>
+            <textarea
+              id="visual-description"
+              className="form-textarea"
+              rows={2}
+              placeholder="Describe what someone would see or how the product works. This is founder-supplied, not image analysis."
+              value={visualDescription}
+              onChange={e => setVisualDescription(e.target.value)}
+            />
           </div>
 
           {/* 5. Product Images */}

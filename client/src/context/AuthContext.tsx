@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { PublicUser, SignUpPayload, SignInPayload } from '@droptest/shared';
+import { DEMO_PASSWORD } from '@droptest/shared';
 
 interface AuthContextType {
   user: PublicUser | null;
@@ -8,7 +9,7 @@ interface AuthContextType {
   signIn: (payload: SignInPayload) => Promise<{ success: boolean; error?: string }>;
   signUp: (payload: SignUpPayload) => Promise<{ success: boolean; error?: string; issues?: any[] }>;
   signOut: () => Promise<void>;
-  quickDemoLogin: (email: string) => Promise<void>;
+  quickDemoLogin: (email: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -110,8 +111,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const quickDemoLogin = async (email: string): Promise<void> => {
-    await signIn({ email, password: 'password123' });
+  const quickDemoLogin = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    return signIn({ email, password: DEMO_PASSWORD });
   };
 
   return (

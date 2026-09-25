@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
 import { UserRole } from '@droptest/shared';
+import { DEMO_ACCOUNTS } from '@droptest/shared';
 import { X, Sparkles, User, Briefcase, Rocket, LogIn, UserPlus } from 'lucide-react';
 
 interface AuthModalProps {
@@ -72,8 +73,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError(null);
     setIsSubmitting(true);
     try {
-      await quickDemoLogin(demoEmail);
-      onClose();
+      const result = await quickDemoLogin(demoEmail);
+      if (result.success) onClose();
+      else setError(result.error || 'Quick login failed');
     } catch (err: any) {
       setError(err.message || 'Quick login failed');
     } finally {
@@ -292,13 +294,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Startup Short Description</label>
+                      <label className="form-label">Startup Short Description *</label>
                       <textarea
                         className="form-textarea"
                         rows={2}
                         placeholder="What problem does your startup solve?"
                         value={startupDesc}
                         onChange={e => setStartupDesc(e.target.value)}
+                        required
                       />
                     </div>
                   </>
@@ -356,11 +359,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+              {DEMO_ACCOUNTS.map(account => (
+                <button
+                  key={account.email}
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '11px', padding: '5px 8px', justifyContent: 'flex-start' }}
+                  onClick={() => handleQuickLogin(account.email)}
+                  disabled={isSubmitting}
+                >
+                  {account.button_label}
+                </button>
+              ))}
+              <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                Demo password: {DEMO_ACCOUNTS[0].password}
+              </div>
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: '11px', padding: '5px 8px', justifyContent: 'flex-start' }}
-                onClick={() => handleQuickLogin('founder@ecothreads.in')}
+                style={{ display: 'none' }}
+                onClick={() => handleQuickLogin(DEMO_ACCOUNTS[0].email)}
                 disabled={isSubmitting}
               >
                 🚀 Aarav (Apparel Startup)
@@ -368,8 +386,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: '11px', padding: '5px 8px', justifyContent: 'flex-start' }}
-                onClick={() => handleQuickLogin('founder@artisanbake.in')}
+                style={{ display: 'none' }}
+                onClick={() => handleQuickLogin(DEMO_ACCOUNTS[1].email)}
                 disabled={isSubmitting}
               >
                 🥖 Maya (Food Startup)
@@ -377,8 +395,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: '11px', padding: '5px 8px', justifyContent: 'flex-start' }}
-                onClick={() => handleQuickLogin('sponsor@indiagrowth.vc')}
+                style={{ display: 'none' }}
+                onClick={() => handleQuickLogin(DEMO_ACCOUNTS[2].email)}
                 disabled={isSubmitting}
               >
                 💼 Vikram (Sponsor)
@@ -386,8 +404,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: '11px', padding: '5px 8px', justifyContent: 'flex-start' }}
-                onClick={() => handleQuickLogin('riya@gmail.com')}
+                style={{ display: 'none' }}
+                onClick={() => handleQuickLogin(DEMO_ACCOUNTS[3].email)}
                 disabled={isSubmitting}
               >
                 🛍️ Riya (Shopper)

@@ -20,7 +20,7 @@ interface MyProductsPageProps {
   onOpenProduct: (productId: string) => void;
   onEditProduct: (productId: string) => void;
   onNavigateToPublish: () => void;
-  onOpenSyntheticLab: (productId: string) => void;
+  onOpenSyntheticLab: (productId: string, review?: 'resume' | 'new') => void;
 }
 
 export const MyProductsPage: React.FC<MyProductsPageProps> = ({
@@ -249,6 +249,14 @@ export const MyProductsPage: React.FC<MyProductsPageProps> = ({
                     onClick={() => onOpenSyntheticLab(p.id)}
                   >
                     <FlaskConical size={13} /> Synthetic Lab
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: '12px', padding: '6px 10px' }}
+                    onClick={() => onOpenSyntheticLab(p.id, 'new')}
+                  >
+                    New review from current product
                   </button>
                 </div>
               </div>
