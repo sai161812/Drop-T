@@ -9,7 +9,8 @@ import {
   FullTestResponse,
   PrimaryLever,
   HumanResponse,
-  HumanChoice
+  HumanChoice,
+  Profile
 } from '@droptest/shared';
 
 export class TestRepository {
@@ -358,4 +359,80 @@ export class TestRepository {
       responses
     };
   }
+
+  /**
+   * Save or replace 50 generated profiles for a test
+   */
+  static saveProfiles(testId: string, profiles: Profile[]): Profile[] {
+    const db = getDatabase();
+    
+    // Begin transaction
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      // Delete existing profiles for this test
+      db.prepare('DELETE FROM profiles WHERE test_id = ?').run(testId);
+
+      const insertStmt = db.prepare(`
+        INSERT INTO profiles (
+          id, test_id, segment, market, budget_min, budget_max,
+          use_case, constraints, priorities, access_mode, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const p of profiles) {
+        insertStmt.run(
+          p.id,
+          testId,
+          p.segment,
+          p.market,
+          p.budget_min,
+          p.budget_max,
+          p.use_case,
+          JSON.stringify(p.constraints),
+          JSON.stringify(p.priorities),
+          p.access_mode,
+          p.created_at
+        );
+      }
+
+      db.exec('COMMIT;');
+      return this.getProfiles(testId);
+    } catch (err) {
+      db.exec('ROLLBACK;');
+      throw err;
+    }
+  }
+
+  /**
+   * Get all 50 profiles for a test
+   */
+  static getProfiles(testId: string): Profile[] {
+    const db = getDatabase();
+    const rows = db.prepare('SELECT * FROM profiles WHERE test_id = ? ORDER BY id ASC').all(testId) as any[];
+
+    return rows.map(r => ({
+      id: r.id,
+      test_id: r.test_id,
+      segment: r.segment,
+      market: r.market,
+      budget_min: r.budget_min,
+      budget_max: r.budget_max,
+      use_case: r.use_case,
+      constraints: JSON.parse(r.constraints || '[]'),
+      priorities: JSON.parse(r.priorities || '[]'),
+      access_mode: r.access_mode,
+      created_at: r.created_at
+    }));
+  }
+
+  /**
+   * Delete profiles for a test
+   */
+  static deleteProfiles(testId: string): boolean {
+    const db = getDatabase();
+    const result = db.prepare('DELETE FROM profiles WHERE test_id = ?').run(testId);
+    return result.changes > 0;
+  }
 }
+

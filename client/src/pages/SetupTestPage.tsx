@@ -13,6 +13,7 @@ import { OfferingForm } from '../components/SetupTest/OfferingForm.js';
 import { AlternativeBForm, OptionAData, OptionBData } from '../components/SetupTest/AlternativeBForm.js';
 import { FinancialsForm } from '../components/SetupTest/FinancialsForm.js';
 import { AssumptionSummary } from '../components/SetupTest/AssumptionSummary.js';
+import { ProfileReviewPanel } from '../components/SetupTest/ProfileReviewPanel.js';
 import { DOMAIN_PRESETS, BLANK_PRESET } from '../config/templates.js';
 import { RotateCcw, Sparkles, FolderOpen } from 'lucide-react';
 
@@ -515,6 +516,20 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           onChangeCentralUnits={setCentralUnits}
           higherUnits={higherUnits}
           onChangeHigherUnits={setHigherUnits}
+        />
+
+        {/* Step 6: 50-Profile Panel & Deterministic Eligibility Review */}
+        <ProfileReviewPanel
+          testId={testId}
+          domainId={domainId}
+          intendedBuyer={intendedBuyer}
+          adjacentBuyer={adjacentBuyer}
+          expectedSpendMin={expectedSpendMin}
+          expectedSpendMax={expectedSpendMax}
+          audienceMarkets={audienceMarkets}
+          currency={currency}
+          optionA={{ name: optionA.name, served_markets: optionA.served_markets }}
+          optionB={{ name: optionB.name, served_markets: optionB.served_markets }}
         />
       </div>
 

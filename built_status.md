@@ -12,7 +12,7 @@
 - **Stack:**
   - **Frontend:** Vite + React 19 + TypeScript + Custom CSS Tokens (Desktop Research Workbench).
   - **Backend:** Express + TypeScript + Node 24 native built-in `node:sqlite`.
-  - **Shared Layer:** Domain models, TypeScript interfaces, Zod runtime validation schemas, deterministic finance engine.
+  - **Shared Layer:** Domain models, TypeScript interfaces, Zod runtime validation schemas, deterministic finance engine, deterministic eligibility engine.
   - **AI Integration (Server-Only):** Groq SDK configured via server `.env` (zero client-side exposure).
 
 ---
@@ -25,49 +25,55 @@
   - Initial scaffolding, locked domain contracts, SQLite migrations, Zod validation schemas, deterministic finance engine, base test suites.
 
 ### Phase 1: "Set up test" Screen & Durable Draft Persistence
+- **Status:** `COMPLETED & VERIFIED` (Local commit: `c23f012`)
+- **Deliverables:**
+  - First-fold guidance banner, saved drafts switcher, quick starter presets (Apparel, Food, Digital SaaS).
+  - Domain-tailored forms for clothing, food, and digital products.
+  - 0–3 local image uploads with thumbnail preview, size checks, accessible deletion, and confirmed visual descriptions.
+  - Audience & location configuration with character trackers, expected spend bounds, and 1–4 audience markets.
+  - Option B single-lever comparison and A &rarr; B diff engine (`price`, `message`, `served_markets`, `creative`).
+  - Deterministic finance scenario calculator (PRD Section 8) with break-even $\lceil F / (P - C) \rceil$ and net calculations.
+  - 35% sticky assumption sidebar and validation readiness gate.
+
+### Phase 2: 50-Profile Builder, Deterministic Eligibility Engine & UI Review Panel
 - **Status:** `COMPLETED & VERIFIED`
 - **Key Deliverables:**
-  1. **First Fold Guidance & Research Hierarchy**:
-     - Concise guidance banner explaining the 5 intake steps and the 50-persona simulated panel.
-     - Saved Drafts Switcher dropdown with durable rehydration from SQLite.
-     - Quick Starter Presets bar: one-click loading for Apparel, Food & Beverage, Digital SaaS, and Clear Form.
-  2. **Domain-Tailored Intake Forms**:
-     - `clothing_accessories`: Item type, material composition, sizes, unit production cost, shipping details.
-     - `local_food_beverages`: Item name, portion size, ingredients/allergens, pickup/delivery mode, availability window, unit preparation cost.
-     - `digital_products_services`: Core use case, platform & language compatibility, pricing model (one-time vs recurring subscription for first-period calculation), support availability.
-     - Displays strictly relevant tailored fields per selected domain.
-  3. **0–3 Image / Screenshot Management**:
-     - Local multipart uploads via `/api/upload` (and deletion via `/api/upload/:filename`).
-     - Image cards with formatted file sizes (KB/MB), thumbnail preview, accessible removal button (`aria-label="Remove image"`).
-     - Confirmed visual description textarea for each image with honest disclaimer: *"Image attached; describe what it shows for the simulation."*
-     - Enforced mandatory confirmed description when the creative lever is selected.
-  4. **Audience & Location Configuration**:
-     - Character count trackers on Intended (20 personas) and Adjacent (20 personas) buyer descriptions.
-     - Expected spend range min and max with validation ($min \le max$).
-     - 1–4 user-named audience markets with inline add/remove controls.
-  5. **Option B Alternative & Single-Lever Diff Engine**:
-     - Lever selector: `price`, `message`, `served_markets`, `creative`.
-     - Exact A &rarr; B diff summary banner displaying all changed fields.
-     - Linked cost change detector (discloses any per-sale unit cost variance as an explicit finance change).
-     - Option B image uploads and confirmed visual descriptions when testing creative.
-  6. **Deterministic Financial Scenarios (PRD Section 8)**:
-     - Fixed launch cost, variable cost per sale, capacity ceiling, accounting period.
-     - 3 user-entered unit scenarios (lower, central, higher).
-     - Real-time break-even units $\lceil F / (P - C) \rceil$ and net scenario calculation.
-     - Explicit missing-field disclosures when cost inputs are omitted.
-  7. **Assumption Summary & Simulation Readiness Gate**:
-     - 20/20/10 visual segment bar with exact counts (20 intended / 20 adjacent / 10 contrasting).
-     - Reachable market coverage breakdown (Option A vs Option B).
-     - Missing requirements checklist; Run button disabled with explicit reason until all mandatory fields are valid.
-  8. **Responsive 1440px & 390px Styling**:
-     - Desktop (1440px): 2-column research workbench with sticky assumption sidebar.
-     - Mobile (390px): Single-column task order, $\ge 44\text{px}$ touch targets, zero horizontal overflow.
-  9. **Backend Draft CRUD APIs**:
-     - `POST /api/tests` — Save / update draft test.
-     - `GET /api/tests/:id` — Retrieve test draft by ID.
-     - `GET /api/tests` — List all saved drafts.
-     - `DELETE /api/tests/:id` — Delete saved test draft.
-     - `POST /api/upload` & `DELETE /api/upload/:filename` — Manage local images.
+  1. **Deterministic 50-Profile Builder (`server/src/simulation/profileGenerator.ts`)**:
+     - Generates exactly 50 distinct personas: **20 Intended**, **20 Adjacent**, **10 Contrasting**.
+     - Assigns stable IDs (`prof_01` .. `prof_50`) preserved across Option A, Option B, and re-evaluations.
+     - Uses deterministic PRNG (`Mulberry32`) with configurable integer seed.
+     - Enforces budget bands derived strictly from `expected_spend_min` & `expected_spend_max`, completely independent of candidate prices $P_A$ or $P_B$.
+     - Rich domain traits matrix for Clothing & Accessories, Local Food & Beverages, and Digital Products & Services.
+     - Stratified market allocation across the user's 1–4 configured audience markets.
+     - Stride-based co-prime assembly and combinatorial collision avoidance ensuring 100% attribute combination uniqueness across use cases, constraints, priorities, and markets.
+     - Avoids names, photos, and demographic stereotypes (focuses purely on use case, constraints, priorities, purchasing context, market, budget).
+  2. **Deterministic Eligibility Engine (`shared/src/eligibility.ts`)**:
+     - `evaluateEligibility(profile, option)`: Computes access status (`served` vs `unserved`).
+     - Strictly marks unserved markets as `unavailable` with an explicit reason string (e.g. `Market "Chennai Central" is outside "Option B" served markets (Bangalore Urban)`).
+     - No LLM model calls or heuristic overrides permitted for unserved markets.
+     - `calculatePanelEligibilityStats(profiles, option)`: Calculates eligible/unserved counts across segments and markets.
+     - Transitioning an unserved market to served across options directly moves profiles to evaluation while keeping profile IDs and attributes identical.
+  3. **Database & Repository Persistence (`server/src/db/testRepository.ts`)**:
+     - `saveProfiles(testId, profiles)`: Atomically saves/replaces the 50 profiles in SQLite `profiles` table within a transaction.
+     - `getProfiles(testId)`: Retrieves saved profiles ordered by `id ASC`.
+     - `deleteProfiles(testId)`: Cascading profile deletion.
+  4. **Server API Routes (`server/src/routes/testRoutes.ts`)**:
+     - `POST /api/tests/preview-panel` — In-memory 50-profile preview with Option A/B eligibility and stats.
+     - `GET /api/tests/:id/panel` — Retrieves saved panel profiles and computes Option A/B stats (generates & saves on first request if absent).
+     - `POST /api/tests/:id/panel/generate` — Regenerates panel profiles with a new seed and persists to database.
+  5. **UI Review Panel Component (`client/src/components/SetupTest/ProfileReviewPanel.tsx`)**:
+     - Embedded in `SetupTestPage.tsx` below the intake forms.
+     - Visual 20/20/10 segment bar with exact counts.
+     - Audience market allocation breakdown badges.
+     - Option A vs Option B served coverage metrics and unserved counts.
+     - "Regenerate Panel" button (re-rolls seed and re-generates unique personas).
+     - Filter controls: segment tabs ("All 50", "Intended 20", "Adjacent 20", "Contrasting 10"), market dropdown, and keyword search.
+     - Inspectable 50-row persona table with Option A & Option B access badges and explicit unserved reason tooltips.
+     - Expandable persona inspection card detailing use cases, purchasing constraints, priorities, and access channels.
+     - Explicit panel lock disclaimer: *"When a simulation run begins, these exact 50 profiles are frozen with identical IDs and traits across both options."*
+  6. **Automated Test Suite (`server/test/profileGenerator.test.ts`)**:
+     - 14 automated tests passing across `@droptest/shared` and `@droptest/server`.
+     - Verifies 50 profile count, 20/20/10 split, stable IDs, budget independence, deterministic coverage transitions, attribute uniqueness, and domain drafts (Clothing, Food, SaaS).
 
 ---
 
@@ -86,25 +92,29 @@ DROP-T/
 │   │   ├── types.ts           # Domain entities, enums, interfaces
 │   │   ├── validation.ts      # Zod runtime validation schemas
 │   │   ├── finance.ts         # Deterministic financial scenario engine
+│   │   ├── eligibility.ts     # Deterministic access status & panel stats engine
 │   │   └── index.ts           # Exports
 │   └── test/
-│       └── shared.test.ts     # Unit tests for contracts, splits, and math
+│       └── shared.test.ts     # Unit tests for contracts, splits, math, and eligibility
 │
 ├── server/                    # Express + SQLite Backend
 │   ├── src/
 │   │   ├── config.ts          # Server-only env & Groq model configuration
+│   │   ├── simulation/
+│   │   │   └── profileGenerator.ts # 50-profile generator & domain traits matrix
 │   │   ├── db/
 │   │   │   ├── database.ts    # SQLite DatabaseSync connection wrapper
 │   │   │   ├── migrations.ts  # DDL schema definitions & migrations
-│   │   │   └── testRepository.ts # SQL queries for test drafts & feedback
+│   │   │   └── testRepository.ts # SQL queries for test drafts, profiles & feedback
 │   │   ├── routes/
-│   │   │   ├── testRoutes.ts  # Test CRUD endpoints (GET, POST, DELETE)
+│   │   │   ├── testRoutes.ts  # Test CRUD & panel generation endpoints
 │   │   │   ├── uploadRoutes.ts# Multer file upload & delete endpoints
 │   │   │   └── feedbackRoutes.ts # Public feedback submission & stats
 │   │   ├── app.ts             # Express application setup & middleware
 │   │   └── index.ts           # Server entrypoint (Port 3001)
 │   └── test/
-│       └── server.test.ts     # In-memory SQLite API & repository tests
+│       ├── server.test.ts     # In-memory SQLite API & repository tests
+│       └── profileGenerator.test.ts # 50-profile generator & eligibility tests
 │
 └── client/                    # Vite + React 19 Frontend
     ├── src/
@@ -120,6 +130,7 @@ DROP-T/
     │   │       ├── OfferingForm.tsx         # Baseline A & domain-specific fields
     │   │       ├── AlternativeBForm.tsx     # Option B diff & comparison lever
     │   │       ├── FinancialsForm.tsx       # Fixed/variable costs & scenarios
+    │   │       ├── ProfileReviewPanel.tsx   # 50-persona preview & eligibility review
     │   │       └── AssumptionSummary.tsx    # 35% sticky assumption sidebar
     │   ├── pages/
     │   │   ├── SetupTestPage.tsx            # Complete interactive workbench
@@ -142,7 +153,7 @@ DROP-T/
 # 1. Install dependencies across all workspaces
 npm install
 
-# 2. Run all unit and database tests (8 passing)
+# 2. Run all unit, database, and simulation tests (14 passing)
 npm test
 
 # 3. Build all packages (shared, server, client)
@@ -154,20 +165,19 @@ npm run dev
 
 ---
 
-## 5. Next Steps for Phase 2 (Incoming Agent Handoff)
+## 5. Next Steps for Phase 3 (Incoming Agent Handoff)
 
-When starting Phase 2, implement the Simulation Engine and Results Dashboard:
-1. **Profile Generation Engine (`server/src/simulation/profileGenerator.ts`)**:
-   - Deterministic 50-persona matrix generation (20 intended, 20 adjacent, 10 contrasting) spread across configured audience markets.
-   - Assign stable IDs (`prof_01` .. `prof_50`).
-   - Store profile snapshot with the run.
-2. **Groq Evaluation Engine (`server/src/simulation/groqEvaluator.ts`)**:
-   - Evaluate Option A and Option B across the same 50 profiles in batches (5–10 per request).
-   - Deterministic access gate: unserved profiles are immediately recorded as `unavailable` with reason, without calling the LLM.
-   - Parse structured output (`interested`, `unsure`, `not_interested`) with qualitative reason and primary objection.
-   - Bounded retries on rate limits (`429`) and partial run resumption.
+When starting Phase 3, implement the LLM Simulation Runner and Results Dashboard:
+1. **Groq LLM Evaluation Engine (`server/src/simulation/groqEvaluator.ts`)**:
+   - Evaluate Option A and Option B across the frozen 50 profiles in batches (5–10 per request).
+   - Deterministic access gate: profiles in unserved markets are immediately recorded as `unavailable` with explicit coverage reasons, skipping LLM calls.
+   - For served profiles, call Groq model using structured JSON prompt (`interested`, `unsure`, `not_interested`) with qualitative reason, primary objection, factor tags, and referenced input fields.
+   - Bounded retries on rate limits (`429`) with exponential backoff and partial run resumption.
+2. **Simulation Run Controller (`server/src/routes/runRoutes.ts`)**:
+   - `POST /api/tests/:id/run` — Freeze test & profiles, initiate simulation run, execute 100 evaluations.
+   - `GET /api/tests/:id/runs/:runId` — Poll run progress (evaluations completed / 100).
 3. **Results UI (`client/src/pages/ResultsPage.tsx`)**:
    - Top decision card (best next test, key simulated observation, main objection, missing evidence).
-   - Paired A &rarr; B transition matrix.
-   - Segment & market breakdowns with visible denominators.
-   - Inspectable individual persona response drawer.
+   - Paired A &rarr; B transition matrix (e.g. Unsure &rarr; Interested, Not Interested &rarr; Unsure).
+   - Segment & market breakdowns with visible denominators ($n / 20$, $n / 50$).
+   - Inspectable persona response drawer with full reasoning and objection tags.
