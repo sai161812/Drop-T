@@ -52,26 +52,26 @@ Update the relevant row and add a dated entry to the execution log. Do not erase
 | DT-07 | P1 | IMPLEMENTED | Codex / working tree | Category-aware publish facts, explicit undecided values, availability rules and image/description checks added |
 | DT-08 | P1 | IMPLEMENTED | Codex / working tree | Unknown public price remains null; lab trial price is private and concept-only suppresses price finance |
 | DT-09 | P1 | IMPLEMENTED | Codex / working tree | Lab prefills no inferred coverage, fulfillment, audience markets, adjacent group or price-derived budgets |
-| DT-10 | P1 | OPEN | — | Search failure starts run without choice |
-| DT-11 | P1 | OPEN | — | Reference presence used as research status |
-| DT-12 | P1 | OPEN | — | REF-2 maps to first source reproduced |
-| DT-13 | P1 | OPEN | — | Empty snapshot falls back to current sources |
+| DT-10 | P1 | VERIFIED | Codex / working tree | Forced failure persists and returns Retry/Continue before zero evaluator calls; boolean skip and restore state tested |
+| DT-11 | P1 | VERIFIED | Codex / working tree | Fingerprinted attempts persist independently with linked sources and reusable no-match/completed states |
+| DT-12 | P1 | VERIFIED | Codex / working tree | Exact aliases/full IDs only; invalid citation records retry and result citations link to frozen sources |
+| DT-13 | P1 | VERIFIED | Codex / working tree | Empty source snapshots remain immutable; invalid legacy snapshots require a new review |
 | DT-14 | P1 | IMPLEMENTED | Codex / working tree | Resume and new-current-product flows separated; server persists input snapshot and research uses it |
 | DT-15 | P1 | IMPLEMENTED | Codex / working tree | Digital and generic category adapters added; seed brew equipment reclassified |
-| DT-16 | P1 | OPEN | — | B finance rendered in single mode |
-| DT-17 | P2 | OPEN | — | Lab reads legacy feedback collection |
+| DT-16 | P1 | IMPLEMENTED | Codex / working tree | Finance panel receives an optional B; single mode renders A economics and scenario results only |
+| DT-17 | P2 | IMPLEMENTED | Codex / working tree | Product-linked results load owner-authorized product feedback and keep legacy anonymous feedback separate |
 | DT-18 | P1 | IMPLEMENTED | Codex / working tree | Seed, auth metadata and quick login share the same demo identities/password |
-| DT-19 | P2 | OPEN | — | Edit query/history state not restored |
+| DT-19 | P2 | IMPLEMENTED | Codex / working tree | URL state now restores product/edit/lab/results routes, root Explore and unknown-route fallback; browser history remains unverified |
 | DT-20 | P2 | VERIFIED | Codex / working tree | Injected private fields rejected; legacy public serialization strips private fields |
 | DT-21 | P2 | IMPLEMENTED | Codex / working tree | Bounded partial lab drafts save; full run validation still rejects incomplete inputs |
 | DT-22 | P2 | IMPLEMENTED | Codex / working tree | Blank publish form defaults, edit state reset, lossless legacy digital fields and no auto-confirmed image text |
-| DT-23 | P2 | OPEN | — | Research comparison/relevance/link gaps |
-| DT-24 | P2 | OPEN | — | Missing evaluations labeled unavailable |
+| DT-23 | P2 | VERIFIED | Codex / working tree | Grounded query, URL-level dedupe, evidence comparison snapshot and clickable citations tested |
+| DT-24 | P2 | IMPLEMENTED | Codex / working tree | Coverage eligibility is derived from frozen served markets; missing responses have a separate state and are excluded from paired transitions |
 | DT-25 | P2 | IMPLEMENTED | Codex / working tree | Minor-unit persistence, supported currency precision, and legacy rounding migration regression pass |
 | DT-26 | P2 | IMPLEMENTED | Codex / working tree | Server and form require nonblank startup description |
-| DT-27 | P2 | OPEN | — | Source-level accessibility/layout gaps |
-| DT-28 | P2 | OPEN | — | Documentation differs from implementation |
-| DT-29 | P2 | OPEN | — | Feed lacks viewer saved state |
+| DT-27 | P2 | IMPLEMENTED | Codex / working tree | Explore cards use real links, forms/dialogs gain labels and keyboard semantics, focus styles and mobile-safe grid; browser/layout acceptance remains unverified |
+| DT-28 | P2 | IMPLEMENTED | Codex / working tree | README, walkthrough, build status, inventory, and env example now match actual routes/providers/test counts; live/browser limits are called out |
+| DT-29 | P2 | IMPLEMENTED | Codex / working tree | API regression covers idempotent desired-state writes, per-viewer/anonymous feed state and no-store cache; Explore browser interaction remains unverified |
 
 ## Issues, fixes and acceptance checks
 
@@ -427,6 +427,36 @@ Verification commands, exit codes, counts and evidence paths: `npm.cmd run build
 Browser/live checks actually performed: None. Client typecheck and production build passed; publish/edit controls were not browser- or keyboard-tested.
 Remaining limitations/blockers: Blank category fields are stored explicitly as `not_decided` with helper text; browser review should confirm the choice reads clearly. Legacy seed correction applies only to the recognized original brewware fixture signature, avoiding reclassification of edited records.
 Dependencies or handoff for next agent: Sequence 4 can rely on stable category, price-status, audience, and saved product-snapshot contracts; preserve those contracts.
+
+Date / agent / branch or revision: 2026-09-25 / Codex / existing working tree
+Assigned issue IDs: DT-16, DT-17, DT-24
+Status changes: OPEN -> IMPLEMENTED; production build passes. Acceptance behavior remains pending explicit focused/UI verification.
+Current reproduction and root cause: Single-mode results substituted A finance for B and rendered a false B comparison; product-linked results queried legacy anonymous test feedback instead of community feedback; absent model rows were mapped to unavailable and counted as unserved.
+Files and API/schema/migration contracts changed: Financial panel and ResultsPage now use optional B; ResultsPage loads owner-scoped community feedback by product while preserving comparison-link responses separately; shared analysis distinguishes missing evaluations, derives coverage from the saved option markets, and omits incomplete pairs from transition movement counts. Persona and breakdown views label missing responses separately.
+Verification commands, exit codes, counts and evidence paths: `npm run build` exit 0 (shared, server, client TypeScript and Vite production bundle). Tests were not run in this work package.
+Browser/live checks actually performed: None.
+Remaining limitations/blockers: DT-16/17/24 require focused regression and browser checks before VERIFIED; product feedback detail remains available only to the product owner through the existing authorized endpoint.
+Dependencies or handoff for next agent: Results can rely on explicit `missing` response and `incomplete_pairs` fields; consumers should keep unserved access separate from absent evaluations.
+
+Date / agent / branch or revision: 2026-09-25 / Codex / existing working tree
+Assigned issue IDs: DT-19, DT-27, DT-29
+Status changes: OPEN -> IMPLEMENTED for all assigned IDs; browser verification not performed.
+Current reproduction and root cause: Publish edit IDs and results/lab selections were not restored from URLs, Explore did not reliably return to its root state on history navigation, and product cards/save controls lacked complete link and viewer-specific save behavior.
+Files and API/schema/migration contracts changed: App route parsing/navigation and account-change handling; Explore feed and save UI; optional `is_saved` field in feed serialization/query with private authenticated responses marked no-store; auth/support dialog focus semantics; Navbar home keyboard control; publish field label associations; global visible focus styling.
+Verification commands, exit codes, counts and evidence paths: `npm.cmd run build` exit 0 (shared/server/client TypeScript and Vite production bundle); no tests run. Existing Vite chunk-size warning remains (>500 kB).
+Browser/live checks actually performed: None. URL refresh/back/forward, keyboard focus, 390px layout, and two-account save state remain unverified.
+Remaining limitations/blockers: DT-19/27/29 stay IMPLEMENTED pending focused regressions and browser acceptance. Auth and support dialogs implement focus entry/trapping/return and Escape, but those behaviors and responsive visuals still need browser review.
+Dependencies or handoff for next agent: Use `/results?test=ID` and `/lab?test=ID` for direct run links; personal feed state is returned only for the authenticated viewer and must remain uncacheable/shared-state-safe.
+
+Date / agent / branch or revision: 2026-09-26 / Codex / main working tree
+Assigned issue IDs: DT-28 and integrated audit DT-01 through DT-29
+Status changes: DT-28 OPEN -> IMPLEMENTED. Existing VERIFIED claims were retained only where focused checks exist; browser-dependent items remain IMPLEMENTED/UNVERIFIED rather than being promoted.
+Current reproduction and root cause: User-facing guides contained obsolete fallback/provider-cascade claims, routes, environment names, test totals and demo instructions. The final audit also found one stale analysis-test expectation that declared a winner despite increased unserved coverage; the test now asserts the intended conflict warning. Added missing DT-29 feed assertions for idempotent desired-state writes and viewer-specific state.
+Files and API/schema/migration contracts changed: README, walkthrough, built status and v2 inventory rewritten to current behavior; `.env.example` synchronized with actual config; unused `GROQ_VISION_MODEL` config removed; issues ledger and `verification_results.md` updated; analysis and saved-feed regression expectations strengthened.
+Verification commands, exit codes, counts and evidence paths: Isolated `$env:DATA_DIR='.cache/final-audit-20260926-final/data'; $env:UPLOAD_DIR='.cache/final-audit-20260926-final/uploads'; npm.cmd test` exit 0 (21 shared + 90 server = 111; 0 failed). `npm.cmd run build` exit 0 (three workspaces; Vite >500 kB chunk warning). `git diff --check` reported no whitespace errors. Read-only local HTTP checks: client 200, API health healthy, feed 71 products with boolean anonymous saved state.
+Browser/live checks actually performed: Computer-use surface returned no browsers and refused IAB/Chrome; no screenshot/keyboard/390px validation could be performed. No live Groq certification; tests use controlled provider behavior. No live search certification claimed.
+Remaining limitations/blockers: DT-14, DT-17, DT-19, DT-22, DT-27 and DT-29 require remaining browser/E2E acceptance described in `verification_results.md`; live provider status is unverified. Vite large-bundle warning remains non-blocking. `prompts_v2.md` and `bp_reference_v2.md` were not present.
+Dependencies or handoff for next agent: Before claiming fully verified, run the owner/community flow in separate browser sessions; refresh/back/forward edit/lab/results routes; exercise sign-in, publish/edit, save/unsave, feedback/support and lab failure/retry at desktop and ~390 px with keyboard. Separately smoke-test configured Groq and one actual search provider without describing mocks as live evidence.
 
 Append entries in this format:
 
