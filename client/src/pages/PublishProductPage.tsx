@@ -468,6 +468,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     className="form-input"
                     placeholder="699"
                     min={0}
+                    step="0.01"
                     value={price}
                     onChange={e => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
                     required={!priceNotSet}

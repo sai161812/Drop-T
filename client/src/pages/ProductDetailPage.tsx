@@ -1211,6 +1211,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSupportModalOpen(false)}
+                aria-label="Close support proposal"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
               >
                 <X size={18} />
@@ -1245,7 +1246,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <form onSubmit={handleSubmitSupport}>
               {/* Proposed Amount Input */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
+                <label htmlFor="support-proposal-amount" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                   Proposed Amount (₹ INR) <span style={{ color: 'var(--color-danger)' }}>*</span>
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -1253,8 +1254,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     ₹
                   </span>
                   <input
+                    id="support-proposal-amount"
                     type="number"
-                    min={1}
+                    min={0.01}
+                    step="0.01"
                     className="form-input"
                     placeholder="500"
                     value={supportAmount}
@@ -1270,10 +1273,11 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
               {/* Message Input */}
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
+                <label htmlFor="support-proposal-message" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                   Proposal Message / Backing Terms <span style={{ color: 'var(--color-danger)' }}>*</span>
                 </label>
                 <textarea
+                  id="support-proposal-message"
                   className="form-input"
                   rows={4}
                   placeholder="e.g. Interested in early batch pre-orders for 20 units or testing in our workspace..."
