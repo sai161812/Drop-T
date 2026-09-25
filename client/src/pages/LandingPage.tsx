@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { ProductPublicSummary, UserRole } from '@droptest/shared';
-import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Phone, Mail, Clock } from 'lucide-react';
 import { ElectricBrandMark } from '../components/Common/ElectricBrandMark.js';
 import { LightRays } from '../components/LightRays/LightRays.js';
 import './LandingPage.css';
@@ -350,18 +350,63 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onExplore, onSignIn, o
 
       <footer className="landing-footer-full">
         <div className="footer-container">
-          <a href="/" className="landing-brand-link" aria-label="DROPTEST home">
-            <ElectricBrandMark />
-            <span className="brand-title-text">DROPTEST</span>
-          </a>
-          <p>A product validation workspace for early-stage teams.</p>
-          <div className="footer-actions">
-            <button type="button" onClick={onExplore}>Browse products</button>
-            <button type="button" onClick={() => onSignIn()}>Account access</button>
+          <div className="footer-brand-col">
+            <a href="/" className="landing-brand-link" aria-label="DROPTEST home">
+              <ElectricBrandMark />
+              <span className="brand-title-text">DROPTEST</span>
+            </a>
+            <p className="footer-tagline">
+              Product validation workspace for early-stage teams. Structured buyer feedback and 50 simulated market profiles.
+            </p>
+            <div className="footer-status-indicator">
+              <span className="status-dot"></span>
+              <span>Global Infrastructure · Active</span>
+            </div>
+          </div>
+
+          <div className="footer-contact-col">
+            <span className="footer-col-heading">DIRECT CONTACT</span>
+            <div className="footer-contact-items">
+              <a href="tel:+04433443344" className="footer-contact-link">
+                <div className="contact-icon-bubble">
+                  <Phone size={14} />
+                </div>
+                <div className="contact-text-block">
+                  <span className="contact-label">Telephone</span>
+                  <span className="contact-value">+044 3344 3344</span>
+                </div>
+              </a>
+
+              <a href="mailto:droptest@mailme.com" className="footer-contact-link">
+                <div className="contact-icon-bubble">
+                  <Mail size={14} />
+                </div>
+                <div className="contact-text-block">
+                  <span className="contact-label">Direct Mail</span>
+                  <span className="contact-value">droptest@mailme.com</span>
+                </div>
+              </a>
+
+              <div className="footer-hours-note">
+                <Clock size={12} />
+                <span>Mon – Fri, 08:00 – 18:00 UTC</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-nav-col">
+            <span className="footer-col-heading">WORKSPACE</span>
+            <div className="footer-actions">
+              <button type="button" onClick={onExplore}>Browse products</button>
+              <button type="button" onClick={() => onSignIn()}>Account access</button>
+              <a href="#platform" className="footer-text-link">Platform architecture</a>
+              <a href="#method" className="footer-text-link">Validation method</a>
+            </div>
           </div>
         </div>
+
         <div className="footer-bottom-bar">
-          <span>© {new Date().getFullYear()} DROPTEST</span>
+          <span>© {new Date().getFullYear()} DROPTEST. All rights reserved.</span>
           <span>Feedback you can trace. Assumptions you can challenge.</span>
         </div>
       </footer>

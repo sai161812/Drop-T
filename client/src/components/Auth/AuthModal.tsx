@@ -167,7 +167,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         role="dialog" 
         aria-modal="true" 
         aria-label="Sign In to DROPTEST"
-        aria-labelledby="auth-dialog-title"
       >
         {/* Close Button as first focusable element */}
         <button
