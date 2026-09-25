@@ -139,8 +139,6 @@ export function runMigrations(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_runs_test ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_evaluations_run ON evaluations(run_id);
     CREATE INDEX IF NOT EXISTS idx_human_responses_test ON human_responses(test_id);
-    CREATE INDEX IF NOT EXISTS idx_tests_feedback_token ON tests(feedback_token);
-    CREATE INDEX IF NOT EXISTS idx_human_responses_client_token ON human_responses(client_token);
   `;
 
   db.exec(schema);
@@ -162,6 +160,26 @@ export function runMigrations(db: DatabaseSync): void {
     db.exec('ALTER TABLE human_responses ADD COLUMN client_token TEXT;');
   } catch (_e) {
     // Column already exists
+  }
+
+  // Backfill feedback_token for existing tests if null
+  try {
+    db.exec('UPDATE tests SET feedback_token = id WHERE feedback_token IS NULL;');
+  } catch (_e) {
+    // Ignore
+  }
+
+  // Safe index creation on migrated columns
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_tests_feedback_token ON tests(feedback_token);');
+  } catch (_e) {
+    // Ignore
+  }
+
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_human_responses_client_token ON human_responses(client_token);');
+  } catch (_e) {
+    // Ignore
   }
 }
 
