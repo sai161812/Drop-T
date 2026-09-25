@@ -331,6 +331,11 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
                   <option value="one_time">One-time purchase (Perpetual)</option>
                   <option value="subscription">Recurring Subscription (First-period calculation)</option>
                 </select>
+                {domainSpecificData?.pricing_type === 'subscription' && (
+                  <span className="form-help" style={{ color: 'var(--color-text-secondary)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                    Calculations apply to the first billing period only. Churn or lifetime value is not assumed.
+                  </span>
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Service / Support Availability</label>

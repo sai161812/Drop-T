@@ -23,37 +23,38 @@ export const DOMAIN_PRESETS: Record<DomainId, DomainPreset> = {
         domain_specific_data: {
           item_type: 'Shirt',
           material: '100% Organic Flax Linen',
-          sizes: ['S', 'M', 'L', 'XL']
+          sizes: ['S', 'M', 'L', 'XL'],
+          unit_production_cost: 350
         }
       },
       option_a: {
-        name: 'Baseline ₹699',
+        name: 'Launch Price ₹699',
         price: 699,
         primary_message: 'Sustainable everyday comfort at an accessible launch price',
-        served_markets: ['Bangalore Urban', 'Chennai Central'],
+        served_markets: ['Koramangala', 'Indiranagar', 'Whitefield'],
         fulfillment_mode: 'Standard postal shipping',
         images: [],
-        variable_cost_per_sale: 299,
-        fixed_launch_cost: 20000,
-        capacity_units: 100
+        variable_cost_per_sale: 350,
+        fixed_launch_cost: 6000,
+        capacity_units: 50
       },
       option_b: {
-        name: 'Premium ₹899',
+        name: 'Premium Price ₹899',
         price: 899,
         primary_message: 'Sustainable luxury crafted with gift packaging included',
-        served_markets: ['Bangalore Urban', 'Chennai Central'],
+        served_markets: ['Koramangala', 'Indiranagar', 'Whitefield'],
         fulfillment_mode: 'Standard postal shipping',
         images: [],
-        variable_cost_per_sale: 320,
-        fixed_launch_cost: 20000,
-        capacity_units: 100
+        variable_cost_per_sale: 350,
+        fixed_launch_cost: 6000,
+        capacity_units: 50
       },
       audience_config: {
         intended_buyer_description: 'Young eco-conscious working professionals (25-35) looking for sustainable minimalist apparel',
         adjacent_buyer_description: 'College students or gift buyers looking for durable natural aesthetic fabrics',
         expected_spend_min: 500,
         expected_spend_max: 1200,
-        audience_markets: ['Bangalore Urban', 'Chennai Central', 'Hyderabad']
+        audience_markets: ['Koramangala', 'Indiranagar', 'Whitefield', 'HSR Layout']
       },
       comparison_lever: 'price'
     }
