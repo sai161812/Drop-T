@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import Groq from 'groq-sdk';
 import { 
   FullTestResponse, 
   Profile, 
@@ -398,46 +399,20 @@ You MUST return an evaluation for every profile_id in the input list.`;
       }))
     }, null, 2);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const groq = new Groq({ apiKey, maxRetries: 2 });
 
     try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: config.groqModel,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          response_format: { type: 'json_object' },
-          temperature: config.groqTemperature
-        }),
-        signal: controller.signal
+      const chatCompletion = await groq.chat.completions.create({
+        model: config.groqModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: config.groqTemperature
       });
 
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let retryAfterSec = 0;
-        const retryHeader = response.headers.get('retry-after');
-        if (retryHeader) {
-          retryAfterSec = parseInt(retryHeader, 10) || 2;
-        }
-
-        if (response.status === 429) {
-          throw new Error(`Groq rate limit (429): ${errorText}. Retry after ${retryAfterSec}s`);
-        }
-        throw new Error(`Groq API error (${response.status}): ${errorText}`);
-      }
-
-      const responseJson: any = await response.json();
-      const content = responseJson.choices?.[0]?.message?.content;
+      const content = chatCompletion.choices?.[0]?.message?.content;
       if (!content) {
         throw new Error('Groq returned empty response content');
       }
@@ -461,7 +436,6 @@ You MUST return an evaluation for every profile_id in the input list.`;
 
       return parseResult.data.evaluations;
     } catch (err: any) {
-      clearTimeout(timeoutId);
       throw err;
     }
   }

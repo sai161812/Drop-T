@@ -1,7 +1,10 @@
 import path from 'node:path';
 import dotenv from 'dotenv';
 
+const baseDir = typeof import.meta.dirname === 'string' ? import.meta.dirname : process.cwd();
 dotenv.config();
+dotenv.config({ path: path.resolve(baseDir, '../../.env') });
+dotenv.config({ path: path.resolve(baseDir, '../.env') });
 
 export interface ServerConfig {
   port: number;
