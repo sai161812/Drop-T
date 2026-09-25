@@ -15,18 +15,21 @@ import { useAuth } from '../context/AuthContext.js';
 interface ExplorePageProps {
   onOpenProduct: (productId: string) => void;
   onNavigateToPublish: () => void;
+  onPromptAuth: () => void;
 }
 
 export const ExplorePage: React.FC<ExplorePageProps> = ({
   onOpenProduct,
-  onNavigateToPublish
+  onNavigateToPublish,
+  onPromptAuth
 }) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [products, setProducts] = useState<ProductPublicSummary[]>([]);
   const [category, setCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [togglingSaveId, setTogglingSaveId] = useState<string | null>(null);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -54,6 +57,39 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchProducts();
+  };
+
+  const handleToggleSave = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    if (!token) {
+      onPromptAuth();
+      return;
+    }
+
+    setTogglingSaveId(productId);
+    try {
+      const res = await fetch(`/api/products/${productId}/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) throw new Error('Failed to update save status');
+      const result = await res.json();
+      
+      setProducts(prev => prev.map(p => {
+        if (p.id === productId) {
+          return { ...p, save_count: result.save_count };
+        }
+        return p;
+      }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTogglingSaveId(null);
+    }
   };
 
   const getCategoryIcon = (cat: ProductCategory) => {
@@ -333,10 +369,28 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
 
                     {/* Engagement Counts */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--color-text-muted)', fontSize: '11px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }} title={`${product.save_count} saves`}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleSave(e, product.id)}
+                        disabled={togglingSaveId === product.id}
+                        title="Toggle Save"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--color-text-muted)',
+                          padding: '2px 4px',
+                          borderRadius: '4px'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--color-primary)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}
+                      >
                         <Bookmark size={13} /> {product.save_count}
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }} title={`${product.feedback_count} feedback responses`}>
+                      </button>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }} title={`${product.feedback_count} community responses`}>
                         <MessageSquare size={13} /> {product.feedback_count}
                       </span>
                     </div>

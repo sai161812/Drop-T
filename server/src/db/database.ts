@@ -22,6 +22,10 @@ export function initDatabase(dbPath?: string): DatabaseSync {
   }
 
   const db = new DatabaseSync(targetPath);
+  if (targetPath !== ':memory:') {
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA busy_timeout = 5000;');
+  }
   runMigrations(db);
   dbInstance = db;
   return db;

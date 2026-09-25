@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { Navbar, PageTab } from './components/Navbar.js';
 import { AuthModal } from './components/Auth/AuthModal.js';
 import { ExplorePage } from './pages/ExplorePage.js';
+import { SavedPage } from './pages/SavedPage.js';
 import { ProductDetailPage } from './pages/ProductDetailPage.js';
 import { PublishProductPage } from './pages/PublishProductPage.js';
 import { MyProductsPage } from './pages/MyProductsPage.js';
@@ -40,6 +41,8 @@ const MainApp: React.FC = () => {
         if (token) {
           setStandaloneFeedbackToken(token);
         }
+      } else if (pathname === '/saved') {
+        setActiveTab('saved');
       } else if (pathname === '/publish') {
         setActiveTab('publish');
       } else if (pathname === '/my-products') {
@@ -59,6 +62,12 @@ const MainApp: React.FC = () => {
     if (tab === 'explore') {
       window.history.pushState({}, '', '/');
       setSelectedProductId(null);
+    } else if (tab === 'saved') {
+      if (!user) {
+        setIsAuthModalOpen(true);
+        return;
+      }
+      window.history.pushState({}, '', '/saved');
     } else if (tab === 'publish') {
       if (!user) {
         setIsAuthModalOpen(true);
@@ -127,6 +136,16 @@ const MainApp: React.FC = () => {
           <ExplorePage
             onOpenProduct={handleOpenProduct}
             onNavigateToPublish={() => navigateToTab('publish')}
+            onPromptAuth={() => setIsAuthModalOpen(true)}
+          />
+        )}
+
+        {/* Saved Products */}
+        {activeTab === 'saved' && (
+          <SavedPage
+            onOpenProduct={handleOpenProduct}
+            onNavigateToExplore={() => navigateToTab('explore')}
+            onPromptAuth={() => setIsAuthModalOpen(true)}
           />
         )}
 

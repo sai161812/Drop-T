@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { 
   ProductDraftPayloadSchema, 
-  ProductPublishPayloadSchema 
+  ProductPublishPayloadSchema,
+  CommunityFeedbackSubmissionSchema 
 } from '@droptest/shared';
 import { ProductRepository } from '../db/productRepository.js';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../middleware/authMiddleware.js';
@@ -28,6 +29,16 @@ productRouter.get('/my', requireAuth, requireRole(['startup']), (req: Authentica
     res.json({ products });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to load your products', message: err.message });
+  }
+});
+
+// GET /api/products/saved/all - Products saved by authenticated user (All roles)
+productRouter.get('/saved/all', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const products = ProductRepository.listSavedByUser(req.user!.id);
+    res.json({ products });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to load saved products', message: err.message });
   }
 });
 
@@ -111,6 +122,59 @@ productRouter.delete('/:id', requireAuth, requireRole(['startup']), (req: Authen
   } catch (err: any) {
     res.status(err.status || 500).json({
       error: err.message || 'Failed to delete product'
+    });
+  }
+});
+
+// POST /api/products/:id/save - Toggle Save / Unsave product (All roles)
+productRouter.post('/:id/save', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const productId = String(req.params.id);
+    const targetState = req.body.saved !== undefined ? Boolean(req.body.saved) : undefined;
+    const result = ProductRepository.toggleSave(req.user!.id, productId, targetState);
+    res.json(result);
+  } catch (err: any) {
+    res.status(err.status || 500).json({
+      error: err.message || 'Failed to update saved state'
+    });
+  }
+});
+
+// POST /api/products/:id/feedback - Submit or edit structured feedback (All roles)
+productRouter.post('/:id/feedback', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const productId = String(req.params.id);
+    const parseResult = CommunityFeedbackSubmissionSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Invalid feedback submission',
+        issues: parseResult.error.issues
+      });
+    }
+
+    const result = ProductRepository.upsertFeedback(req.user!.id, productId, parseResult.data);
+    res.json({
+      success: true,
+      feedback: result.feedback,
+      feedback_summary: result.feedback_summary
+    });
+  } catch (err: any) {
+    res.status(err.status || 500).json({
+      error: err.message || 'Failed to record feedback'
+    });
+  }
+});
+
+// GET /api/products/:id/feedback/breakdown - Detailed feedback breakdown (Owner only)
+productRouter.get('/:id/feedback/breakdown', requireAuth, requireRole(['startup']), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const productId = String(req.params.id);
+    const breakdown = ProductRepository.getFounderFeedbackBreakdown(productId, req.user!.id);
+    res.json(breakdown);
+  } catch (err: any) {
+    res.status(err.status || 500).json({
+      error: err.message || 'Failed to load feedback breakdown'
     });
   }
 });

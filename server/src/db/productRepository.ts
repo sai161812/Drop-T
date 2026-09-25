@@ -10,6 +10,9 @@ import {
   ProductStatus,
   CommunityFeedbackChoice,
   CommunityFeedbackFactor,
+  ProductFeedback,
+  FounderFeedbackBreakdown,
+  FounderFeedbackItem,
   PublicUser
 } from '@droptest/shared';
 import { AuthRepository } from './authRepository.js';
@@ -168,15 +171,27 @@ export class ProductRepository {
       isSaved = Boolean(userSaveRow);
     }
 
-    // Get feedback counts
+    // Get feedback counts and factors
     const feedbackRows = db.prepare('SELECT choice, factor, reason, author_id FROM product_feedback WHERE product_id = ?').all(productId) as any[];
     const counts = { yes: 0, maybe: 0, no: 0 };
+    const factorCounts: Record<CommunityFeedbackFactor, number> = {
+      price: 0,
+      design_fit: 0,
+      quality_details: 0,
+      availability_delivery: 0,
+      usefulness: 0,
+      other: 0
+    };
     let userFeedback: { choice: CommunityFeedbackChoice; factor: CommunityFeedbackFactor; reason?: string } | undefined;
 
     for (const f of feedbackRows) {
       if (f.choice === 'yes') counts.yes++;
       else if (f.choice === 'maybe') counts.maybe++;
       else if (f.choice === 'no') counts.no++;
+
+      if (f.factor && factorCounts[f.factor as CommunityFeedbackFactor] !== undefined) {
+        factorCounts[f.factor as CommunityFeedbackFactor]++;
+      }
 
       if (currentUserId && f.author_id === currentUserId) {
         userFeedback = {
@@ -210,6 +225,7 @@ export class ProductRepository {
       feedback_summary: {
         total: feedbackRows.length,
         counts,
+        factor_counts: factorCounts,
         user_feedback: userFeedback
       },
       user_proposal: userProposal
@@ -300,5 +316,232 @@ export class ProductRepository {
       save_count: r.save_count || 0,
       feedback_count: r.feedback_count || 0
     }));
+  }
+
+  /**
+   * Save or unsave a product for a user.
+   * Returns whether it is saved and the new save count.
+   */
+  static toggleSave(userId: string, productId: string, targetState?: boolean): { is_saved: boolean; save_count: number } {
+    const db = getDatabase();
+    const product = this.getRawById(productId);
+    if (!product) {
+      throw Object.assign(new Error('Product not found'), { status: 404 });
+    }
+
+    const existing = db.prepare('SELECT 1 FROM product_saves WHERE user_id = ? AND product_id = ?').get(userId, productId);
+    let isSaved: boolean;
+
+    if (targetState === undefined) {
+      isSaved = !existing;
+    } else {
+      isSaved = targetState;
+    }
+
+    if (isSaved && !existing) {
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO product_saves (id, user_id, product_id, created_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id, product_id) DO NOTHING
+      `).run(uuidv4(), userId, productId, now);
+    } else if (!isSaved && existing) {
+      db.prepare('DELETE FROM product_saves WHERE user_id = ? AND product_id = ?').run(userId, productId);
+    }
+
+    const countRow = db.prepare('SELECT COUNT(*) as count FROM product_saves WHERE product_id = ?').get(productId) as { count: number };
+    return {
+      is_saved: isSaved,
+      save_count: countRow?.count || 0
+    };
+  }
+
+  /**
+   * List all products saved by a specific user (newest saved first)
+   */
+  static listSavedByUser(userId: string): ProductPublicSummary[] {
+    const db = getDatabase();
+    const rows = db.prepare(`
+      SELECT p.*, u.display_name as owner_name, u.startup_name,
+             (SELECT COUNT(*) FROM product_saves ps WHERE ps.product_id = p.id) as save_count,
+             (SELECT COUNT(*) FROM product_feedback pf WHERE pf.product_id = p.id) as feedback_count
+      FROM product_saves user_saves
+      JOIN products p ON user_saves.product_id = p.id
+      JOIN users u ON p.owner_id = u.id
+      WHERE user_saves.user_id = ? AND p.status = 'published'
+      ORDER BY user_saves.created_at DESC
+    `).all(userId) as any[];
+
+    return rows.map(r => ({
+      id: r.id,
+      owner_id: r.owner_id,
+      owner_name: r.owner_name,
+      startup_name: r.startup_name || undefined,
+      name: r.name,
+      category: r.category as ProductCategory,
+      stage: r.stage as ProductStage,
+      summary: r.summary,
+      price: r.price !== null ? r.price : null,
+      currency: r.currency,
+      images: JSON.parse(r.images || '[]'),
+      save_count: r.save_count || 0,
+      feedback_count: r.feedback_count || 0,
+      created_at: r.created_at,
+      updated_at: r.updated_at
+    }));
+  }
+
+  /**
+   * Upsert a structured feedback response from an account.
+   * Editing an existing response alters the distribution without increasing total respondent count.
+   */
+  static upsertFeedback(
+    authorId: string, 
+    productId: string, 
+    payload: { choice: CommunityFeedbackChoice; factor: CommunityFeedbackFactor; reason?: string }
+  ): { feedback: ProductFeedback; feedback_summary: ProductPublicDetail['feedback_summary'] } {
+    const db = getDatabase();
+    const product = this.getRawById(productId);
+    if (!product) {
+      throw Object.assign(new Error('Product not found'), { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    const existing = db.prepare('SELECT id, created_at FROM product_feedback WHERE author_id = ? AND product_id = ?').get(authorId, productId) as any;
+
+    let feedbackId: string;
+    let createdAt: string;
+
+    if (existing) {
+      feedbackId = existing.id;
+      createdAt = existing.created_at;
+      db.prepare(`
+        UPDATE product_feedback 
+        SET choice = ?, factor = ?, reason = ?, updated_at = ?
+        WHERE author_id = ? AND product_id = ?
+      `).run(payload.choice, payload.factor, payload.reason || null, now, authorId, productId);
+    } else {
+      feedbackId = uuidv4();
+      createdAt = now;
+      db.prepare(`
+        INSERT INTO product_feedback (id, author_id, product_id, choice, factor, reason, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(feedbackId, authorId, productId, payload.choice, payload.factor, payload.reason || null, now, now);
+    }
+
+    // Compute fresh summary
+    const feedbackRows = db.prepare('SELECT choice, factor, reason, author_id FROM product_feedback WHERE product_id = ?').all(productId) as any[];
+    const counts = { yes: 0, maybe: 0, no: 0 };
+    const factorCounts: Record<CommunityFeedbackFactor, number> = {
+      price: 0,
+      design_fit: 0,
+      quality_details: 0,
+      availability_delivery: 0,
+      usefulness: 0,
+      other: 0
+    };
+
+    for (const f of feedbackRows) {
+      if (f.choice === 'yes') counts.yes++;
+      else if (f.choice === 'maybe') counts.maybe++;
+      else if (f.choice === 'no') counts.no++;
+
+      if (f.factor && factorCounts[f.factor as CommunityFeedbackFactor] !== undefined) {
+        factorCounts[f.factor as CommunityFeedbackFactor]++;
+      }
+    }
+
+    const feedback: ProductFeedback = {
+      id: feedbackId,
+      author_id: authorId,
+      product_id: productId,
+      choice: payload.choice,
+      factor: payload.factor,
+      reason: payload.reason || undefined,
+      created_at: createdAt,
+      updated_at: now
+    };
+
+    return {
+      feedback,
+      feedback_summary: {
+        total: feedbackRows.length,
+        counts,
+        factor_counts: factorCounts,
+        user_feedback: {
+          choice: payload.choice,
+          factor: payload.factor,
+          reason: payload.reason || undefined
+        }
+      }
+    };
+  }
+
+  /**
+   * Get full founder feedback breakdown with respondent identity, role, and reasons.
+   * Product owner only.
+   */
+  static getFounderFeedbackBreakdown(productId: string, ownerId: string): FounderFeedbackBreakdown {
+    const db = getDatabase();
+    const product = this.getRawById(productId);
+    if (!product) {
+      throw Object.assign(new Error('Product not found'), { status: 404 });
+    }
+    if (product.owner_id !== ownerId) {
+      throw Object.assign(new Error('Only the product owner can access detailed feedback breakdown'), { status: 403 });
+    }
+
+    const rows = db.prepare(`
+      SELECT pf.id, pf.choice, pf.factor, pf.reason, pf.created_at, pf.updated_at,
+             u.id as author_id, u.display_name, u.role, u.startup_name
+      FROM product_feedback pf
+      JOIN users u ON pf.author_id = u.id
+      WHERE pf.product_id = ?
+      ORDER BY pf.updated_at DESC
+    `).all(productId) as any[];
+
+    const counts = { yes: 0, maybe: 0, no: 0 };
+    const factorCounts: Record<CommunityFeedbackFactor, number> = {
+      price: 0,
+      design_fit: 0,
+      quality_details: 0,
+      availability_delivery: 0,
+      usefulness: 0,
+      other: 0
+    };
+
+    const responses: FounderFeedbackItem[] = [];
+
+    for (const r of rows) {
+      if (r.choice === 'yes') counts.yes++;
+      else if (r.choice === 'maybe') counts.maybe++;
+      else if (r.choice === 'no') counts.no++;
+
+      if (r.factor && factorCounts[r.factor as CommunityFeedbackFactor] !== undefined) {
+        factorCounts[r.factor as CommunityFeedbackFactor]++;
+      }
+
+      responses.push({
+        id: r.id,
+        author: {
+          id: r.author_id,
+          display_name: r.display_name,
+          role: r.role,
+          startup_name: r.startup_name || undefined
+        },
+        choice: r.choice,
+        factor: r.factor,
+        reason: r.reason || undefined,
+        created_at: r.created_at,
+        updated_at: r.updated_at
+      });
+    }
+
+    return {
+      total: rows.length,
+      counts,
+      factor_counts: factorCounts,
+      responses
+    };
   }
 }

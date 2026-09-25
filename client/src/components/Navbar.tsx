@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { 
   Compass, 
+  Bookmark,
   PlusCircle, 
   Package, 
   FlaskConical, 
@@ -12,7 +13,7 @@ import {
   Rocket
 } from 'lucide-react';
 
-export type PageTab = 'explore' | 'product-detail' | 'publish' | 'my-products' | 'setup' | 'results' | 'feedback';
+export type PageTab = 'explore' | 'saved' | 'product-detail' | 'publish' | 'my-products' | 'setup' | 'results' | 'feedback';
 
 interface NavbarProps {
   activeTab: PageTab;
@@ -76,6 +77,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Compass size={15} />
           <span>Explore Products</span>
         </button>
+
+        {user && (
+          <button
+            type="button"
+            className={`nav-tab-btn ${activeTab === 'saved' ? 'active' : ''}`}
+            onClick={() => onTabChange('saved')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+          >
+            <Bookmark size={15} />
+            <span>Saved</span>
+          </button>
+        )}
 
         {user?.role === 'startup' && (
           <>

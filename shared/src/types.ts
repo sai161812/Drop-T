@@ -691,6 +691,7 @@ export interface ProductPublicDetail extends Product {
   feedback_summary: {
     total: number;
     counts: { yes: number; maybe: number; no: number };
+    factor_counts?: Record<CommunityFeedbackFactor, number>;
     user_feedback?: {
       choice: CommunityFeedbackChoice;
       factor: CommunityFeedbackFactor;
@@ -735,6 +736,30 @@ export interface ProductFeedback {
   reason?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface FeedbackAuthorInfo {
+  id: string;
+  display_name: string;
+  role: UserRole;
+  startup_name?: string;
+}
+
+export interface FounderFeedbackItem {
+  id: string;
+  author: FeedbackAuthorInfo;
+  choice: CommunityFeedbackChoice;
+  factor: CommunityFeedbackFactor;
+  reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FounderFeedbackBreakdown {
+  total: number;
+  counts: Record<CommunityFeedbackChoice, number>;
+  factor_counts: Record<CommunityFeedbackFactor, number>;
+  responses: FounderFeedbackItem[];
 }
 
 export interface SupportProposal {
