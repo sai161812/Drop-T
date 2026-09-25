@@ -116,7 +116,7 @@ describe('Stage 2: Saved Products, Save/Unsave Toggle & Structured Community Fee
     productId = pData.id;
   });
 
-  it('2. Save / Unsave toggle accurately updates save count and persisted saved list', async () => {
+  it('2. Desired save state is idempotent and per-viewer feed state matches persisted saves', async () => {
     // Initial state: save_count is 0, is_saved is false
     const initialDetailRes = await fetch(`${baseUrl}/api/products/${productId}`, {
       headers: { Authorization: `Bearer ${shopperToken}` }
@@ -145,6 +145,29 @@ describe('Stage 2: Saved Products, Save/Unsave Toggle & Structured Community Fee
     const saveData: any = await saveRes.json();
     assert.equal(saveData.is_saved, true);
     assert.equal(saveData.save_count, 1);
+
+    // Desired-state writes are idempotent, and each feed response reflects only its viewer.
+    const repeatSaveRes = await fetch(`${baseUrl}/api/products/${productId}/save`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${shopperToken}`
+      },
+      body: JSON.stringify({ saved: true })
+    });
+    assert.equal(repeatSaveRes.status, 200);
+    assert.deepEqual(await repeatSaveRes.json(), { is_saved: true, save_count: 1 });
+
+    const shopperFeedRes = await fetch(`${baseUrl}/api/products`, { headers: { Authorization: `Bearer ${shopperToken}` } });
+    const shopperFeed: any = await shopperFeedRes.json();
+    assert.equal(shopperFeedRes.headers.get('cache-control'), 'private, no-store');
+    assert.equal(shopperFeed.products.find((item: any) => item.id === productId).is_saved, true);
+    const sponsorFeedRes = await fetch(`${baseUrl}/api/products`, { headers: { Authorization: `Bearer ${sponsorToken}` } });
+    const sponsorFeed: any = await sponsorFeedRes.json();
+    assert.equal(sponsorFeed.products.find((item: any) => item.id === productId).is_saved, false);
+    assert.equal(sponsorFeed.products.find((item: any) => item.id === productId).save_count, 1);
+    const anonymousFeed: any = await (await fetch(`${baseUrl}/api/products`)).json();
+    assert.equal(anonymousFeed.products.find((item: any) => item.id === productId).is_saved, false);
 
     // Verify detail page reflects saved state
     const afterSaveRes = await fetch(`${baseUrl}/api/products/${productId}`, {

@@ -220,6 +220,21 @@ export function runMigrations(db: DatabaseSync): void {
       FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    -- A research attempt is durable even when it fails or returns no matches.
+    CREATE TABLE IF NOT EXISTS research_attempts (
+      id TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      input_fingerprint TEXT NOT NULL,
+      query TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      status TEXT NOT NULL,
+      error_message TEXT,
+      comparison_summary TEXT,
+      started_at TEXT NOT NULL,
+      completed_at TEXT,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
     -- DROPTEST v2: Competitor references table (Synthetic Lab)
     CREATE TABLE IF NOT EXISTS competitor_references (
       id TEXT PRIMARY KEY,
@@ -234,6 +249,7 @@ export function runMigrations(db: DatabaseSync): void {
       supported_facts TEXT DEFAULT '[]',
       founder_note TEXT,
       created_at TEXT,
+      research_attempt_id TEXT,
       selected INTEGER NOT NULL DEFAULT 1,
       date_checked TEXT NOT NULL,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -266,6 +282,7 @@ export function runMigrations(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_product_feedback_product ON product_feedback(product_id);
     CREATE INDEX IF NOT EXISTS idx_support_proposals_recipient ON support_proposals(recipient_id);
     CREATE INDEX IF NOT EXISTS idx_competitor_references_product ON competitor_references(product_id);
+    CREATE INDEX IF NOT EXISTS idx_research_attempts_product_fingerprint ON research_attempts(product_id, input_fingerprint, started_at DESC);
     CREATE INDEX IF NOT EXISTS idx_uploads_owner ON uploads(owner_id);
   `;
 
@@ -292,6 +309,8 @@ export function runMigrations(db: DatabaseSync): void {
   addColumn('competitor_references', 'supported_facts', 'TEXT DEFAULT "[]"');
   addColumn('competitor_references', 'founder_note', 'TEXT');
   addColumn('competitor_references', 'created_at', 'TEXT');
+  addColumn('competitor_references', 'research_attempt_id', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_competitor_references_attempt ON competitor_references(research_attempt_id)');
 
   // Older releases stored proposals as REAL. Rebuild that table after an
   // explicit one-time rounding conversion, preserving proposal identity and

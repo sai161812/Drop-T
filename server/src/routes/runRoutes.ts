@@ -5,6 +5,8 @@ import { TestRepository } from '../db/testRepository.js';
 import { ProductRepository } from '../db/productRepository.js';
 import { ReferenceRepository } from '../db/referenceRepository.js';
 import { SearchService } from '../search/searchService.js';
+import { ResearchRepository } from '../db/researchRepository.js';
+import { executeResearchAttempt, recoverableResearchResponse } from '../research/researchWorkflow.js';
 import { generatePanelProfiles } from '../simulation/profileGenerator.js';
 import { AuthenticatedRequest } from '../middleware/authMiddleware.js';
 import { config } from '../config.js';
@@ -35,6 +37,9 @@ async function launch(req: AuthenticatedRequest, res: Response, retry: boolean) 
   if (!GroqEvaluator.isConfigured()) return res.status(503).json({ error: 'Simulation is not configured on the server. Your draft is saved.' });
   
   if (!run) {
+    if (req.body?.skip_research !== undefined && typeof req.body.skip_research !== 'boolean') {
+      return res.status(400).json({ error: 'skip_research must be a boolean.' });
+    }
     const resolvedMode = test.mode || (test.options.B ? 'comparison' : 'single');
     const validation = TestDraftPayloadSchema.safeParse({ 
       mode: resolvedMode,
@@ -58,32 +63,32 @@ async function launch(req: AuthenticatedRequest, res: Response, retry: boolean) 
     let selectedRefs: any[] = [];
     let researchStatus: 'without_research' | 'completed' | 'no_matches' | 'failed' | 'skipped' = 'without_research';
 
+    let referenceSummary: string | undefined;
+    let researchAttempt: any;
     if (test.product_id && product) {
-      selectedRefs = ReferenceRepository.getSelectedByProductId(test.product_id);
       const intendedProductSnapshot = (test.offering.domain_specific_data as any)?._product_snapshot;
       const researchProduct = intendedProductSnapshot || product;
-      
-      // If no references exist and skip_research wasn't explicitly requested, perform automatic search
-      if (selectedRefs.length === 0 && !req.body.skip_research) {
-        try {
-          const searchResult = await SearchService.searchComparableProducts(researchProduct);
-          if (searchResult.status === 'completed' && searchResult.references.length > 0) {
-            ReferenceRepository.saveReferences(product.id, searchResult.references);
-            selectedRefs = ReferenceRepository.getSelectedByProductId(product.id);
-            researchStatus = 'completed';
-          } else if (searchResult.status === 'no_matches') {
-            researchStatus = 'no_matches';
-          } else if (searchResult.status === 'failed') {
-            researchStatus = 'failed';
-          }
-        } catch {
-          researchStatus = 'failed';
-        }
-      } else if (selectedRefs.length > 0) {
-        researchStatus = 'completed';
-      } else if (req.body.skip_research) {
+      const fingerprint = ResearchRepository.fingerprint(researchProduct);
+      const query = SearchService.buildSearchQuery(researchProduct);
+
+      if (req.body.skip_research === true) {
+        researchAttempt = ResearchRepository.recordSkipped(product.id, fingerprint, query);
         researchStatus = 'skipped';
+      } else {
+        let attempt = ResearchRepository.getLatest(product.id, fingerprint);
+        if (!attempt) {
+          const executed = await executeResearchAttempt(product.id, researchProduct);
+          attempt = executed.attempt;
+        }
+        researchAttempt = attempt;
+        if (attempt.status === 'failed') return res.status(409).json(recoverableResearchResponse(attempt));
+        if (attempt.status === 'pending') return res.status(409).json({ error: 'Market research is still running.', code: 'RESEARCH_PENDING', recoverable: true, research_attempt: attempt });
+        if (attempt.status === 'completed' || attempt.status === 'no_matches') {
+          researchStatus = attempt.status;
+          selectedRefs = ReferenceRepository.getSelectedForAttempt(product.id, attempt.id);
+        }
       }
+      referenceSummary = ReferenceRepository.buildComparisonSummary(researchProduct, selectedRefs);
     }
 
     run = TestRepository.createRun(
@@ -93,10 +98,15 @@ async function launch(req: AuthenticatedRequest, res: Response, retry: boolean) 
       config.groqModel, 
       resolvedMode, 
       researchStatus, 
-      selectedRefs
+      selectedRefs,
+      referenceSummary,
+      researchAttempt
     );
   }
-  if (!TestRepository.getRunSnapshot(run.id)) return res.status(409).json({ error: 'This legacy run has no verified snapshot. Save a new test.' });
+  const frozenSnapshot = TestRepository.getRunSnapshot(run.id);
+  if (!frozenSnapshot || !Array.isArray(frozenSnapshot.references) || frozenSnapshot.profiles?.length !== 50) {
+    return res.status(409).json({ error: 'This legacy run has no valid frozen research snapshot. Create a new review.' });
+  }
   const runId = run.id;
   void GroqEvaluator.executeRun(testId, runId).catch(() => {
     TestRepository.updateRun(runId, { status: 'partial', error_message: 'Run interrupted. Retry missing evaluations.' });

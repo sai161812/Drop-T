@@ -83,6 +83,9 @@ uploadRouter.post('/', requireAuth, upload.single('image'), (req: AuthenticatedR
 
     res.status(201).json(imageMetadata);
   } catch (error: any) {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     res.status(500).json({ error: 'Image upload failed', message: error.message });
   }
 });

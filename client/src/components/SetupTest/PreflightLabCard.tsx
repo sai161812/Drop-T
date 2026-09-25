@@ -23,6 +23,8 @@ interface PreflightLabCardProps {
   isPriceNotSet: boolean;
   skipResearch?: boolean;
   onSkipResearchChange?: (skip: boolean) => void;
+  onContinueWithoutResearch?: () => void;
+  researchRefreshKey?: number;
 }
 
 export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
@@ -33,7 +35,9 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
   onTrialPriceChange,
   isPriceNotSet,
   skipResearch = false,
-  onSkipResearchChange
+  onSkipResearchChange,
+  onContinueWithoutResearch,
+  researchRefreshKey = 0
 }) => {
   const { token } = useAuth();
   const [isTestingProvider, setIsTestingProvider] = useState(false);
@@ -64,7 +68,7 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
       loadReferences();
       loadResearchStatus();
     }
-  }, [product?.id, token]);
+  }, [product?.id, token, researchRefreshKey]);
 
   const loadResearchStatus = async () => {
     if (!product?.id) return;
@@ -76,6 +80,17 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
         const data = await res.json();
         setSearchProviderStatus(data.status);
         if (data.suggested_query) setSearchQuery(data.suggested_query);
+        const attempt = data.research_attempt;
+        if (attempt?.status === 'failed') {
+          setSearchError(attempt.error_message || 'The latest market search failed.');
+          setSearchStatusMsg(null);
+        } else if (attempt?.status === 'no_matches') {
+          setSearchError(null);
+          setSearchStatusMsg('Search completed: no relevant comparable products were found. You may continue.');
+        } else if (attempt?.status === 'completed') {
+          setSearchError(null);
+          setSearchStatusMsg('The latest matching market search is ready.');
+        }
       }
     } catch {
       // Ignore
@@ -113,9 +128,11 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
       });
       const data = await res.json();
       if (data.status === 'completed') {
+        onSkipResearchChange?.(false);
         setReferences(data.references || []);
         setSearchStatusMsg(`Found ${data.references?.length || 0} comparable market references.`);
       } else if (data.status === 'no_matches') {
+        onSkipResearchChange?.(false);
         setReferences(data.references || []);
         setSearchStatusMsg('Search completed: No direct competitor products found for this query.');
       } else {
@@ -419,7 +436,7 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
                 <button type="button" className="btn btn-secondary" style={{ fontSize: '10px', padding: '2px 8px' }} onClick={handleRunSearch}>
                   Retry Search
                 </button>
-                <button type="button" className="btn btn-secondary" style={{ fontSize: '10px', padding: '2px 8px' }} onClick={() => onSkipResearchChange(true)}>
+                <button type="button" className="btn btn-secondary" style={{ fontSize: '10px', padding: '2px 8px' }} onClick={() => onContinueWithoutResearch ? onContinueWithoutResearch() : onSkipResearchChange(true)}>
                   Continue without research
                 </button>
               </div>

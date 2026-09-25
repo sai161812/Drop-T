@@ -10,17 +10,20 @@ import { ProductRepository } from '../db/productRepository.js';
 import { TestRepository } from '../db/testRepository.js';
 import { ReferenceRepository } from '../db/referenceRepository.js';
 import { SearchService } from '../search/searchService.js';
+import { ResearchRepository } from '../db/researchRepository.js';
+import { executeResearchAttempt } from '../research/researchWorkflow.js';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../middleware/authMiddleware.js';
 
 export const productRouter = Router();
 
 // GET /api/products - Public Feed of Published Products (Newest-first)
-productRouter.get('/', (req: Request, res: Response) => {
+productRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
   try {
     const category = req.query.category ? String(req.query.category) : undefined;
     const query = req.query.q ? String(req.query.q) : undefined;
 
-    const products = ProductRepository.listPublished(category, query);
+    if (req.user) res.setHeader('Cache-Control', 'private, no-store');
+    const products = ProductRepository.listPublished(category, query, req.user?.id);
     res.json({ products });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to load product feed', message: err.message });
@@ -377,7 +380,8 @@ productRouter.get('/:id/research/status', requireAuth, requireRole(['startup']),
 
     const status = SearchService.getProviderStatus();
     const query = SearchService.buildSearchQuery(product);
-    res.json({ status, suggested_query: query });
+    const attempt = ResearchRepository.getLatest(product.id, ResearchRepository.fingerprint(product));
+    res.json({ status, suggested_query: query, research_attempt: attempt });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message || 'Failed to get research status' });
   }
@@ -394,19 +398,14 @@ productRouter.post('/:id/research/search', requireAuth, requireRole(['startup'])
     }
 
     const customQuery = req.body.query ? String(req.body.query) : undefined;
-    const searchResult = await SearchService.searchComparableProducts(product, customQuery);
-
-    if (searchResult.status === 'completed' && searchResult.references.length > 0) {
-      ReferenceRepository.saveReferences(product.id, searchResult.references);
-    }
-
-    const currentReferences = ReferenceRepository.listByProductId(product.id);
+    const { result: searchResult, attempt, references: currentReferences } = await executeResearchAttempt(product.id, product, customQuery);
 
     res.json({
       status: searchResult.status,
       query: searchResult.query,
       provider: searchResult.provider,
       error: searchResult.error,
+      research_attempt: attempt,
       references: currentReferences,
       selected_count: currentReferences.filter(r => r.selected).length
     });
@@ -425,7 +424,8 @@ productRouter.get('/:id/research/references', requireAuth, requireRole(['startup
       return res.status(403).json({ error: 'Only the product owner can access references.' });
     }
 
-    const references = ReferenceRepository.listByProductId(productId);
+    const attempt = ResearchRepository.getLatest(product.id, ResearchRepository.fingerprint(product));
+    const references = ReferenceRepository.listForAttempt(productId, attempt?.id);
     res.json({ references });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message || 'Failed to retrieve references' });
@@ -472,7 +472,8 @@ productRouter.patch('/:id/research/references/:refId', requireAuth, requireRole(
     const reference = ReferenceRepository.getByProductAndId(productId, refId);
     if (!reference) return res.status(404).json({ error: 'Reference not found for this product' });
     if (selected) {
-      const currentSelected = ReferenceRepository.getSelectedByProductId(productId);
+      const attemptId = reference.research_attempt_id || ResearchRepository.getLatestForProduct(productId)?.id;
+      const currentSelected = ReferenceRepository.getSelectedForAttempt(productId, attemptId);
       if (currentSelected.length >= 5 && !currentSelected.some(r => r.id === refId)) {
         return res.status(400).json({ error: 'You can select up to 5 references for simulation.' });
       }

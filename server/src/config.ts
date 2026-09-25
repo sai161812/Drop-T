@@ -13,7 +13,6 @@ export interface ServerConfig {
   uploadDir: string;
   groqApiKey: string;
   groqModel: string;
-  groqVisionModel: string;
   groqTemperature: number;
   groqMaxRetries: number;
   braveSearchApiKey: string;
@@ -28,7 +27,6 @@ export const config: ServerConfig = {
   uploadDir: path.resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads'),
   groqApiKey: process.env.GROQ_API_KEY || '',
   groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-  groqVisionModel: process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview',
   groqTemperature: parseFloat(process.env.GROQ_TEMPERATURE || '0.2'),
   groqMaxRetries: parseInt(process.env.GROQ_MAX_RETRIES || '5', 10),
   braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY || '',

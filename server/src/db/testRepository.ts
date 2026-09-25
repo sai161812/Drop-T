@@ -558,7 +558,9 @@ export class TestRepository {
     modelId?: string,
     mode?: 'single' | 'comparison',
     researchStatus: 'without_research' | 'completed' | 'no_matches' | 'failed' | 'skipped' = 'without_research',
-    references: any[] = []
+    references: any[] = [],
+    referenceSummary?: string,
+    researchAttempt?: any
   ): Run {
     const db = getDatabase();
     const id = uuidv4();
@@ -587,7 +589,9 @@ export class TestRepository {
       test: fullTest,
       profiles,
       references: selectedRefs,
-      selected_reference_ids: selectedRefIds
+      selected_reference_ids: selectedRefIds,
+      reference_summary: referenceSummary,
+      research_attempt: researchAttempt
     };
     db.prepare('UPDATE runs SET snapshot = ? WHERE id = ?').run(JSON.stringify(snapshot), id);
 
@@ -804,6 +808,7 @@ export class TestRepository {
     references?: CompetitorReference[];
     selected_reference_ids?: string[];
     reference_summary?: string;
+    research_attempt?: any;
   } | null {
     const row = getDatabase().prepare('SELECT snapshot FROM runs WHERE id = ?').get(runId) as { snapshot?: string } | undefined;
     return row?.snapshot ? JSON.parse(row.snapshot) : null;

@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Product, CompetitorReference, SearchProviderStatus, EvidenceType } from '@droptest/shared';
 import { config } from '../config.js';
 
-interface RawSearchResult {
+export interface RawSearchResult {
   title: string;
   url: string;
   snippet: string;
@@ -54,47 +54,24 @@ export class SearchService {
    * Build an effective, concise market search query from product facts
    */
   static buildSearchQuery(product: Product): string {
-    const parts: string[] = [];
-
-    // Category terms
-    const categoryMap: Record<string, string> = {
-      clothing_accessories: 'sustainable clothing apparel',
-      local_food_beverages: 'artisan food beverage brand',
-      digital_products_services: 'software tool app platform',
+    const categoryLabels: Record<string, string> = {
+      clothing_accessories: 'clothing accessories',
+      local_food_beverages: 'food beverages',
+      digital_products_services: 'digital product service',
       other: 'product'
     };
-    const catTerm = categoryMap[product.category] || 'product';
-
-    // Distinguishing features from category_data
-    let featureTerm = '';
-    if (product.category_data) {
-      if (product.category_data.material) {
-        featureTerm += `${product.category_data.material} `;
-      }
-      if (product.category_data.item_type) {
-        featureTerm += `${product.category_data.item_type} `;
-      }
-      if (product.category_data.core_use_case) {
-        featureTerm += `${product.category_data.core_use_case} `;
-      }
-      if (product.category_data.main_function) {
-        featureTerm += `${product.category_data.main_function} `;
-      }
-    }
-
-    // Market / region
-    let marketTerm = '';
-    if (Array.isArray(product.availability_markets) && product.availability_markets.length > 0 && product.availability_markets[0] !== 'not_decided') {
-      marketTerm = product.availability_markets[0];
-    } else if (product.currency === 'INR') {
-      marketTerm = 'India';
-    }
-
-    const cleanSummary = (product.summary || '').replace(/[^\w\s]/g, ' ').split(/\s+/).slice(0, 6).join(' ');
-    
-    // Combine query
-    const query = `${product.name} ${featureTerm} ${catTerm} ${marketTerm}`.trim().replace(/\s+/g, ' ');
-    return query.length > 10 ? query : `${product.name} ${cleanSummary} competitors alternatives`;
+    const data = product.category_data || {};
+    const enteredFeatures = [data.material, data.item_type, data.core_use_case, data.main_function]
+      .filter(value => typeof value === 'string' && value.trim()).map(value => String(value).trim());
+    const markets = Array.isArray(product.availability_markets)
+      ? product.availability_markets.filter(value => value && value !== 'not_decided').slice(0, 2)
+      : [];
+    const price = typeof product.price === 'number' && product.price > 0
+      ? `${product.currency || ''} ${product.price}`.trim()
+      : '';
+    const summary = (product.summary || '').replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 8).join(' ');
+    return [product.name, categoryLabels[product.category] || product.category, ...enteredFeatures, ...markets, price, summary, 'alternatives']
+      .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
   }
 
   /**
@@ -140,44 +117,7 @@ export class SearchService {
         };
       }
 
-      // Filter out low quality results, remove duplicates by domain, and convert to CompetitorReference
-      const seenDomains = new Set<string>();
-      const references: CompetitorReference[] = [];
-
-      for (const item of rawResults) {
-        const domain = item.domain || this.extractDomain(item.url);
-        if (!domain || seenDomains.has(domain.toLowerCase())) {
-          continue;
-        }
-
-        // Avoid search engine self-links
-        if (domain.includes('duckduckgo.com') || domain.includes('google.com') || domain.includes('bing.com')) {
-          continue;
-        }
-
-        seenDomains.add(domain.toLowerCase());
-
-        // Extract clean facts supported by the actual snippet
-        const supportedFacts = this.extractSupportedFacts(item.snippet, item.title);
-
-        references.push({
-          id: uuidv4(),
-          product_id: product.id,
-          query,
-          title: item.title.trim().slice(0, 200),
-          url: item.url.trim(),
-          domain,
-          snippet_or_fact: item.snippet.trim().slice(0, 500),
-          source_type: 'automated',
-          evidence_type: 'retrieved_snippet' as EvidenceType,
-          supported_facts: supportedFacts,
-          selected: references.length < 5, // Select up to 5 by default
-          date_checked: now,
-          created_at: now
-        });
-
-        if (references.length >= 8) break; // Collect up to 8 unique references
-      }
+      const references = this.processSearchResults(rawResults, product, query, now);
 
       if (references.length === 0) {
         return {
@@ -203,6 +143,59 @@ export class SearchService {
         error: err.message || 'Search execution failed'
       };
     }
+  }
+
+  static canonicalizeUrl(urlStr: string): string {
+    try {
+      const url = new URL(urlStr.trim());
+      url.hash = '';
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid', 'ref']
+        .forEach(key => url.searchParams.delete(key));
+      url.hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+      url.pathname = url.pathname.replace(/\/+$/, '') || '/';
+      const sorted = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
+      url.search = '';
+      sorted.forEach(([key, value]) => url.searchParams.append(key, value));
+      return url.toString();
+    } catch {
+      return urlStr.trim();
+    }
+  }
+
+  static processSearchResults(rawResults: RawSearchResult[], product: Product, query: string, now = new Date().toISOString()): CompetitorReference[] {
+    const seenUrls = new Set<string>();
+    const productTokens = [product.name, product.category, product.summary]
+      .join(' ').toLowerCase().split(/\W+/).filter(token => token.length > 3);
+    const ranked = rawResults.map((item, index) => {
+      const canonicalUrl = this.canonicalizeUrl(item.url);
+      const domain = item.domain || this.extractDomain(canonicalUrl);
+      const text = `${item.title} ${item.snippet}`.toLowerCase();
+      const overlap = productTokens.filter(token => text.includes(token)).length;
+      let productPath = 0;
+      try { productPath = /\/(products?|shop|store|pricing|services?)\b/i.test(new URL(canonicalUrl).pathname) ? 2 : 0; } catch { /* filtered below */ }
+      return { item, canonicalUrl, domain, score: overlap + productPath, index };
+    }).sort((a, b) => b.score - a.score || a.index - b.index);
+
+    const references: CompetitorReference[] = [];
+    for (const { item, canonicalUrl, domain, score } of ranked) {
+      const lowerDomain = domain.toLowerCase();
+      const snippet = item.snippet?.trim() || '';
+      let isHttp = false;
+      try { isHttp = ['http:', 'https:'].includes(new URL(canonicalUrl).protocol); } catch { /* excluded */ }
+      if (!isHttp || seenUrls.has(canonicalUrl) || snippet.length < 25 || score < 1) continue;
+      if (/duckduckgo\.com|google\.|bing\.com|facebook\.com|instagram\.com|x\.com$/.test(lowerDomain)) continue;
+      seenUrls.add(canonicalUrl);
+      references.push({
+        id: uuidv4(), product_id: product.id, query,
+        title: item.title.trim().slice(0, 200), url: canonicalUrl, domain,
+        snippet_or_fact: snippet.slice(0, 500), source_type: 'automated',
+        evidence_type: 'retrieved_snippet' as EvidenceType,
+        supported_facts: this.extractSupportedFacts(snippet, item.title),
+        selected: references.length < 5, date_checked: now, created_at: now
+      });
+      if (references.length >= 8) break;
+    }
+    return references;
   }
 
   /**

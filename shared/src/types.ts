@@ -440,6 +440,7 @@ export interface SegmentResultBreakdown {
   unavailable: number;
   total: number;
   eligible: number;
+  missing: number;
 }
 
 export interface MarketResultBreakdown {
@@ -451,6 +452,7 @@ export interface MarketResultBreakdown {
   total: number;
   eligible: number;
   access_status: AccessStatus;
+  missing: number;
 }
 
 export interface ObjectionSummaryItem {
@@ -470,6 +472,7 @@ export interface OptionResultSummary {
   unsure_total: number;
   not_interested_total: number;
   unavailable_total: number;
+  missing_total: number;
   by_segment: Record<AudienceSegment, SegmentResultBreakdown>;
   by_market: Record<string, MarketResultBreakdown>;
   dominant_objections: ObjectionSummaryItem[];
@@ -482,7 +485,10 @@ export type TransitionType =
   | 'remained_hesitant'
   | 'remained_unavailable'
   | 'access_opened'
-  | 'access_closed';
+  | 'access_closed'
+  | 'incomplete';
+
+export type PersonaResponse = ResponseCategory | 'missing';
 
 export interface ProfileTransition {
   profile_id: string;
@@ -494,8 +500,10 @@ export interface ProfileTransition {
   constraints: string[];
   priorities: string[];
   access_mode: string;
-  response_a: ResponseCategory;
-  response_b: ResponseCategory;
+  response_a: PersonaResponse;
+  response_b: PersonaResponse;
+  evaluation_status_a: 'complete' | 'missing';
+  evaluation_status_b: 'complete' | 'missing';
   access_status_a: AccessStatus;
   access_status_b: AccessStatus;
   reason_a: string;
@@ -515,6 +523,7 @@ export interface TransitionMatrix {
   matrix: Record<ResponseCategory, Record<ResponseCategory, number>>;
   top_transitions: Array<{ from: ResponseCategory; to: ResponseCategory; count: number }>;
   net_interested_change: number; // interested_B - interested_A
+  incomplete_pairs: number;
   segment_switches: Record<AudienceSegment, {
     gained_interested: number;
     lost_interested: number;
@@ -705,6 +714,7 @@ export interface ProductPublicSummary {
   currency: string;
   images: ImageMetadata[];
   save_count: number;
+  is_saved?: boolean;
   feedback_count: number;
   created_at: string;
   updated_at: string;
@@ -822,6 +832,22 @@ export interface CompetitorReference {
   selected: boolean;
   date_checked: string;
   created_at?: string;
+  research_attempt_id?: string;
+}
+
+export type ResearchAttemptStatus = 'pending' | 'completed' | 'no_matches' | 'failed' | 'skipped';
+
+export interface ResearchAttempt {
+  id: string;
+  product_id: string;
+  input_fingerprint: string;
+  query: string;
+  provider: string;
+  status: ResearchAttemptStatus;
+  error_message?: string;
+  comparison_summary?: string;
+  started_at: string;
+  completed_at?: string;
 }
 
 export interface SearchProviderStatus {

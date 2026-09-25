@@ -277,17 +277,21 @@ export class ProductRepository {
   /**
    * List published products in newest-first order with optional category & search filter
    */
-  static listPublished(category?: string, query?: string): ProductPublicSummary[] {
+  static listPublished(category?: string, query?: string, viewerId?: string): ProductPublicSummary[] {
     const db = getDatabase();
     let sql = `
       SELECT p.*, u.display_name as owner_name, u.startup_name,
              (SELECT COUNT(*) FROM product_saves ps WHERE ps.product_id = p.id) as save_count,
-             (SELECT COUNT(*) FROM product_feedback pf WHERE pf.product_id = p.id) as feedback_count
+             (SELECT COUNT(*) FROM product_feedback pf WHERE pf.product_id = p.id) as feedback_count,
+             CASE WHEN ? IS NULL THEN 0 ELSE EXISTS(
+               SELECT 1 FROM product_saves viewer_save
+               WHERE viewer_save.product_id = p.id AND viewer_save.user_id = ?
+             ) END as is_saved
       FROM products p
       JOIN users u ON p.owner_id = u.id
       WHERE p.status = 'published'
     `;
-    const params: any[] = [];
+    const params: any[] = [viewerId || null, viewerId || null];
 
     if (category && category !== 'all') {
       sql += ` AND p.category = ?`;
@@ -317,6 +321,7 @@ export class ProductRepository {
       currency: r.currency,
       images: JSON.parse(r.images || '[]'),
       save_count: r.save_count || 0,
+      is_saved: Boolean(r.is_saved),
       feedback_count: r.feedback_count || 0,
       created_at: r.created_at,
       updated_at: r.updated_at

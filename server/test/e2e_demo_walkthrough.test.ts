@@ -38,8 +38,10 @@ describe('E2E Full Demo Walkthrough & Role Access Control Verification', () => {
     return profiles.map((p, idx) => ({
       profile_id: p.id,
       response: option.served_markets.includes(p.market) ? ('interested' as const) : ('not_interested' as const),
-      primary_objection: option.served_markets.includes(p.market) ? 'Slightly higher price than conventional synthetic tees' : 'Outside coverage area',
-      reason: `Persona in ${p.market} compared with market alternative ${refIds[0] || 'market baseline'}`,
+      primary_objection: idx === 0 && refIds.length > 0 ? 'Slightly higher price than the cited alternative' : 'Price needs consideration',
+      reason: idx === 0 && refIds.length > 0
+        ? `Persona in ${p.market} compared with the cited market alternative.`
+        : `Persona in ${p.market} evaluated the stated product price and material.`,
       factor_tags: ['price' as const],
       referenced_fields: ['price', 'material'],
       source_ids: idx === 0 && refIds.length > 0 ? [refIds[0]] : []

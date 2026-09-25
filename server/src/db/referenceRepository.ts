@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDatabase } from './database.js';
 import { CompetitorReference, EvidenceType } from '@droptest/shared';
 import { SearchService } from '../search/searchService.js';
+import { ResearchRepository } from './researchRepository.js';
 
 export class ReferenceRepository {
   /**
@@ -33,10 +34,23 @@ export class ReferenceRepository {
     return rows.map(r => this.mapRow(r));
   }
 
+  static listForAttempt(productId: string, attemptId?: string): CompetitorReference[] {
+    const rows = getDatabase().prepare(`
+      SELECT * FROM competitor_references
+      WHERE product_id = ? AND (source_type = 'founder_supplied' OR research_attempt_id = ?)
+      ORDER BY source_type = 'founder_supplied' DESC, date_checked DESC
+    `).all(productId, attemptId || '') as any[];
+    return rows.map(row => this.mapRow(row));
+  }
+
+  static getSelectedForAttempt(productId: string, attemptId?: string): CompetitorReference[] {
+    return this.listForAttempt(productId, attemptId).filter(ref => ref.selected).slice(0, 5);
+  }
+
   /**
    * Save a list of newly retrieved references (replacing or merging without duplicates)
    */
-  static saveReferences(productId: string, references: CompetitorReference[]): void {
+  static saveReferences(productId: string, references: CompetitorReference[], attemptId?: string): void {
     if (references.length === 0) return;
     const db = getDatabase();
     const now = new Date().toISOString();
@@ -44,22 +58,23 @@ export class ReferenceRepository {
     const insertStmt = db.prepare(`
       INSERT INTO competitor_references (
         id, product_id, query, title, url, domain, snippet_or_fact,
-        source_type, evidence_type, supported_facts, founder_note, selected, date_checked, created_at
+        source_type, evidence_type, supported_facts, founder_note, selected, date_checked, created_at, research_attempt_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const existingSelected = this.getSelectedByProductId(productId);
+    const existingSelected = this.getSelectedForAttempt(productId, attemptId);
     let selectedCount = existingSelected.length;
 
     db.exec('BEGIN TRANSACTION;');
     try {
       for (const ref of references) {
-        // Check if domain or url already exists for this product
+        const canonicalUrl = SearchService.canonicalizeUrl(ref.url);
+        // A URL is unique inside one attempt; separate pages on one domain remain valid.
         const existing = db.prepare(`
           SELECT id FROM competitor_references
-          WHERE product_id = ? AND (url = ? OR domain = ?)
-        `).get(productId, ref.url, ref.domain);
+          WHERE product_id = ? AND url = ? AND COALESCE(research_attempt_id, '') = COALESCE(?, '')
+        `).get(productId, canonicalUrl, attemptId || null);
 
         if (!existing) {
           const isSelected = (ref.selected !== false && selectedCount < 5) ? 1 : 0;
@@ -70,8 +85,8 @@ export class ReferenceRepository {
             productId,
             ref.query,
             ref.title,
-            ref.url,
-            ref.domain,
+            canonicalUrl,
+            SearchService.extractDomain(canonicalUrl),
             ref.snippet_or_fact,
             ref.source_type,
             ref.evidence_type || 'retrieved_snippet',
@@ -79,7 +94,8 @@ export class ReferenceRepository {
             ref.founder_note || null,
             isSelected,
             ref.date_checked || now,
-            ref.created_at || now
+            ref.created_at || now,
+            attemptId || ref.research_attempt_id || null
           );
         }
       }
@@ -100,8 +116,18 @@ export class ReferenceRepository {
     const db = getDatabase();
     const id = uuidv4();
     const now = new Date().toISOString();
-    const domain = SearchService.extractDomain(data.url);
-    const currentSelected = this.getSelectedByProductId(productId);
+    const canonicalUrl = SearchService.canonicalizeUrl(data.url);
+    try {
+      const parsed = new URL(canonicalUrl);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('unsupported protocol');
+    } catch {
+      throw Object.assign(new Error('Reference URL must be a valid HTTP(S) URL.'), { status: 400 });
+    }
+    const domain = SearchService.extractDomain(canonicalUrl);
+    const duplicate = db.prepare('SELECT id FROM competitor_references WHERE product_id = ? AND url = ?').get(productId, canonicalUrl);
+    if (duplicate) throw Object.assign(new Error('This URL is already attached to the product.'), { status: 409 });
+    const currentAttempt = ResearchRepository.getLatestForProduct(productId);
+    const currentSelected = this.getSelectedForAttempt(productId, currentAttempt?.id);
 
     // If already 5 selected, unselect the lowest-priority automated reference to keep total selected <= 5
     if (currentSelected.length >= 5) {
@@ -114,16 +140,16 @@ export class ReferenceRepository {
     const stmt = db.prepare(`
       INSERT INTO competitor_references (
         id, product_id, query, title, url, domain, snippet_or_fact,
-        source_type, evidence_type, supported_facts, founder_note, selected, date_checked, created_at
+        source_type, evidence_type, supported_facts, founder_note, selected, date_checked, created_at, research_attempt_id
       )
-      VALUES (?, ?, 'founder_manual_entry', ?, ?, ?, ?, 'founder_supplied', 'founder_manual_note', ?, ?, 1, ?, ?)
+      VALUES (?, ?, 'founder_manual_entry', ?, ?, ?, ?, 'founder_supplied', 'founder_manual_note', ?, ?, 1, ?, ?, NULL)
     `);
 
     stmt.run(
       id,
       productId,
       data.title.trim(),
-      data.url.trim(),
+      canonicalUrl,
       domain,
       data.note.trim(),
       JSON.stringify([`Founder note: ${data.note.trim()}`]),
@@ -180,8 +206,8 @@ export class ReferenceRepository {
 
     const lines: string[] = ['--- MARKET COMPETITORS & COMPARABLE PRODUCTS ---'];
     references.forEach((ref, index) => {
-      const refCode = `[REF-${index + 1}:${ref.id.slice(0, 8)}]`;
-      lines.push(`${refCode} "${ref.title}" (domain: ${ref.domain})`);
+      const refCode = `REF-${index + 1}`;
+      lines.push(`[${refCode}] full_id=${ref.id} "${ref.title}" (domain: ${ref.domain})`);
       lines.push(`  Source Type: ${ref.evidence_type === 'founder_manual_note' ? 'Founder-Supplied Manual Note' : 'Retrieved Web Snippet'}`);
       if (ref.supported_facts && ref.supported_facts.length > 0) {
         lines.push(`  Supported Facts: ${ref.supported_facts.join('; ')}`);
@@ -194,6 +220,25 @@ export class ReferenceRepository {
     });
 
     return lines.join('\n');
+  }
+
+  static resolveSourceId(rawId: unknown, references: CompetitorReference[]): string | null {
+    const value = String(rawId ?? '').trim();
+    const aliasMatch = value.match(/^\[?REF-(\d+)\]?$/i);
+    if (aliasMatch) return references[Number(aliasMatch[1]) - 1]?.id || null;
+    return references.find(ref => ref.id.toLowerCase() === value.toLowerCase())?.id || null;
+  }
+
+  static buildComparisonSummary(product: any, references: CompetitorReference[]): string {
+    if (!references.length) return 'No selected external sources. Market overlap and differences are unknown.';
+    const productFacts = [product?.summary, product?.category_data?.core_use_case, product?.category_data?.main_function]
+      .filter(Boolean).join(' ').toLowerCase();
+    const lines = references.map((ref, index) => {
+      const facts = (ref.supported_facts.length ? ref.supported_facts : [ref.snippet_or_fact]).filter(Boolean);
+      const overlap = facts.find(fact => fact.toLowerCase().split(/\W+/).some(token => token.length > 4 && productFacts.includes(token)));
+      return `REF-${index + 1}: overlap=${overlap || 'unknown'}; verified_difference=${facts[0] || 'unknown'}; missing_facts=pricing/specifications not present in the retrieved evidence are unknown.`;
+    });
+    return `Selected-source comparison (evidence only):\n${lines.join('\n')}`;
   }
 
   private static mapRow(row: any): CompetitorReference {
@@ -218,7 +263,8 @@ export class ReferenceRepository {
       founder_note: row.founder_note || undefined,
       selected: Boolean(row.selected),
       date_checked: row.date_checked,
-      created_at: row.created_at || row.date_checked
+      created_at: row.created_at || row.date_checked,
+      research_attempt_id: row.research_attempt_id || undefined
     };
   }
 }

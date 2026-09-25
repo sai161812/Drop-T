@@ -26,6 +26,8 @@ interface SetupTestPageProps {
   setSaveStatus?: (status: 'saved' | 'saving' | 'error' | 'idle') => void;
   activeTestId?: string;
   onTestIdChange?: (id: string | undefined) => void;
+  linkedProductId?: string;
+  linkedProductReview?: 'resume' | 'new';
 }
 
 export const SetupTestPage: React.FC<SetupTestPageProps> = ({
@@ -34,7 +36,9 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   onUpdateHeaderTitle,
   setSaveStatus,
   activeTestId,
-  onTestIdChange
+  onTestIdChange,
+  linkedProductId,
+  linkedProductReview = 'resume'
 }) => {
   const { token } = useAuth();
   // Active test ID if saved
@@ -44,11 +48,14 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const [panelSeed, setPanelSeed] = useState(12345);
   const [isLocked, setIsLocked] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [labLoadError, setLabLoadError] = useState<string | null>(null);
 
   // Mode: Default to single-product review (50 evaluations)
   const [mode, setMode] = useState<'single' | 'comparison'>('single');
   const [linkedProduct, setLinkedProduct] = useState<any | null>(null);
   const [trialPrice, setTrialPrice] = useState<number | undefined>(undefined);
+  const [skipResearch, setSkipResearch] = useState(false);
+  const [researchRefreshKey, setResearchRefreshKey] = useState(0);
 
   // Load initial preset (Clothing)
   const initialPreset = DOMAIN_PRESETS.clothing_accessories.payload;
@@ -191,16 +198,19 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   };
 
   // Load product lab when URL has ?product=... or ?id=...
-  const loadProductLab = useCallback(async (productId: string) => {
+  const loadProductLab = useCallback(async (productId: string, review: 'resume' | 'new') => {
     setIsLoadingDraft(true);
+    setLabLoadError(null);
     try {
-      const review = new URLSearchParams(window.location.search).get('review');
       setTrialPrice(undefined);
       const res = await fetch(`/api/products/${productId}/lab${review === 'new' ? '?review=new' : ''}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to open this product in the Synthetic Lab.');
+      }
+
         setLinkedProduct(data.product);
         if (data.test) {
           const full = data.test;
@@ -226,22 +236,24 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           applyPreset(data.prefilled_payload, false);
           setMode('single');
         }
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load product lab:', err);
+      setLinkedProduct(null);
+      setLabLoadError(err.message || 'Unable to open this product in the Synthetic Lab.');
     } finally {
       setIsLoadingDraft(false);
     }
   }, [onTestIdChange, token]);
 
-  // Check URL on mount for product ID
+  // React to every product Lab navigation, including when this page is already mounted.
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const pId = urlParams.get('product') || urlParams.get('product_id');
-    if (pId) {
-      void loadProductLab(pId);
+    if (linkedProductId) {
+      void loadProductLab(linkedProductId, linkedProductReview);
+    } else {
+      setLinkedProduct(null);
+      setLabLoadError(null);
     }
-  }, [loadProductLab]);
+  }, [linkedProductId, linkedProductReview, loadProductLab]);
 
   // Load a saved draft by ID from SQLite
   const loadDraftById = async (id: string) => {
@@ -465,17 +477,21 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [testId, runState.status, runState.runId, mode, token]);
 
-  const requestRun = async (url: string) => {
+  const requestRun = async (url: string, skipResearchForRun?: boolean) => {
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
+        },
+        body: JSON.stringify(skipResearchForRun === undefined ? {} : { skip_research: skipResearchForRun })
       });
       const data = await res.json();
-      if (!res.ok || !data.run) throw new Error(data.error || 'Could not start the simulation.');
+      if (!res.ok || !data.run) {
+        if (data.code === 'RESEARCH_FAILED' || data.code === 'RESEARCH_PENDING') setResearchRefreshKey(value => value + 1);
+        throw new Error(data.error || 'Could not start the simulation.');
+      }
       setIsLocked(true);
       updateRunState(data.run);
     } catch (error) {
@@ -485,7 +501,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     }
   };
 
-  const handleRunSimulation = async () => {
+  const handleRunSimulation = async (skipOverride?: boolean) => {
     setIsSubmitting(true);
     setRunState({ status: 'running', message: 'Saving your test before starting...' });
     const savedId = await handleSaveDraft();
@@ -494,7 +510,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       setIsSubmitting(false);
       return;
     }
-    await requestRun('/api/tests/' + savedId + '/run');
+    await requestRun('/api/tests/' + savedId + '/run', skipOverride ?? skipResearch);
   };
 
   const handleRetryIncompleteRun = async (runId: string) => {
@@ -505,6 +521,11 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   };
 
   const handleUploadImage = async (file: File): Promise<ImageMetadata | null> => {
+    if (!token) {
+      alert('Please sign in before uploading an image.');
+      return null;
+    }
+
     const formData = new FormData();
     formData.append('image', file);
 
@@ -516,7 +537,8 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       });
 
       if (!res.ok) {
-        alert('Image upload failed. Check file size (max 5MB) and format.');
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || 'Image upload failed. Check file size (max 5MB) and format.');
         return null;
       }
 
@@ -545,6 +567,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       {/* 65% Main Setup Column */}
       <div className="setup-column">
         {saveError && <p role="alert">{saveError}</p>}
+        {labLoadError && <p role="alert" style={{ color: 'var(--color-danger)' }}>{labLoadError}</p>}
         {isLocked && (
           <div className="workbench-card">
             <p>This test is frozen. Its inputs, panel and evaluations stay paired with this run.</p>
@@ -562,6 +585,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           trialPrice={trialPrice}
           onTrialPriceChange={handleTrialPriceChange}
           isPriceNotSet={isPriceNotSet}
+          skipResearch={skipResearch}
+          onSkipResearchChange={setSkipResearch}
+          onContinueWithoutResearch={() => void handleRunSimulation(true)}
+          researchRefreshKey={researchRefreshKey}
         />
 
         {/* Simulation Execution State Banner */}

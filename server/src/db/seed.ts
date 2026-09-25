@@ -69,10 +69,10 @@ export function runSeed(): void {
         images: [
           {
             id: uuidv4(),
-            filename: 'hemp_summer_tee.jpg',
-            url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80',
-            mime_type: 'image/jpeg',
-            size_bytes: 142800,
+            filename: 'organic-hemp-summer-tee.png',
+            url: '/images/products/organic-hemp-summer-tee.png',
+            mime_type: 'image/png',
+            size_bytes: 2470127,
             confirmed_visual_description: 'Sage green crewneck organic hemp t-shirt displayed against natural linen background'
           }
         ]
@@ -82,6 +82,17 @@ export function runSeed(): void {
       product1 = db.prepare('SELECT * FROM products WHERE owner_id = ? AND name = ?').get(founderA.id, p1Name) as any;
     }
   } else {
+    const existingImages = JSON.parse(product1.images || '[]');
+    if (existingImages[0]?.url?.includes('images.unsplash.com/photo-1521572267360-ee0c2909d518')) {
+      existingImages[0] = {
+        ...existingImages[0],
+        filename: 'organic-hemp-summer-tee.png',
+        url: '/images/products/organic-hemp-summer-tee.png',
+        mime_type: 'image/png',
+        size_bytes: 2470127
+      };
+      db.prepare('UPDATE products SET images = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(existingImages), now, product1.id);
+    }
     console.log(`  ✓ Product 1 already exists: "${p1Name}"`);
   }
 
@@ -108,10 +119,10 @@ export function runSeed(): void {
         images: [
           {
             id: uuidv4(),
-            filename: 'cold_brew_press.jpg',
-            url: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=800&q=80',
-            mime_type: 'image/jpeg',
-            size_bytes: 198400,
+            filename: 'cold-brew-press-tumbler.png',
+            url: '/images/products/cold-brew-press-tumbler.png',
+            mime_type: 'image/png',
+            size_bytes: 1948537,
             confirmed_visual_description: 'Matte black double-walled ceramic tumbler with raw cork band next to cold brew glass carafe'
           }
         ]
@@ -121,6 +132,17 @@ export function runSeed(): void {
       product2 = db.prepare('SELECT * FROM products WHERE owner_id = ? AND name = ?').get(founderB.id, p2Name) as any;
     }
   } else {
+    const existingImages = JSON.parse(product2.images || '[]');
+    if (existingImages[0]?.url?.includes('images.unsplash.com/photo-1514432324607-a09d9b4aefdd')) {
+      existingImages[0] = {
+        ...existingImages[0],
+        filename: 'cold-brew-press-tumbler.png',
+        url: '/images/products/cold-brew-press-tumbler.png',
+        mime_type: 'image/png',
+        size_bytes: 1948537
+      };
+      db.prepare('UPDATE products SET images = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(existingImages), now, product2.id);
+    }
     // Correct only the original demo fixture signature. This avoids reclassifying
     // an edited product and does not modify its engagement or linked lab data.
     try {

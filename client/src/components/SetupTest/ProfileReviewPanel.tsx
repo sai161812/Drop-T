@@ -504,8 +504,8 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
                 ) : (
                   filteredProfiles.map((prof, idx) => {
                     const elig = profileEligibility[prof.id];
-                    const isServedA = elig ? elig.a.is_eligible : true;
-                    const isServedB = elig ? elig.b.is_eligible : true;
+                    const isServedA = elig?.a?.is_eligible ?? true;
+                    const isServedB = optionB ? (elig?.b?.is_eligible ?? true) : true;
 
                     return (
                       <tr 
@@ -674,20 +674,22 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
               <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: '16px', fontSize: '11px' }}>
                 <div>
                   <strong>Option A Deterministic Eligibility: </strong>
-                  {profileEligibility[selectedProfile.id]?.a.is_eligible ? (
+                  {profileEligibility[selectedProfile.id]?.a?.is_eligible ? (
                     <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>Served (Reachable in {selectedProfile.market})</span>
                   ) : (
-                    <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{profileEligibility[selectedProfile.id]?.a.reason_if_unserved}</span>
+                    <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{profileEligibility[selectedProfile.id]?.a?.reason_if_unserved || 'Calculating eligibility...'}</span>
                   )}
                 </div>
-                <div>
-                  <strong>Option B Deterministic Eligibility: </strong>
-                  {profileEligibility[selectedProfile.id]?.b.is_eligible ? (
-                    <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>Served (Reachable in {selectedProfile.market})</span>
-                  ) : (
-                    <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{profileEligibility[selectedProfile.id]?.b.reason_if_unserved}</span>
-                  )}
-                </div>
+                {optionB && (
+                  <div>
+                    <strong>Option B Deterministic Eligibility: </strong>
+                    {profileEligibility[selectedProfile.id]?.b?.is_eligible ? (
+                      <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>Served (Reachable in {selectedProfile.market})</span>
+                    ) : (
+                      <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{profileEligibility[selectedProfile.id]?.b?.reason_if_unserved || 'Calculating eligibility...'}</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
