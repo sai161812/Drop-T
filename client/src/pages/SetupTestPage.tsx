@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   DomainId, 
   PrimaryLever, 
@@ -12,12 +12,32 @@ import { AudienceLocationForm } from '../components/SetupTest/AudienceLocationFo
 import { OfferingForm } from '../components/SetupTest/OfferingForm.js';
 import { AlternativeBForm, OptionAData, OptionBData } from '../components/SetupTest/AlternativeBForm.js';
 import { FinancialsForm } from '../components/SetupTest/FinancialsForm.js';
-import { AssumptionSummary } from '../components/SetupTest/AssumptionSummary.js';
 import { ProfileReviewPanel } from '../components/SetupTest/ProfileReviewPanel.js';
 import { PreflightLabCard } from '../components/SetupTest/PreflightLabCard.js';
 import { DOMAIN_PRESETS } from '../config/templates.js';
-import { FolderOpen } from 'lucide-react';
+import { 
+  FolderOpen, 
+  FlaskConical, 
+  Rocket, 
+  Package, 
+  Users, 
+  TrendingUp, 
+  Cpu, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Lock, 
+  Play, 
+  ArrowRight, 
+  ArrowLeft, 
+  Save,
+  Sparkles,
+  RefreshCw,
+  Sliders
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
+import './SetupTestPage.css';
+
+export type LabPageId = 'overview' | 'offering' | 'audience' | 'financials' | 'simulation';
 
 interface SetupTestPageProps {
   onSaveSuccess?: (savedData: any) => void;
@@ -41,10 +61,15 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   linkedProductReview = 'resume'
 }) => {
   const { token } = useAuth();
+  
+  // Page navigation state (Default: 'overview')
+  const [activePage, setActivePage] = useState<LabPageId>('overview');
+
   // Active test ID if saved
   const [testId, setTestId] = useState<string | undefined>(activeTestId);
   const [savedDraftsList, setSavedDraftsList] = useState<Test[]>([]);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isSavingLocal, setIsSavingLocal] = useState(false);
   const [panelSeed, setPanelSeed] = useState(12345);
   const [isLocked, setIsLocked] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -211,31 +236,31 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         throw new Error(data.error || 'Unable to open this product in the Synthetic Lab.');
       }
 
-        setLinkedProduct(data.product);
-        if (data.test) {
-          const full = data.test;
-          if (data.product.price === null && full.options.A.price > 0) setTrialPrice(full.options.A.price);
-          setTestId(full.test.id);
-          onTestIdChange?.(full.test.id);
-          setIsLocked(Boolean(data.run));
-          if (data.run) updateRunState(data.run);
-          else setRunState({ status: 'idle' });
-          const payload: TestDraftPayload = {
-            panel_seed: full.test.panel_seed,
-            mode: full.mode || (full.options.B ? 'comparison' : 'single'),
-            product_id: productId,
-            test: { id: full.test.id, title: full.test.title, domain_id: full.test.domain_id, product_id: productId },
-            offering: full.offering,
-            option_a: full.options.A,
-            option_b: full.options.B,
-            audience_config: full.audience_config,
-            comparison_lever: full.comparison_lever
-          };
-          applyPreset(payload, true);
-        } else if (data.prefilled_payload) {
-          applyPreset(data.prefilled_payload, false);
-          setMode('single');
-        }
+      setLinkedProduct(data.product);
+      if (data.test) {
+        const full = data.test;
+        if (data.product.price === null && full.options.A.price > 0) setTrialPrice(full.options.A.price);
+        setTestId(full.test.id);
+        onTestIdChange?.(full.test.id);
+        setIsLocked(Boolean(data.run));
+        if (data.run) updateRunState(data.run);
+        else setRunState({ status: 'idle' });
+        const payload: TestDraftPayload = {
+          panel_seed: full.test.panel_seed,
+          mode: full.mode || (full.options.B ? 'comparison' : 'single'),
+          product_id: productId,
+          test: { id: full.test.id, title: full.test.title, domain_id: full.test.domain_id, product_id: productId },
+          offering: full.offering,
+          option_a: full.options.A,
+          option_b: full.options.B,
+          audience_config: full.audience_config,
+          comparison_lever: full.comparison_lever
+        };
+        applyPreset(payload, true);
+      } else if (data.prefilled_payload) {
+        applyPreset(data.prefilled_payload, false);
+        setMode('single');
+      }
     } catch (err: any) {
       console.error('Failed to load product lab:', err);
       setLinkedProduct(null);
@@ -245,7 +270,6 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     }
   }, [onTestIdChange, token]);
 
-  // React to every product Lab navigation, including when this page is already mounted.
   useEffect(() => {
     if (linkedProductId) {
       void loadProductLab(linkedProductId, linkedProductReview);
@@ -403,6 +427,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
   const handleSaveDraft = async (): Promise<string | null> => {
     setSaveError(null);
+    setIsSavingLocal(true);
     if (setSaveStatus) setSaveStatus('saving');
     try {
       const res = await fetch('/api/tests', {
@@ -435,6 +460,8 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       setSaveError('Unable to reach the server. Your changes are still in this form.');
       if (setSaveStatus) setSaveStatus('error');
       return null;
+    } finally {
+      setIsSavingLocal(false);
     }
   };
 
@@ -561,37 +588,250 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   };
 
   const isPriceNotSet = linkedProduct ? linkedProduct.price === null : false;
+  const isFormValid = missingInputs.length === 0 && !isLocked;
+
+  // Page definitions for the left sidebar
+  const labPages = useMemo(() => {
+    // Check completion status for each page
+    const isOfferingComplete = Boolean(
+      title.trim() &&
+      shortValueProp.trim() &&
+      description.trim() &&
+      optionA.name.trim() &&
+      optionA.primary_message.trim() &&
+      (mode !== 'comparison' || (optionB.name.trim() && optionB.primary_message.trim()))
+    );
+
+    const isAudienceComplete = Boolean(
+      intendedBuyer.trim() &&
+      adjacentBuyer.trim() &&
+      audienceMarkets.length > 0 &&
+      expectedSpendMin >= 0 &&
+      expectedSpendMax >= expectedSpendMin
+    );
+
+    const isFinancialsComplete = true; // Financials have sensible defaults
+    const isOverviewComplete = true;
+
+    return [
+      {
+        id: 'overview' as LabPageId,
+        stepNum: '01',
+        title: 'Launch Overview',
+        subtitle: 'Review mode & market research',
+        icon: Rocket,
+        isComplete: isOverviewComplete
+      },
+      {
+        id: 'offering' as LabPageId,
+        stepNum: '02',
+        title: 'Product & Offering',
+        subtitle: mode === 'comparison' ? 'Baseline A & Variant B' : 'Core specs & baseline details',
+        icon: Package,
+        isComplete: isOfferingComplete
+      },
+      {
+        id: 'audience' as LabPageId,
+        stepNum: '03',
+        title: 'Audience & Markets',
+        subtitle: 'Buyer profiles & locations',
+        icon: Users,
+        isComplete: isAudienceComplete
+      },
+      {
+        id: 'financials' as LabPageId,
+        stepNum: '04',
+        title: 'Unit Economics',
+        subtitle: 'Costs, margins & sales volume',
+        icon: TrendingUp,
+        isComplete: isFinancialsComplete
+      },
+      {
+        id: 'simulation' as LabPageId,
+        stepNum: '05',
+        title: 'Panel & Simulation',
+        subtitle: '50 personas & execution',
+        icon: Cpu,
+        isComplete: isFormValid
+      }
+    ];
+  }, [
+    mode, 
+    title, 
+    shortValueProp, 
+    description, 
+    optionA, 
+    optionB, 
+    intendedBuyer, 
+    adjacentBuyer, 
+    audienceMarkets, 
+    expectedSpendMin, 
+    expectedSpendMax, 
+    isFormValid
+  ]);
+
+  const completedCount = labPages.filter(p => p.isComplete).length;
+  const progressPercent = Math.round((completedCount / labPages.length) * 100);
+
+  const currentPageIndex = labPages.findIndex(p => p.id === activePage);
+  const prevPage = currentPageIndex > 0 ? labPages[currentPageIndex - 1] : null;
+  const nextPage = currentPageIndex < labPages.length - 1 ? labPages[currentPageIndex + 1] : null;
 
   return (
-    <div className="workbench-grid">
-      {/* 65% Main Setup Column */}
-      <div className="setup-column">
-        {saveError && <p role="alert">{saveError}</p>}
-        {labLoadError && <p role="alert" style={{ color: 'var(--color-danger)' }}>{labLoadError}</p>}
+    <div className="lab-workbench-layout">
+      {/* 1. Dedicated Left Navigation Sidebar */}
+      <aside className="lab-sidebar" aria-label="Synthetic Lab Navigation">
+        <div className="lab-sidebar-header">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="lab-badge">
+              <FlaskConical size={12} />
+              <span>Synthetic Lab</span>
+            </span>
+            <span style={{ 
+              fontSize: '10px', 
+              fontWeight: 700, 
+              padding: '2px 6px', 
+              borderRadius: 'var(--radius-sm)',
+              background: mode === 'comparison' ? '#FEF3C7' : 'var(--color-intended-bg)',
+              color: mode === 'comparison' ? '#92400E' : 'var(--color-intended)'
+            }}>
+              {mode === 'comparison' ? 'A/B Test (100)' : 'Single (50)'}
+            </span>
+          </div>
+
+          <h2 className="lab-sidebar-title" title={title || 'Product Evaluation'}>
+            {title || (linkedProduct ? linkedProduct.name : 'Product Evaluation')}
+          </h2>
+          <p className="lab-sidebar-subtitle">
+            {linkedProduct ? 'Linked to published proposal' : 'Interactive pre-launch sandbox'}
+          </p>
+        </div>
+
+        {/* Step Pages Navigation List */}
+        <nav aria-label="Synthetic Lab Steps">
+          <ul className="lab-nav-list">
+            {labPages.map((page) => {
+              const Icon = page.icon;
+              const isActive = activePage === page.id;
+              return (
+                <li key={page.id} className="lab-nav-item">
+                  <button
+                    type="button"
+                    className={`lab-nav-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => setActivePage(page.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <div className="lab-nav-btn-content">
+                      <div className="lab-nav-icon-wrap">
+                        <Icon size={14} />
+                      </div>
+                      <div className="lab-nav-text">
+                        <span className="lab-nav-step-num">Step {page.stepNum}</span>
+                        <span className="lab-nav-label">{page.title}</span>
+                      </div>
+                    </div>
+
+                    <div className="lab-nav-status-icon">
+                      {page.isComplete ? (
+                        <CheckCircle2 size={14} color="var(--color-success)" />
+                      ) : (
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-border-strong)' }} />
+                      )}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* Sidebar Footer Controls & Progress */}
+        <div className="lab-sidebar-footer">
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+              <span>Configuration Readiness</span>
+              <span className="tabular-nums" style={{ fontWeight: 600 }}>{completedCount}/{labPages.length}</span>
+            </div>
+            <div className="lab-progress-bar-wrap">
+              <div className="lab-progress-bar-fill" style={{ width: `${progressPercent}%` }} />
+            </div>
+          </div>
+
+          {/* Save Draft Action Button */}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ width: '100%', fontSize: '12px', padding: '6px 10px' }}
+            onClick={() => void handleSaveDraft()}
+            disabled={isLocked || isSubmitting || isSavingLocal || runState.status === 'running'}
+          >
+            {isSavingLocal ? <RefreshCw size={12} className="spin" /> : <Save size={12} />}
+            <span>{isSavingLocal ? 'Saving...' : 'Save Lab Draft'}</span>
+          </button>
+
+          {/* Saved Drafts Dropdown (if exists) */}
+          {savedDraftsList.length > 0 && !linkedProduct && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FolderOpen size={13} color="var(--color-text-muted)" />
+              <select
+                className="form-select"
+                style={{ fontSize: '11px', padding: '3px 6px', width: '100%' }}
+                value={testId || ''}
+                onChange={e => {
+                  if (e.target.value) {
+                    loadDraftById(e.target.value);
+                  }
+                }}
+                disabled={isLoadingDraft}
+              >
+                <option value="" disabled>Load saved draft...</option>
+                {savedDraftsList.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.title.length > 20 ? `${d.title.substring(0, 20)}...` : d.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Quick Run / Execution Button from Sidebar */}
+          <button
+            type="button"
+            className="btn btn-primary lab-quick-run-btn"
+            disabled={!isFormValid || isSubmitting || runState.status === 'running'}
+            onClick={() => void handleRunSimulation()}
+            title={!isFormValid ? 'Complete all required inputs to run simulation' : 'Launch 50-profile synthetic simulation'}
+          >
+            {!isFormValid ? <Lock size={13} /> : <Play size={13} />}
+            <span>{mode === 'single' ? 'Run Review (50)' : 'Run A/B Review (100)'}</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* 2. Main Page Content Area */}
+      <main className="lab-main-content">
+        {saveError && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '13px', background: 'var(--color-danger-bg)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-danger-border)' }}>{saveError}</p>}
+        {labLoadError && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '13px', background: 'var(--color-danger-bg)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-danger-border)' }}>{labLoadError}</p>}
+        
         {isLocked && (
-          <div className="workbench-card">
-            <p>This test is frozen. Its inputs, panel and evaluations stay paired with this run.</p>
-            <button className="btn btn-secondary" onClick={() => { setTestId(undefined); onTestIdChange?.(undefined); setIsLocked(false); setRunState({ status: 'idle' }); }}>
-              Create an editable copy
-            </button>
+          <div className="workbench-card" style={{ background: '#FEFCE8', borderColor: '#FDE047' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: '#92400E', margin: 0 }}>This test is frozen</p>
+                <p style={{ fontSize: '12px', color: '#78350F', margin: 0 }}>Its inputs, panel and evaluations stay paired with this run.</p>
+              </div>
+              <button 
+                className="btn btn-secondary" 
+                style={{ fontSize: '12px', padding: '4px 10px' }}
+                onClick={() => { setTestId(undefined); onTestIdChange?.(undefined); setIsLocked(false); setRunState({ status: 'idle' }); }}
+              >
+                Create an editable copy
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Stage 4 Preflight Lab Card */}
-        <PreflightLabCard
-          product={linkedProduct}
-          mode={mode}
-          onModeChange={setMode}
-          trialPrice={trialPrice}
-          onTrialPriceChange={handleTrialPriceChange}
-          isPriceNotSet={isPriceNotSet}
-          skipResearch={skipResearch}
-          onSkipResearchChange={setSkipResearch}
-          onContinueWithoutResearch={() => void handleRunSimulation(true)}
-          researchRefreshKey={researchRefreshKey}
-        />
-
-        {/* Simulation Execution State Banner */}
+        {/* Global Simulation Execution State Banner */}
         {runState.status !== 'idle' && (
           <div role="status" aria-live="polite" style={{
             background: runState.status === 'completed' 
@@ -624,8 +864,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: '12px',
-            flexWrap: 'wrap',
-            marginBottom: 'var(--space-4)'
+            flexWrap: 'wrap'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontWeight: 600 }}>
@@ -685,157 +924,374 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-          <button className="btn btn-secondary" onClick={() => void handleSaveDraft()} disabled={isLocked || isSubmitting || runState.status === 'running'}>
-            Save Lab Draft
-          </button>
-          
-          {savedDraftsList.length > 0 && !linkedProduct && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <FolderOpen size={14} color="var(--color-text-muted)" />
-              <select
-                className="form-select"
-                style={{ fontSize: '11px', padding: '3px 8px', maxWidth: '180px' }}
-                value={testId || ''}
-                onChange={e => {
-                  if (e.target.value) {
-                    loadDraftById(e.target.value);
-                  }
-                }}
-                disabled={isLoadingDraft}
-              >
-                <option value="" disabled>Load saved draft...</option>
-                {savedDraftsList.map(d => (
-                  <option key={d.id} value={d.id}>
-                    {d.title.length > 20 ? `${d.title.substring(0, 20)}...` : d.title}
-                  </option>
-                ))}
-              </select>
+        {/* Page 1: Overview & Research */}
+        {activePage === 'overview' && (
+          <div className="lab-page-body">
+            <div className="lab-page-header">
+              <div className="lab-page-title-group">
+                <div className="lab-page-breadcrumb">
+                  <span>Synthetic Lab</span>
+                  <span>/</span>
+                  <span>Step 1 of 5</span>
+                </div>
+                <h1 className="lab-page-title">Launch Overview & Market Evidence</h1>
+                <p className="lab-page-desc">
+                  Set evaluation mode, verify launch pricing, and extract live competitor search references.
+                </p>
+              </div>
+
+              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
+                Stage 1: Preflight
+              </span>
             </div>
-          )}
-        </div>
 
-        <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-          {/* Step 1: Domain */}
-          <DomainSelector
-            selectedDomain={domainId}
-            onSelectDomain={handleDomainSelect}
-          />
+            {/* Quick Context Highlights */}
+            <div className="lab-overview-grid">
+              <div className="lab-overview-card">
+                <div className="lab-overview-card-title">
+                  <Cpu size={14} color="var(--color-intended)" />
+                  <span>AI Consumer Panel Engine</span>
+                </div>
+                <div className="lab-overview-card-value">
+                  Powered by Llama 3.3 70B via Groq. Evaluates willingness-to-pay and objections across 50 consumer profiles.
+                </div>
+              </div>
 
-          {/* Step 2: Audience & Location */}
-          <AudienceLocationForm
-            intendedBuyer={intendedBuyer}
-            onChangeIntendedBuyer={setIntendedBuyer}
-            adjacentBuyer={adjacentBuyer}
-            onChangeAdjacentBuyer={setAdjacentBuyer}
-            expectedSpendMin={expectedSpendMin}
-            onChangeExpectedSpendMin={setExpectedSpendMin}
-            expectedSpendMax={expectedSpendMax}
-            onChangeExpectedSpendMax={setExpectedSpendMax}
-            currency={currency}
-            audienceMarkets={audienceMarkets}
-            onChangeAudienceMarkets={setAudienceMarkets}
-            validationErrors={validationErrors}
-          />
+              <div className="lab-overview-card">
+                <div className="lab-overview-card-title">
+                  <Sparkles size={14} color="var(--color-adjacent)" />
+                  <span>Market Intelligence</span>
+                </div>
+                <div className="lab-overview-card-value">
+                  Retrieves live comparable market prices and competitor claims to ground persona reasoning in real market data.
+                </div>
+              </div>
 
-          {/* Step 3: Offering & Baseline A */}
-          <OfferingForm
-            domainId={domainId}
-            title={title}
-            onChangeTitle={setTitle}
-            shortValueProp={shortValueProp}
-            onChangeShortValueProp={setShortValueProp}
-            description={description}
-            onChangeDescription={setDescription}
-            currency={currency}
-            onChangeCurrency={setCurrency}
-            period={period}
-            onChangePeriod={setPeriod}
-            domainSpecificData={domainSpecificData}
-            onChangeDomainSpecificData={setDomainSpecificData}
-            optionA={optionA}
-            onChangeOptionA={setOptionA}
-            audienceMarkets={audienceMarkets}
-            onUploadImage={handleUploadImage}
-            validationErrors={validationErrors}
-          />
+              <div className="lab-overview-card">
+                <div className="lab-overview-card-title">
+                  <Sliders size={14} color="var(--color-contrasting)" />
+                  <span>Decision Isolation</span>
+                </div>
+                <div className="lab-overview-card-value">
+                  Single-product review validates concept viability. A/B mode isolates price, messaging, or creative levers.
+                </div>
+              </div>
+            </div>
 
-          {/* Step 4: Alternative B & Comparison Lever (Only in Comparison Mode) */}
-          {mode === 'comparison' && (
-            <AlternativeBForm
-              comparisonLever={comparisonLever}
-              onChangeComparisonLever={setComparisonLever}
-              optionB={optionB}
-              onChangeOptionB={setOptionB}
-              optionA={optionA}
-              currency={currency}
-              audienceMarkets={audienceMarkets}
-              onUploadImage={handleUploadImage}
-              validationErrors={validationErrors}
+            {/* Stage 4/5 Preflight Lab Card */}
+            <PreflightLabCard
+              product={linkedProduct}
+              mode={mode}
+              onModeChange={setMode}
+              trialPrice={trialPrice}
+              onTrialPriceChange={handleTrialPriceChange}
+              isPriceNotSet={isPriceNotSet}
+              skipResearch={skipResearch}
+              onSkipResearchChange={setSkipResearch}
+              onContinueWithoutResearch={() => void handleRunSimulation(true)}
+              researchRefreshKey={researchRefreshKey}
             />
-          )}
+          </div>
+        )}
 
-          {/* Step 5: Deterministic Financials */}
-          <FinancialsForm
-            currency={currency}
-            period={period}
-            priceA={optionA.price}
-            priceUnknown={linkedProduct?.price === null && trialPrice === undefined}
-            priceB={mode === 'comparison' ? optionB.price : undefined}
-            variableCostA={varCostA}
-            onChangeVariableCostA={setVarCostA}
-            variableCostB={mode === 'comparison' ? varCostB : undefined}
-            onChangeVariableCostB={setVarCostB}
-            fixedCost={fixedCost}
-            onChangeFixedCost={setFixedCost}
-            capacityUnits={capacityUnits}
-            onChangeCapacityUnits={setCapacityUnits}
-            lowerUnits={lowerUnits}
-            onChangeLowerUnits={setLowerUnits}
-            centralUnits={centralUnits}
-            onChangeCentralUnits={setCentralUnits}
-            higherUnits={higherUnits}
-            onChangeHigherUnits={setHigherUnits}
-          />
-        </fieldset>
+        {/* Page 2: Product & Offering */}
+        {activePage === 'offering' && (
+          <div className="lab-page-body">
+            <div className="lab-page-header">
+              <div className="lab-page-title-group">
+                <div className="lab-page-breadcrumb">
+                  <span>Synthetic Lab</span>
+                  <span>/</span>
+                  <span>Step 2 of 5</span>
+                </div>
+                <h1 className="lab-page-title">Product Offering & Baseline Variant</h1>
+                <p className="lab-page-desc">
+                  Select your product domain category and detail your core value proposition, specs, and visual creative.
+                </p>
+              </div>
 
-        {/* Step 6: 50-Profile Panel & Deterministic Eligibility Review */}
-        <ProfileReviewPanel
-          seed={panelSeed}
-          onSeedChange={setPanelSeed}
-          locked={isLocked || runState.status === 'running'}
-          testId={testId}
-          domainId={domainId}
-          intendedBuyer={intendedBuyer}
-          adjacentBuyer={adjacentBuyer}
-          expectedSpendMin={expectedSpendMin}
-          expectedSpendMax={expectedSpendMax}
-          audienceMarkets={audienceMarkets}
-          currency={currency}
-          optionA={{ name: optionA.name, served_markets: optionA.served_markets }}
-          optionB={mode === 'comparison' ? { name: optionB.name, served_markets: optionB.served_markets } : undefined}
-        />
-      </div>
+              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
+                Stage 2: Offering Specs
+              </span>
+            </div>
 
-      {/* 35% Sticky Sidebar Assumption Summary */}
-      <AssumptionSummary
-        mode={mode}
-        audienceMarkets={audienceMarkets}
-        servedMarketsA={optionA.served_markets}
-        servedMarketsB={mode === 'comparison' ? optionB.served_markets : undefined}
-        intendedBuyer={intendedBuyer}
-        adjacentBuyer={adjacentBuyer}
-        expectedSpendMin={expectedSpendMin}
-        expectedSpendMax={expectedSpendMax}
-        currency={currency}
-        comparisonLever={mode === 'comparison' ? comparisonLever : undefined}
-        priceA={optionA.price}
-        priceB={mode === 'comparison' ? optionB.price : undefined}
-        missingInputs={missingInputs}
-        isValid={missingInputs.length === 0 && !isLocked}
-        onRunSimulation={handleRunSimulation}
-        isSubmitting={isSubmitting || runState.status === 'running'}
-      />
+            <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+              {/* Step 1: Domain Selection */}
+              <DomainSelector
+                selectedDomain={domainId}
+                onSelectDomain={handleDomainSelect}
+              />
+
+              {/* Step 2: Core Offering & Baseline Option A */}
+              <OfferingForm
+                domainId={domainId}
+                title={title}
+                onChangeTitle={setTitle}
+                shortValueProp={shortValueProp}
+                onChangeShortValueProp={setShortValueProp}
+                description={description}
+                onChangeDescription={setDescription}
+                currency={currency}
+                onChangeCurrency={setCurrency}
+                period={period}
+                onChangePeriod={setPeriod}
+                domainSpecificData={domainSpecificData}
+                onChangeDomainSpecificData={setDomainSpecificData}
+                optionA={optionA}
+                onChangeOptionA={setOptionA}
+                audienceMarkets={audienceMarkets}
+                onUploadImage={handleUploadImage}
+                validationErrors={validationErrors}
+              />
+
+              {/* Step 3: Alternative B & Comparison Lever (Only in Comparison Mode) */}
+              {mode === 'comparison' && (
+                <AlternativeBForm
+                  comparisonLever={comparisonLever}
+                  onChangeComparisonLever={setComparisonLever}
+                  optionB={optionB}
+                  onChangeOptionB={setOptionB}
+                  optionA={optionA}
+                  currency={currency}
+                  audienceMarkets={audienceMarkets}
+                  onUploadImage={handleUploadImage}
+                  validationErrors={validationErrors}
+                />
+              )}
+            </fieldset>
+          </div>
+        )}
+
+        {/* Page 3: Target Audience & Markets */}
+        {activePage === 'audience' && (
+          <div className="lab-page-body">
+            <div className="lab-page-header">
+              <div className="lab-page-title-group">
+                <div className="lab-page-breadcrumb">
+                  <span>Synthetic Lab</span>
+                  <span>/</span>
+                  <span>Step 3 of 5</span>
+                </div>
+                <h1 className="lab-page-title">Target Audience & Geographic Markets</h1>
+                <p className="lab-page-desc">
+                  Specify your ideal intended customer, adjacent market profiles, expected spend boundaries, and delivery cities.
+                </p>
+              </div>
+
+              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
+                Stage 3: Audience
+              </span>
+            </div>
+
+            <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+              <AudienceLocationForm
+                intendedBuyer={intendedBuyer}
+                onChangeIntendedBuyer={setIntendedBuyer}
+                adjacentBuyer={adjacentBuyer}
+                onChangeAdjacentBuyer={setAdjacentBuyer}
+                expectedSpendMin={expectedSpendMin}
+                onChangeExpectedSpendMin={setExpectedSpendMin}
+                expectedSpendMax={expectedSpendMax}
+                onChangeExpectedSpendMax={setExpectedSpendMax}
+                currency={currency}
+                audienceMarkets={audienceMarkets}
+                onChangeAudienceMarkets={setAudienceMarkets}
+                validationErrors={validationErrors}
+              />
+            </fieldset>
+          </div>
+        )}
+
+        {/* Page 4: Unit Economics & Scenarios */}
+        {activePage === 'financials' && (
+          <div className="lab-page-body">
+            <div className="lab-page-header">
+              <div className="lab-page-title-group">
+                <div className="lab-page-breadcrumb">
+                  <span>Synthetic Lab</span>
+                  <span>/</span>
+                  <span>Step 4 of 5</span>
+                </div>
+                <h1 className="lab-page-title">Unit Economics & Sales Scenarios</h1>
+                <p className="lab-page-desc">
+                  Model fixed setup costs, variable margins per unit, and projected volume scenarios (conservative, target, optimistic).
+                </p>
+              </div>
+
+              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
+                Stage 4: Economics
+              </span>
+            </div>
+
+            <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+              <FinancialsForm
+                currency={currency}
+                period={period}
+                priceA={optionA.price}
+                priceUnknown={linkedProduct?.price === null && trialPrice === undefined}
+                priceB={mode === 'comparison' ? optionB.price : undefined}
+                variableCostA={varCostA}
+                onChangeVariableCostA={setVarCostA}
+                variableCostB={mode === 'comparison' ? varCostB : undefined}
+                onChangeVariableCostB={setVarCostB}
+                fixedCost={fixedCost}
+                onChangeFixedCost={setFixedCost}
+                capacityUnits={capacityUnits}
+                onChangeCapacityUnits={setCapacityUnits}
+                lowerUnits={lowerUnits}
+                onChangeLowerUnits={setLowerUnits}
+                centralUnits={centralUnits}
+                onChangeCentralUnits={setCentralUnits}
+                higherUnits={higherUnits}
+                onChangeHigherUnits={setHigherUnits}
+              />
+            </fieldset>
+          </div>
+        )}
+
+        {/* Page 5: Synthetic Panel & Simulation Run */}
+        {activePage === 'simulation' && (
+          <div className="lab-page-body">
+            <div className="lab-page-header">
+              <div className="lab-page-title-group">
+                <div className="lab-page-breadcrumb">
+                  <span>Synthetic Lab</span>
+                  <span>/</span>
+                  <span>Step 5 of 5</span>
+                </div>
+                <h1 className="lab-page-title">50-Profile Panel & Simulation Launchpad</h1>
+                <p className="lab-page-desc">
+                  Inspect the deterministic 50-consumer persona distribution and launch your AI evaluation run.
+                </p>
+              </div>
+
+              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
+                Stage 5: Mission Control
+              </span>
+            </div>
+
+            {/* Simulation Readiness Summary Card */}
+            <div className="workbench-card" style={{ background: isFormValid ? 'var(--color-surface)' : '#FFFBEB', borderColor: isFormValid ? 'var(--color-border)' : '#FDE68A' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {isFormValid ? <CheckCircle2 size={16} color="var(--color-success)" /> : <AlertTriangle size={16} color="var(--color-warning)" />}
+                  <span>Simulation Readiness Checklist</span>
+                </h2>
+                <span className={`badge ${isFormValid ? 'badge-intended' : 'badge-contrasting'}`}>
+                  {isFormValid ? 'All Requirements Met' : `${missingInputs.length} Requirement(s) Needed`}
+                </span>
+              </div>
+
+              {missingInputs.length > 0 ? (
+                <div style={{ marginBottom: '16px' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
+                    Complete the following required fields to enable the 50-profile evaluation:
+                  </p>
+                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#92400E', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {missingInputs.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
+                  Your product proposal, market evidence, audience parameters, and economic assumptions are fully verified and ready.
+                </p>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ padding: '10px 20px', fontSize: '14px', fontWeight: 600 }}
+                  disabled={!isFormValid || isSubmitting || runState.status === 'running'}
+                  onClick={() => void handleRunSimulation()}
+                >
+                  {!isFormValid ? <Lock size={16} /> : <Play size={16} />}
+                  <span>
+                    {isSubmitting || runState.status === 'running' 
+                      ? 'Running 50-Profile Evaluation...' 
+                      : mode === 'single' 
+                        ? 'Launch Product Review (50 Personas)' 
+                        : 'Launch Comparative Review (100 Evaluations)'}
+                  </span>
+                </button>
+
+                {runState.status === 'completed' && onNavigateToResults && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: '10px 16px', fontSize: '14px' }}
+                    onClick={onNavigateToResults}
+                  >
+                    View Completed Results &rarr;
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 50-Profile Panel Review */}
+            <ProfileReviewPanel
+              seed={panelSeed}
+              onSeedChange={setPanelSeed}
+              locked={isLocked || runState.status === 'running'}
+              testId={testId}
+              domainId={domainId}
+              intendedBuyer={intendedBuyer}
+              adjacentBuyer={adjacentBuyer}
+              expectedSpendMin={expectedSpendMin}
+              expectedSpendMax={expectedSpendMax}
+              audienceMarkets={audienceMarkets}
+              currency={currency}
+              optionA={{ name: optionA.name, served_markets: optionA.served_markets }}
+              optionB={mode === 'comparison' ? { name: optionB.name, served_markets: optionB.served_markets } : undefined}
+            />
+          </div>
+        )}
+
+        {/* Page Navigation Footer (Previous / Next Step) */}
+        <footer className="lab-page-footer">
+          <div className="lab-page-footer-left">
+            {prevPage ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setActivePage(prevPage.id)}
+              >
+                <ArrowLeft size={14} />
+                <span>Previous: {prevPage.title}</span>
+              </button>
+            ) : (
+              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                Step 1 of 5
+              </span>
+            )}
+          </div>
+
+          <div className="lab-page-footer-right">
+            {nextPage ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setActivePage(nextPage.id)}
+              >
+                <span>Next: {nextPage.title}</span>
+                <ArrowRight size={14} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!isFormValid || isSubmitting || runState.status === 'running'}
+                onClick={() => void handleRunSimulation()}
+              >
+                <Play size={14} />
+                <span>Launch 50-Profile Simulation</span>
+              </button>
+            )}
+          </div>
+        </footer>
+      </main>
     </div>
   );
 };
