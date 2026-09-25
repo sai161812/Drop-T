@@ -106,8 +106,8 @@ describe('DROPTEST Shared Contracts & Logic', () => {
       option_b: {
         name: 'Premium ₹899',
         price: 899,
-        primary_message: 'Sustainable everyday luxury with gift box',
-        served_markets: ['Bangalore Urban'],
+        primary_message: 'Sustainable everyday comfort',
+        served_markets: ['Bangalore Urban', 'Chennai Central'],
         fulfillment_mode: 'Standard shipping'
       },
       audience_config: {

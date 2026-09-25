@@ -23,7 +23,7 @@ interface SetupTestPageProps {
   onUpdateHeaderTitle?: (title: string) => void;
   setSaveStatus?: (status: 'saved' | 'saving' | 'error' | 'idle') => void;
   activeTestId?: string;
-  onTestIdChange?: (id: string) => void;
+  onTestIdChange?: (id: string | undefined) => void;
 }
 
 export const SetupTestPage: React.FC<SetupTestPageProps> = ({
@@ -38,6 +38,9 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const [testId, setTestId] = useState<string | undefined>(activeTestId);
   const [savedDraftsList, setSavedDraftsList] = useState<Test[]>([]);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [panelSeed, setPanelSeed] = useState(12345);
+  const [isLocked, setIsLocked] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Load initial preset (Clothing)
   const initialPreset = DOMAIN_PRESETS.clothing_accessories.payload;
@@ -92,9 +95,9 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const [varCostA, setVarCostA] = useState<number | undefined>(initialPreset.option_a.variable_cost_per_sale);
   const [varCostB, setVarCostB] = useState<number | undefined>(initialPreset.option_b.variable_cost_per_sale);
   const [capacityUnits, setCapacityUnits] = useState<number | undefined>(initialPreset.option_a.capacity_units);
-  const [lowerUnits, setLowerUnits] = useState<number | undefined>(30);
-  const [centralUnits, setCentralUnits] = useState<number | undefined>(60);
-  const [higherUnits, setHigherUnits] = useState<number | undefined>(90);
+  const [lowerUnits, setLowerUnits] = useState<number | undefined>();
+  const [centralUnits, setCentralUnits] = useState<number | undefined>();
+  const [higherUnits, setHigherUnits] = useState<number | undefined>();
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [missingInputs, setMissingInputs] = useState<string[]>([]);
@@ -121,7 +124,11 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const applyPreset = (payload: TestDraftPayload, keepId = false) => {
     if (!keepId) {
       setTestId(undefined);
+      onTestIdChange?.(undefined);
+      setIsLocked(false);
+      setRunState({ status: 'idle' });
     }
+    setPanelSeed(payload.panel_seed ?? 12345);
     setDomainId(payload.test.domain_id);
     setTitle(payload.test.title);
     setShortValueProp(payload.offering.short_value_prop);
@@ -165,6 +172,9 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     setVarCostA(payload.option_a.variable_cost_per_sale);
     setVarCostB(payload.option_b.variable_cost_per_sale);
     setCapacityUnits(payload.option_a.capacity_units);
+    setLowerUnits(payload.offering.sales_scenarios?.lower_units);
+    setCentralUnits(payload.offering.sales_scenarios?.central_units);
+    setHigherUnits(payload.offering.sales_scenarios?.higher_units);
   };
 
   // Load a saved draft by ID from SQLite
@@ -175,7 +185,13 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       if (res.ok) {
         const full = await res.json();
         setTestId(full.test.id);
+        onTestIdChange?.(full.test.id);
+        const runData = await fetch(`/api/tests/${id}/runs/latest`).then(r => r.json());
+        setIsLocked(Boolean(runData.run));
+        if (runData.run) updateRunState(runData.run);
+        else setRunState({ status: 'idle' });
         const payload: TestDraftPayload = {
+          panel_seed: full.test.panel_seed,
           test: { id: full.test.id, title: full.test.title, domain_id: full.test.domain_id },
           offering: full.offering,
           option_a: full.options.A,
@@ -193,6 +209,19 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     }
   };
 
+  useEffect(() => { if (activeTestId) void loadDraftById(activeTestId); }, []);
+
+  // Only the selected lever can diverge. Baseline edits propagate to the other fields.
+  useEffect(() => {
+    setOptionB(previous => ({ ...previous,
+      price: comparisonLever === 'price' ? previous.price : optionA.price,
+      primary_message: comparisonLever === 'message' ? previous.primary_message : optionA.primary_message,
+      served_markets: comparisonLever === 'served_markets' ? previous.served_markets : optionA.served_markets,
+      images: comparisonLever === 'creative' ? previous.images : optionA.images,
+      fulfillment_mode: optionA.fulfillment_mode
+    }));
+  }, [comparisonLever, optionA]);
+
   // Synchronize header title
   useEffect(() => {
     if (onUpdateHeaderTitle) {
@@ -202,12 +231,14 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
   // Construct current payload
   const currentPayload: TestDraftPayload = {
+    panel_seed: panelSeed,
     test: {
       id: testId,
       title,
       domain_id: domainId
     },
     offering: {
+      sales_scenarios: { lower_units: lowerUnits, central_units: centralUnits, higher_units: higherUnits },
       short_value_prop: shortValueProp,
       description,
       currency,
@@ -265,10 +296,11 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   }, [
     testId, title, domainId, shortValueProp, description, currency, period, domainSpecificData,
     optionA, optionB, comparisonLever, intendedBuyer, adjacentBuyer,
-    expectedSpendMin, expectedSpendMax, audienceMarkets, fixedCost, varCostA, varCostB, capacityUnits
+    expectedSpendMin, expectedSpendMax, audienceMarkets, fixedCost, varCostA, varCostB, capacityUnits, lowerUnits, centralUnits, higherUnits
   ]);
 
   const handleSaveDraft = async (): Promise<string | null> => {
+    setSaveError(null);
     if (setSaveStatus) setSaveStatus('saving');
     try {
       const res = await fetch('/api/tests', {
@@ -280,6 +312,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       if (!res.ok) {
         const err = await res.json();
         console.error('Save error:', err);
+        setSaveError(err.error || 'Unable to save draft. Please try again.');
         if (setSaveStatus) setSaveStatus('error');
         return null;
       }
@@ -294,6 +327,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       return savedId;
     } catch (e) {
       console.error('Save network error:', e);
+      setSaveError('Unable to reach the server. Your changes are still in this form.');
       if (setSaveStatus) setSaveStatus('error');
       return null;
     }
@@ -306,98 +340,62 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     message?: string;
   }>({ status: 'idle' });
 
-  const handleRunSimulation = async () => {
-    setIsSubmitting(true);
-    setRunState({ status: 'running', message: 'Saving test configuration and initiating 50-profile evaluation...' });
+  const updateRunState = (run: any) => {
+    const running = run.status === 'running' || run.status === 'pending';
+    setIsSubmitting(running);
+    setRunState({ status: running ? 'running' : run.status, runId: run.id, completedCount: run.total_evaluations_completed,
+      message: `${run.total_evaluations_completed} / 100 evaluations saved.${run.error_message ? ` ${run.error_message}` : running ? ' Evaluation is in progress.' : ''}` });
+  };
 
-    const savedId = await handleSaveDraft();
-    if (!savedId) {
-      setRunState({ status: 'failed', message: 'Failed to save test draft before starting simulation.' });
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Now execute simulation run via backend
-    try {
-      setRunState({ status: 'running', message: 'Executing 100 evaluations across Option A and Option B...' });
-      const runRes = await fetch(`/api/tests/${savedId}/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      const data = await runRes.json();
-
-      if (!runRes.ok || data.run?.status === 'failed') {
-        const errorMsg = data.run?.error_message || data.error || data.message || 'Simulation run failed';
-        const isUnconfigured = errorMsg.includes('GROQ_API_KEY') || errorMsg.includes('not configured');
-        setRunState({
-          status: isUnconfigured ? 'unconfigured' : 'failed',
-          runId: data.run?.id,
-          completedCount: data.evaluations?.length || 0,
-          message: errorMsg
-        });
-      } else if (data.run?.status === 'partial') {
-        setRunState({
-          status: 'partial',
-          runId: data.run.id,
-          completedCount: data.evaluations?.length || 0,
-          message: data.run.error_message || `Incomplete run: ${data.evaluations?.length || 0} / 100 evaluations recorded.`
-        });
-      } else {
-        setRunState({
-          status: 'completed',
-          runId: data.run?.id,
-          completedCount: data.evaluations?.length || 100,
-          message: '100 / 100 paired evaluations complete! Results ready for analysis.'
-        });
+  useEffect(() => {
+    if (!testId || runState.status !== 'running' || !runState.runId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/tests/${testId}/runs/${runState.runId}`);
+        if (!res.ok) throw new Error('Progress unavailable');
+        const data = await res.json();
+        if (!cancelled) updateRunState(data.run);
+      } catch {
+        if (!cancelled) setRunState(previous => ({ ...previous, message: 'Progress connection interrupted. Reconnecting; saved evaluations are preserved.' }));
       }
-    } catch (runErr: any) {
-      console.error('Run execution error:', runErr);
-      setRunState({
-        status: 'failed',
-        message: `Simulation execution error: ${runErr.message}`
-      });
+    };
+    const timer = window.setInterval(poll, 1500);
+    void poll();
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [testId, runState.status, runState.runId]);
+
+  const requestRun = async (url: string) => {
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (!res.ok || !data.run) throw new Error(data.error || 'Could not start the simulation.');
+      setIsLocked(true);
+      updateRunState(data.run);
+    } catch (error) {
+      setRunState(previous => ({ ...previous, status: 'failed', message: error instanceof Error ? error.message : 'Connection failed. Reload this saved draft to check progress.' }));
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleRunSimulation = async () => {
+    setIsSubmitting(true);
+    setRunState({ status: 'running', message: 'Saving your test before starting...' });
+    const savedId = await handleSaveDraft();
+    if (!savedId) {
+      setRunState({ status: 'failed', message: 'Correct the inputs or retry saving before running.' });
+      setIsSubmitting(false);
+      return;
+    }
+    await requestRun('/api/tests/' + savedId + '/run');
+  };
+
   const handleRetryIncompleteRun = async (runId: string) => {
     if (!testId) return;
     setIsSubmitting(true);
-    setRunState({ status: 'running', message: 'Retrying missing/incomplete evaluations without altering panel...' });
-
-    try {
-      const res = await fetch(`/api/tests/${testId}/runs/${runId}/retry`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await res.json();
-
-      if (data.run?.status === 'completed') {
-        setRunState({
-          status: 'completed',
-          runId: data.run.id,
-          completedCount: data.evaluations?.length || 100,
-          message: 'All 100 evaluations successfully completed!'
-        });
-      } else {
-        setRunState({
-          status: data.run?.status || 'partial',
-          runId: data.run?.id || runId,
-          completedCount: data.evaluations?.length || 0,
-          message: data.run?.error_message || `Partial progress: ${data.evaluations?.length || 0} / 100 recorded.`
-        });
-      }
-    } catch (err: any) {
-      setRunState({
-        status: 'failed',
-        runId,
-        message: `Retry error: ${err.message}`
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    setRunState(previous => ({ ...previous, status: 'running', runId, message: 'Retrying missing evaluations...' }));
+    await requestRun('/api/tests/' + testId + '/runs/' + runId + '/retry');
   };
 
   const handleUploadImage = async (file: File): Promise<ImageMetadata | null> => {
@@ -438,6 +436,8 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     <div className="workbench-grid">
       {/* 65% Main Setup Column */}
       <div className="setup-column">
+        {saveError && <p role="alert">{saveError}</p>}
+        {isLocked && <div className="workbench-card"><p>This test is frozen. Its inputs, panel and feedback stay paired with this run.</p><button className="btn btn-secondary" onClick={() => { setTestId(undefined); onTestIdChange?.(undefined); setIsLocked(false); setRunState({ status: 'idle' }); }}>Create an editable copy</button></div>}
         {/* First Fold Guidance Card */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
@@ -521,7 +521,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
         {/* Simulation Execution State Banner */}
         {runState.status !== 'idle' && (
-          <div style={{
+          <div role="status" aria-live="polite" style={{
             background: runState.status === 'completed' 
               ? 'var(--color-success-bg)' 
               : runState.status === 'partial' || runState.status === 'unconfigured' 
@@ -577,7 +577,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 </button>
               )}
 
-              {runState.status === 'partial' && runState.runId && (
+              {(runState.status === 'partial' || runState.status === 'failed') && runState.runId && (
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -612,6 +612,8 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
+        <button className="btn btn-secondary" onClick={() => void handleSaveDraft()} disabled={isLocked || isSubmitting || runState.status === 'running'}>Save draft</button>
+        <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         {/* Step 1: Domain */}
         <DomainSelector
           selectedDomain={domainId}
@@ -691,8 +693,12 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           onChangeHigherUnits={setHigherUnits}
         />
 
+        </fieldset>
         {/* Step 6: 50-Profile Panel & Deterministic Eligibility Review */}
         <ProfileReviewPanel
+          seed={panelSeed}
+          onSeedChange={setPanelSeed}
+          locked={isLocked || runState.status === 'running'}
           testId={testId}
           domainId={domainId}
           intendedBuyer={intendedBuyer}
@@ -720,9 +726,9 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         priceA={optionA.price}
         priceB={optionB.price}
         missingInputs={missingInputs}
-        isValid={missingInputs.length === 0}
+        isValid={missingInputs.length === 0 && !isLocked}
         onRunSimulation={handleRunSimulation}
-        isSubmitting={isSubmitting}
+        isSubmitting={isSubmitting || runState.status === 'running'}
       />
     </div>
   );

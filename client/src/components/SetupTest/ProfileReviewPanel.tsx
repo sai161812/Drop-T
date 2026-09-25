@@ -33,6 +33,9 @@ interface PanelStats {
 }
 
 interface ProfileReviewPanelProps {
+  seed: number;
+  onSeedChange: (seed: number) => void;
+  locked: boolean;
   testId?: string;
   domainId: DomainId;
   intendedBuyer: string;
@@ -46,6 +49,9 @@ interface ProfileReviewPanelProps {
 }
 
 export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
+  seed: currentSeed,
+  onSeedChange: setCurrentSeed,
+  locked,
   testId: _testId,
   domainId,
   intendedBuyer,
@@ -61,7 +67,6 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
   const [statsA, setStatsA] = useState<PanelStats | null>(null);
   const [statsB, setStatsB] = useState<PanelStats | null>(null);
   const [profileEligibility, setProfileEligibility] = useState<Record<string, { a: EligibilityResult; b: EligibilityResult }>>({});
-  const [currentSeed, setCurrentSeed] = useState<number>(12345);
   const [isLoading, setIsLoading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,10 +137,11 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
       fetchPanel();
     }, 250);
     return () => clearTimeout(handler);
-  }, [domainId, expectedSpendMin, expectedSpendMax, audienceMarkets, optionA.served_markets, optionB.served_markets]);
+  }, [domainId, intendedBuyer, adjacentBuyer, expectedSpendMin, expectedSpendMax, audienceMarkets, optionA.served_markets, optionB.served_markets, currentSeed]);
 
   // Handle manual panel regeneration with new seed
   const handleRegenerate = () => {
+    if (locked) return;
     setIsRegenerating(true);
     const newSeed = Math.floor(Math.random() * 1000000) + 1;
     setCurrentSeed(newSeed);
@@ -225,7 +231,7 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
             className="btn btn-secondary"
             style={{ fontSize: '12px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}
             onClick={handleRegenerate}
-            disabled={isLoading || isRegenerating}
+            disabled={locked || isLoading || isRegenerating}
             title="Re-roll seed and regenerate 50 unique personas"
           >
             <RefreshCw size={13} className={isRegenerating ? 'animate-spin' : ''} />

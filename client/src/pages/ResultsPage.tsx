@@ -57,6 +57,12 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
     fetchAnalysis();
   }, [fetchAnalysis]);
 
+  useEffect(() => {
+    if (analysis?.run_status !== 'running' && analysis?.run_status !== 'pending') return;
+    const timer = window.setInterval(fetchAnalysis, 1500);
+    return () => window.clearInterval(timer);
+  }, [analysis?.run_status, fetchAnalysis]);
+
   const handleRetryIncomplete = async () => {
     if (!testId || !analysis) return;
     setIsRetrying(true);
@@ -67,6 +73,9 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
       });
       if (res.ok) {
         await fetchAnalysis();
+      } else {
+        const data = await res.json();
+        setErrorMsg(data.error || 'Retry failed. Please try again.');
       }
     } catch (e) {
       console.error('Retry failed:', e);
@@ -85,6 +94,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
   }
 
   // If no test or no run exists
+  if (errorMsg && !analysis) return <div role="alert" className="workbench-card"><p>{errorMsg}</p><button className="btn btn-secondary" onClick={fetchAnalysis}>Try again</button><button className="btn btn-secondary" onClick={onNavigateToSetup}>Back to setup</button></div>;
   if (!testId || !analysis) {
     return (
       <div style={{ maxWidth: '900px', margin: '0 auto', width: '100%' }}>
@@ -142,7 +152,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
                 className="btn btn-primary"
                 style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                 onClick={handleRetryIncomplete}
-                disabled={isRetrying}
+                disabled={isRetrying || analysis.run_status === 'running' || analysis.run_status === 'pending'}
               >
                 <RefreshCw size={13} className={isRetrying ? 'animate-spin' : ''} />
                 {isRetrying ? 'Retrying Incomplete...' : 'Retry Missing Evaluations'}
@@ -167,7 +177,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
             <Sliders size={12} /> Decision Lever: <strong>{analysis.primary_lever.toUpperCase()}</strong>
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <ShieldCheck size={12} /> Evaluator Model: <strong>{analysis.model_id || 'openai/gpt-oss-120b'}</strong>
+            <ShieldCheck size={12} /> Evaluator Model: <strong>{analysis.model_id || 'Not recorded'}</strong>
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             Run ID: <code style={{ fontFamily: 'monospace' }}>{analysis.run_id.substring(0, 8)}</code>
@@ -198,6 +208,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
       />
 
       {/* 3. Interest & Coverage Breakdown Table */}
+      {isCompleted && <>
       <BreakdownTable
         summaryA={analysis.option_a_summary}
         summaryB={analysis.option_b_summary}
@@ -210,9 +221,11 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
         nameA={analysis.option_a_summary.option_name}
         nameB={analysis.option_b_summary.option_name}
       />
+      </>}
 
       {/* 5. Deterministic Financial Scenarios & Break-Even Analysis */}
       <FinancialScenarioPanel
+        key={analysis.run_id}
         currency={analysis.currency}
         period={analysis.period}
         nameA={analysis.options.A.name}

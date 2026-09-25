@@ -3,6 +3,21 @@ import { HumanResponseSubmissionSchema, PublicFeedbackViewData } from '@droptest
 import { TestRepository } from '../db/testRepository.js';
 
 export const feedbackRouter = Router();
+const submissionWindows = new Map<string, { count: number; expires: number }>();
+feedbackRouter.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'POST') return next();
+  const now = Date.now();
+  for (const [key, window] of submissionWindows) if (window.expires <= now) submissionWindows.delete(key);
+  const key = req.ip || 'unknown';
+  const window = submissionWindows.get(key) || { count: 0, expires: now + 60000 };
+  submissionWindows.set(key, window);
+  if (++window.count > 30) {
+    res.setHeader('Retry-After', String(Math.ceil((window.expires - now) / 1000)));
+    return res.status(429).json({ error: 'Too many responses. Please wait a minute and try again.' });
+  }
+  next();
+});
 
 // GET /api/feedback/:tokenOrId - Public unguided view of options A and B
 feedbackRouter.get('/:tokenOrId', (req: Request, res: Response) => {
@@ -24,7 +39,7 @@ feedbackRouter.get('/:tokenOrId', (req: Request, res: Response) => {
       description: test.offering.description,
       currency: test.offering.currency,
       period: test.offering.period,
-      domain_specific_data: test.offering.domain_specific_data,
+      domain_specific_data: Object.fromEntries(Object.entries(test.offering.domain_specific_data).filter(([key]) => ['item_type', 'material', 'sizes', 'fulfillment_details', 'item_name', 'portion', 'ingredients_allergens', 'pickup_delivery_mode', 'availability_window', 'core_use_case', 'platform_language', 'pricing_type', 'service_support_availability'].includes(key))),
       comparison_lever: test.comparison_lever,
       options: {
         A: {
@@ -34,8 +49,7 @@ feedbackRouter.get('/:tokenOrId', (req: Request, res: Response) => {
           primary_message: test.options.A.primary_message,
           served_markets: test.options.A.served_markets,
           fulfillment_mode: test.options.A.fulfillment_mode,
-          images: test.options.A.images,
-          variable_cost_per_sale: test.options.A.variable_cost_per_sale
+          images: test.options.A.images
         },
         B: {
           id: 'B',
@@ -44,15 +58,14 @@ feedbackRouter.get('/:tokenOrId', (req: Request, res: Response) => {
           primary_message: test.options.B.primary_message,
           served_markets: test.options.B.served_markets,
           fulfillment_mode: test.options.B.fulfillment_mode,
-          images: test.options.B.images,
-          variable_cost_per_sale: test.options.B.variable_cost_per_sale
+          images: test.options.B.images
         }
       }
     };
 
     res.json(publicData);
   } catch (error: any) {
-    res.status(500).json({ error: 'Failed to load feedback details', message: error.message });
+    res.status(500).json({ error: 'Failed to load feedback details. Please try again.' });
   }
 });
 
@@ -89,7 +102,7 @@ feedbackRouter.post('/:tokenOrId', (req: Request, res: Response) => {
       message: is_updated ? 'Your feedback was updated' : 'Your feedback was recorded' 
     });
   } catch (error: any) {
-    res.status(500).json({ error: 'Failed to record response', message: error.message });
+    res.status(500).json({ error: 'Failed to record response. Please try again.' });
   }
 });
 

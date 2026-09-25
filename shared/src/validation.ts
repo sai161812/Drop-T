@@ -103,6 +103,7 @@ export const TestSchema = z.object({
 
 // Offering schema
 export const OfferingSchema = z.object({
+  sales_scenarios: z.object({ lower_units: z.number().int().nonnegative().optional(), central_units: z.number().int().nonnegative().optional(), higher_units: z.number().int().nonnegative().optional() }).optional(),
   short_value_prop: z.string().min(5, 'Value proposition must be at least 5 characters').max(200, 'Value proposition cannot exceed 200 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters').max(2000, 'Description cannot exceed 2000 characters'),
   currency: z.string().min(1).max(10).default('USD'),
@@ -139,6 +140,7 @@ export const AudienceConfigSchema = z.object({
 
 // Complete Draft Payload Schema with cross-field validations
 export const TestDraftPayloadSchema = z.object({
+  panel_seed: z.number().int().min(0).max(2147483647).optional(),
   test: TestSchema,
   offering: OfferingSchema,
   option_a: OptionInputSchema,
@@ -146,6 +148,31 @@ export const TestDraftPayloadSchema = z.object({
   audience_config: AudienceConfigSchema,
   comparison_lever: PrimaryLeverSchema
 }).superRefine((data, ctx) => {
+  const specificsSchema = data.test.domain_id === 'clothing_accessories' ? ClothingSpecificsSchema : data.test.domain_id === 'local_food_beverages' ? FoodSpecificsSchema : DigitalSpecificsSchema;
+  const specifics = specificsSchema.safeParse(data.offering.domain_specific_data);
+  if (!specifics.success) for (const issue of specifics.error.issues) ctx.addIssue({ ...issue, path: ['offering', 'domain_specific_data', ...issue.path] });
+  for (const option of [data.option_a, data.option_b]) {
+    for (const units of Object.values(data.offering.sales_scenarios || {})) {
+      if (units !== undefined && option.capacity_units !== undefined && units > option.capacity_units) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['offering', 'sales_scenarios'], message: 'Sales scenarios must not exceed either option’s capacity.' });
+    }
+  }
+  const fields = { price: 'price', message: 'primary_message', served_markets: 'served_markets', creative: 'images' } as const;
+  for (const [lever, field] of Object.entries(fields)) {
+    const a = field === 'served_markets' ? [...data.option_a.served_markets].sort() : data.option_a[field as keyof typeof data.option_a];
+    const b = field === 'served_markets' ? [...data.option_b.served_markets].sort() : data.option_b[field as keyof typeof data.option_b];
+    if (lever !== data.comparison_lever && JSON.stringify(a) !== JSON.stringify(b)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['option_b', field], message: `Keep ${field} the same as A when testing ${data.comparison_lever}.` });
+    }
+    if (lever === data.comparison_lever && JSON.stringify(a) === JSON.stringify(b)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['option_b', field], message: `Change ${field} in B to create a comparison.` });
+    }
+  }
+  if (data.option_a.fulfillment_mode !== data.option_b.fulfillment_mode) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['option_b', 'fulfillment_mode'], message: 'Keep fulfillment mode the same across this comparison.' });
+  }
+  if (new Set(data.audience_config.audience_markets).size !== data.audience_config.audience_markets.length) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['audience_config', 'audience_markets'], message: 'Audience markets must be distinct.' });
+  }
   // 1. Verify served_markets are a subset of audience_markets
   const audienceMarketsSet = new Set(data.audience_config.audience_markets);
   
@@ -171,6 +198,7 @@ export const TestDraftPayloadSchema = z.object({
 
   // 2. Enforce confirmed visual description if creative lever is selected
   if (data.comparison_lever === 'creative') {
+    if (!data.option_a.images.length || !data.option_b.images.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['option_b', 'images'], message: 'Attach and describe an image for both creative options.' });
     const aHasImages = data.option_a.images && data.option_a.images.length > 0;
     const bHasImages = data.option_b.images && data.option_b.images.length > 0;
     if (aHasImages) {
@@ -227,12 +255,11 @@ export const GroqEvaluationItemSchema = z.object({
   response: z.enum(['interested', 'unsure', 'not_interested']),
   reason: z.string().min(3).max(1000),
   primary_objection: z.string().max(500).optional().nullable(),
-  factor_tags: z.array(FactorTagSchema).min(1),
-  referenced_fields: z.array(z.string().min(1)).min(1)
+  factor_tags: z.array(FactorTagSchema).min(1).max(3),
+  referenced_fields: z.array(z.string().min(1).max(100)).min(1).max(20)
 });
 
 // Groq structured batch response schema
 export const GroqBatchEvaluationResponseSchema = z.object({
   evaluations: z.array(GroqEvaluationItemSchema)
 });
-

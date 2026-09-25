@@ -171,7 +171,8 @@ describe('Phase 2: 50-Profile Generator & Eligibility Engine Tests', () => {
       seed: 101
     });
     assert.strictEqual(clothingProfiles.length, 50);
-    assert.ok(clothingProfiles[0].use_case.toLowerCase().includes('wear') || clothingProfiles[0].use_case.toLowerCase().includes('apparel') || clothingProfiles[0].use_case.toLowerCase().includes('staple'));
+    assert.ok(clothingProfiles[0].use_case.includes('Young professionals wanting 100% organic linen shirts'));
+    assert.ok(clothingProfiles[20].use_case.includes('Graduates looking for smart workwear gifts'));
 
     // Local Food Draft
     const foodProfiles = generatePanelProfiles({

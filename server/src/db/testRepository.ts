@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { createHash, randomBytes } from 'node:crypto';
 import { getDatabase } from './database.js';
 import { 
   Test, 
@@ -22,13 +23,18 @@ export class TestRepository {
    */
   static saveDraft(payload: TestDraftPayload): FullTestResponse {
     const db = getDatabase();
+    if (payload.test.id && this.getLatestRunByTestId(payload.test.id)) {
+      throw Object.assign(new Error('This test has a frozen run. Save a new test to change its inputs.'), { status: 409 });
+    }
+    db.exec('BEGIN');
+    try {
     const now = new Date().toISOString();
     const testId = payload.test.id || uuidv4();
 
     // Check if test exists
     const existingTestStmt = db.prepare('SELECT id, feedback_token FROM tests WHERE id = ?');
     const existingTest = existingTestStmt.get(testId) as { id: string; feedback_token?: string } | undefined;
-    const feedbackToken = existingTest?.feedback_token || payload.test.feedback_token || uuidv4().replace(/-/g, '').substring(0, 16);
+    const feedbackToken = existingTest?.feedback_token || randomBytes(24).toString('hex');
 
     if (existingTest) {
       // Update existing test
@@ -132,11 +138,19 @@ export class TestRepository {
       );
     }
 
+    db.prepare('UPDATE tests SET panel_seed = ? WHERE id = ?').run(payload.panel_seed ?? 12345, testId);
+    db.prepare('UPDATE offerings SET sales_scenarios = ? WHERE test_id = ?').run(JSON.stringify(payload.offering.sales_scenarios || {}), testId);
+    db.prepare('DELETE FROM profiles WHERE test_id = ?').run(testId);
     const result = this.getById(testId);
     if (!result) {
       throw new Error('Failed to retrieve test after saving');
     }
+    db.exec('COMMIT');
     return result;
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   private static upsertOption(
@@ -219,13 +233,15 @@ export class TestRepository {
       id: testRow.id,
       title: testRow.title,
       domain_id: testRow.domain_id,
-      feedback_token: testRow.feedback_token || testRow.id,
+      feedback_token: testRow.feedback_token,
+      panel_seed: testRow.panel_seed,
       created_at: testRow.created_at,
       updated_at: testRow.updated_at,
       status: testRow.status
     };
 
     const offering: Offering = {
+      sales_scenarios: JSON.parse(offeringRow.sales_scenarios || '{}'),
       id: offeringRow.id,
       test_id: offeringRow.test_id,
       short_value_prop: offeringRow.short_value_prop,
@@ -286,9 +302,11 @@ export class TestRepository {
    */
   static getByFeedbackToken(tokenOrId: string): FullTestResponse | null {
     const db = getDatabase();
-    const row = db.prepare('SELECT id FROM tests WHERE feedback_token = ? OR id = ?').get(tokenOrId, tokenOrId) as { id: string } | undefined;
+    const row = db.prepare('SELECT id FROM tests WHERE feedback_token = ?').get(tokenOrId) as { id: string } | undefined;
     if (!row) return null;
-    return this.getById(row.id);
+    const run = this.getLatestRunByTestId(row.id);
+    if (!run || run.status !== 'completed' || this.getEvaluationsByRunId(run.id).length !== 100) return null;
+    return this.getRunSnapshot(run.id)?.test ?? null;
   }
 
   /**
@@ -331,6 +349,8 @@ export class TestRepository {
     const now = new Date().toISOString();
 
     // Check for existing response from this client token to avoid duplicate counts
+    db.prepare("UPDATE human_responses SET client_token = NULL, token_hash = NULL WHERE created_at < ?").run(new Date(Date.now() - 86400000).toISOString());
+    if (clientToken) clientToken = createHash('sha256').update(`${testId}:${clientToken}`).digest('hex');
     if (clientToken) {
       const existing = db.prepare('SELECT id FROM human_responses WHERE test_id = ? AND client_token = ?').get(testId, clientToken) as { id: string } | undefined;
       if (existing) {
@@ -423,6 +443,7 @@ export class TestRepository {
    */
   static saveProfiles(testId: string, profiles: Profile[]): Profile[] {
     const db = getDatabase();
+    if (this.getLatestRunByTestId(testId)) throw Object.assign(new Error('The panel is frozen. Create a new test to regenerate it.'), { status: 409 });
     
     // Begin transaction
     db.exec('BEGIN TRANSACTION;');
@@ -509,6 +530,7 @@ export class TestRepository {
       VALUES (?, ?, 'running', ?, ?, ?, ?, 100, 0)
     `);
     stmt.run(id, testId, primaryLever, profileSeed, modelId || null, now);
+    db.prepare('UPDATE runs SET snapshot = ? WHERE id = ?').run(JSON.stringify({ test: this.getById(testId), profiles: this.getProfiles(testId) }), id);
 
     return {
       id,
@@ -610,11 +632,12 @@ export class TestRepository {
     const db = getDatabase();
 
     const insertStmt = db.prepare(`
-      INSERT OR REPLACE INTO evaluations (
+      INSERT INTO evaluations (
         id, run_id, test_id, profile_id, option_id, access_status,
         response, reason, primary_objection, factor_tags, referenced_fields, created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE NOT EXISTS (SELECT 1 FROM evaluations WHERE run_id = ? AND profile_id = ? AND option_id = ?)
     `);
 
     db.exec('BEGIN TRANSACTION;');
@@ -632,7 +655,8 @@ export class TestRepository {
           ev.primary_objection || null,
           JSON.stringify(ev.factor_tags),
           JSON.stringify(ev.referenced_fields),
-          ev.created_at
+          ev.created_at,
+          ev.run_id, ev.profile_id, ev.option_id
         );
       }
       db.exec('COMMIT;');
@@ -673,7 +697,7 @@ export class TestRepository {
     const existingA = new Set(existing.filter(e => e.option_id === 'A').map(e => e.profile_id));
     const existingB = new Set(existing.filter(e => e.option_id === 'B').map(e => e.profile_id));
 
-    const profiles = this.getProfiles(testId);
+    const profiles = this.getRunSnapshot(runId)?.profiles ?? this.getProfiles(testId);
     const missingA: string[] = [];
     const missingB: string[] = [];
 
@@ -687,6 +711,9 @@ export class TestRepository {
       option_b_missing: missingB
     };
   }
+
+  static getRunSnapshot(runId: string): { test: FullTestResponse; profiles: Profile[] } | null {
+    const row = getDatabase().prepare('SELECT snapshot FROM runs WHERE id = ?').get(runId) as { snapshot?: string } | undefined;
+    return row?.snapshot ? JSON.parse(row.snapshot) : null;
+  }
 }
-
-

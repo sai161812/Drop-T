@@ -150,7 +150,7 @@ export const FinancialsForm: React.FC<FinancialsFormProps> = ({
             className="form-input tabular-nums"
             placeholder="e.g. 100"
             value={capacityUnits === undefined || isNaN(capacityUnits) ? '' : capacityUnits}
-            onChange={e => onChangeCapacityUnits(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+            onChange={e => onChangeCapacityUnits(e.target.value === '' ? undefined : Number(e.target.value))}
           />
           <span className="form-help">Maximum units you can produce or deliver in this period.</span>
         </div>
@@ -171,7 +171,7 @@ export const FinancialsForm: React.FC<FinancialsFormProps> = ({
               className="form-input tabular-nums"
               placeholder="e.g. 25"
               value={lowerUnits === undefined || isNaN(lowerUnits) ? '' : lowerUnits}
-              onChange={e => onChangeLowerUnits(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+              onChange={e => onChangeLowerUnits(e.target.value === '' ? undefined : Number(e.target.value))}
             />
           </div>
 
@@ -184,7 +184,7 @@ export const FinancialsForm: React.FC<FinancialsFormProps> = ({
               className="form-input tabular-nums"
               placeholder="e.g. 50"
               value={centralUnits === undefined || isNaN(centralUnits) ? '' : centralUnits}
-              onChange={e => onChangeCentralUnits(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+              onChange={e => onChangeCentralUnits(e.target.value === '' ? undefined : Number(e.target.value))}
             />
           </div>
 
@@ -197,7 +197,7 @@ export const FinancialsForm: React.FC<FinancialsFormProps> = ({
               className="form-input tabular-nums"
               placeholder="e.g. 80"
               value={higherUnits === undefined || isNaN(higherUnits) ? '' : higherUnits}
-              onChange={e => onChangeHigherUnits(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+              onChange={e => onChangeHigherUnits(e.target.value === '' ? undefined : Number(e.target.value))}
             />
           </div>
         </div>

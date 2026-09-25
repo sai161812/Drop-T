@@ -58,7 +58,13 @@ export const PublicFeedbackPage: React.FC<PublicFeedbackPageProps> = ({
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(`/api/feedback/${tokenOrId}`);
+      let token = tokenOrId;
+      if (!isStandalone) {
+        const stats = await fetch(`/api/tests/${tokenOrId}/feedback-stats`).then(r => r.json());
+        if (!stats.feedback_token) throw new Error('Complete the comparison before collecting feedback.');
+        token = stats.feedback_token;
+      }
+      const res = await fetch(`/api/feedback/${token}`);
       if (res.ok) {
         const feedbackData: PublicFeedbackViewData = await res.json();
         setData(feedbackData);
@@ -80,14 +86,14 @@ export const PublicFeedbackPage: React.FC<PublicFeedbackPageProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [tokenOrId]);
+  }, [tokenOrId, isStandalone]);
 
   useEffect(() => {
     fetchFeedbackData();
   }, [fetchFeedbackData]);
 
   const handleCopyLink = () => {
-    const url = window.location.href;
+    const url = `${window.location.origin}/feedback/${data?.feedback_token}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);

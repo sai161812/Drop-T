@@ -373,8 +373,8 @@ export function computeSingleLeverDiff(
       val_b: optB.served_markets
     });
   } else if (lever === 'creative') {
-    const descA = optA.images?.[0]?.confirmed_visual_description || 'No creative description';
-    const descB = optB.images?.[0]?.confirmed_visual_description || 'No creative description';
+    const descA = optA.images.map(image => `${image.filename}: ${image.confirmed_visual_description || 'No confirmed description'}`).join('; ');
+    const descB = optB.images.map(image => `${image.filename}: ${image.confirmed_visual_description || 'No confirmed description'}`).join('; ');
     diffs.push({
       field: 'creative_description',
       label: 'Creative & visual positioning',
@@ -413,7 +413,7 @@ export function generateDecisionCard(
   matrix: TransitionMatrix,
   eligibilityChanges: EligibilityChangeSummary[]
 ): DecisionCardData {
-  const isComplete = run.total_evaluations_completed >= run.total_evaluations_expected;
+  const isComplete = run.status === 'completed' && run.total_evaluations_completed === 100 && run.total_evaluations_expected === 100;
 
   if (!isComplete) {
     return {
@@ -499,6 +499,7 @@ export function generateDecisionCard(
 
   // Finance comparison integration
   const financeA = calculateFinancials({
+    sales_scenarios: fullTest.offering.sales_scenarios,
     currency: fullTest.offering.currency,
     period: fullTest.offering.period,
     price: optA.price,
@@ -508,6 +509,7 @@ export function generateDecisionCard(
   });
 
   const financeB = calculateFinancials({
+    sales_scenarios: fullTest.offering.sales_scenarios,
     currency: fullTest.offering.currency,
     period: fullTest.offering.period,
     price: optB.price,
@@ -579,6 +581,7 @@ export function computeComparisonAnalysis(
   );
 
   const financeA = calculateFinancials({
+    sales_scenarios: fullTest.offering.sales_scenarios,
     currency: fullTest.offering.currency,
     period: fullTest.offering.period,
     price: fullTest.options.A.price,
@@ -588,6 +591,7 @@ export function computeComparisonAnalysis(
   });
 
   const financeB = calculateFinancials({
+    sales_scenarios: fullTest.offering.sales_scenarios,
     currency: fullTest.offering.currency,
     period: fullTest.offering.period,
     price: fullTest.options.B.price,

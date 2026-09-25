@@ -143,6 +143,16 @@ export function runMigrations(db: DatabaseSync): void {
 
   db.exec(schema);
 
+  const addColumn = (table: string, name: string, definition: string) => {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!columns.some(column => column.name === name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+  };
+  addColumn('tests', 'panel_seed', 'INTEGER NOT NULL DEFAULT 12345');
+  addColumn('runs', 'snapshot', 'TEXT');
+  addColumn('offerings', 'sales_scenarios', 'TEXT');
+  // Interrupted requests remain recoverable after a server restart.
+  db.exec("UPDATE runs SET status = 'partial', error_message = 'Server restarted. Retry missing evaluations.' WHERE status IN ('pending', 'running')");
+
   // Migration for existing databases
   try {
     db.exec('ALTER TABLE runs ADD COLUMN model_id TEXT;');
@@ -164,7 +174,7 @@ export function runMigrations(db: DatabaseSync): void {
 
   // Backfill feedback_token for existing tests if null
   try {
-    db.exec('UPDATE tests SET feedback_token = id WHERE feedback_token IS NULL;');
+    db.exec('UPDATE tests SET feedback_token = lower(hex(randomblob(24))) WHERE feedback_token IS NULL OR feedback_token = id;');
   } catch (_e) {
     // Ignore
   }
@@ -182,4 +192,3 @@ export function runMigrations(db: DatabaseSync): void {
     // Ignore
   }
 }
-

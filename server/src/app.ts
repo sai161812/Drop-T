@@ -1,6 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'node:path';
+import fs from 'node:fs';
 import { config } from './config.js';
 import { testRouter } from './routes/testRoutes.js';
 import { runRouter } from './routes/runRoutes.js';
@@ -16,6 +17,7 @@ export function createApp(): Express {
 
   // Middleware
   app.use(cors());
+  app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true }));
 
@@ -43,6 +45,12 @@ export function createApp(): Express {
   app.use('/api/*', (_req: Request, res: Response) => {
     res.status(404).json({ error: 'API route not found' });
   });
+
+  const clientDir = path.resolve(import.meta.dirname, '../../client/dist');
+  if (fs.existsSync(path.join(clientDir, 'index.html'))) {
+    app.use(express.static(clientDir));
+    app.get('*', (_req, res) => res.sendFile(path.join(clientDir, 'index.html')));
+  }
 
   // Global Error Handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

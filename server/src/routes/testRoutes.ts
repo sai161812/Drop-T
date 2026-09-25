@@ -7,6 +7,8 @@ import {
 } from '@droptest/shared';
 import { TestRepository } from '../db/testRepository.js';
 import { generatePanelProfiles } from '../simulation/profileGenerator.js';
+import { getDatabase } from '../db/database.js';
+import { z } from 'zod';
 
 export const testRouter = Router();
 
@@ -23,6 +25,8 @@ testRouter.get('/', (_req: Request, res: Response) => {
 // POST /api/tests/preview-panel - Generate and preview 50 profiles in-memory from draft inputs
 testRouter.post('/preview-panel', (req: Request, res: Response) => {
   try {
+    const input = z.object({ domain_id: z.enum(['clothing_accessories', 'local_food_beverages', 'digital_products_services']), audience_markets: z.array(z.string().trim().min(1).max(100)).min(1).max(4), expected_spend_min: z.number().finite().nonnegative(), expected_spend_max: z.number().finite().nonnegative(), intended_buyer_description: z.string().max(500), adjacent_buyer_description: z.string().max(500), seed: z.number().int().min(0).max(2147483647).optional() }).safeParse(req.body);
+    if (!input.success || input.data.expected_spend_max < input.data.expected_spend_min) return res.status(400).json({ error: 'Enter valid audience markets and spend bounds to preview the panel.' });
     const { 
       domain_id, 
       intended_buyer_description = '', 
@@ -108,7 +112,7 @@ testRouter.get('/:id/panel', (req: Request, res: Response) => {
         expectedSpendMin: test.audience_config.expected_spend_min,
         expectedSpendMax: test.audience_config.expected_spend_max,
         audienceMarkets: test.audience_config.audience_markets,
-        seed: 12345
+        seed: test.test.panel_seed ?? 12345
       });
       TestRepository.saveProfiles(testId, profiles);
     }
@@ -145,6 +149,8 @@ testRouter.post('/:id/panel/generate', (req: Request, res: Response) => {
     }
 
     const seed = req.body.seed !== undefined ? Number(req.body.seed) : Math.floor(Math.random() * 1000000);
+    if (!Number.isInteger(seed) || seed < 0 || seed > 2147483647) return res.status(400).json({ error: 'Invalid panel seed' });
+    if (TestRepository.getLatestRunByTestId(testId)) return res.status(409).json({ error: 'This panel is frozen. Create a new test to regenerate it.' });
 
     const generatedProfiles = generatePanelProfiles({
       testId,
@@ -158,6 +164,7 @@ testRouter.post('/:id/panel/generate', (req: Request, res: Response) => {
     });
 
     const savedProfiles = TestRepository.saveProfiles(testId, generatedProfiles);
+    getDatabase().prepare('UPDATE tests SET panel_seed = ? WHERE id = ?').run(seed, testId);
 
     const statsA = calculatePanelEligibilityStats(savedProfiles, test.options.A);
     const statsB = calculatePanelEligibilityStats(savedProfiles, test.options.B);
@@ -196,8 +203,16 @@ testRouter.post('/', (req: Request, res: Response) => {
     const saved = TestRepository.saveDraft(parseResult.data);
     res.status(200).json(saved);
   } catch (error: any) {
-    res.status(500).json({ error: 'Failed to save test draft', message: error.message });
+    res.status(error.status || 500).json({ error: error.status === 409 ? error.message : 'Failed to save test draft' });
   }
+});
+
+testRouter.get('/:id/feedback-stats', (req, res) => {
+  const id = String(req.params.id);
+  const test = TestRepository.getById(id);
+  if (!test) return res.status(404).json({ error: 'Test not found' });
+  const stats = TestRepository.getHumanFeedback(id);
+  res.json({ ...stats, feedback_token: test.test.feedback_token && TestRepository.getByFeedbackToken(test.test.feedback_token) ? test.test.feedback_token : undefined });
 });
 
 // DELETE /api/tests/:id - Delete test by ID

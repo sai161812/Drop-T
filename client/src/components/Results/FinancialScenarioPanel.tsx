@@ -42,9 +42,9 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
   financeB
 }) => {
   // Local interactive scenario units state (defaults or user-adjusted)
-  const [lowerUnits, setLowerUnits] = useState<number>(20);
-  const [centralUnits, setCentralUnits] = useState<number>(50);
-  const [higherUnits, setHigherUnits] = useState<number>(100);
+  const [lowerUnits, setLowerUnits] = useState<number | undefined>(financeA.scenarios?.lower?.units);
+  const [centralUnits, setCentralUnits] = useState<number | undefined>(financeA.scenarios?.central?.units);
+  const [higherUnits, setHigherUnits] = useState<number | undefined>(financeA.scenarios?.higher?.units);
 
   const hasCostsA = financeA.has_sufficient_inputs;
   const hasCostsB = financeB.has_sufficient_inputs;
@@ -291,24 +291,24 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
             <input
               type="number"
               className="input tabular-nums"
-              value={lowerUnits}
-              onChange={e => setLowerUnits(Math.max(0, parseInt(e.target.value) || 0))}
+              value={lowerUnits ?? ''}
+              onChange={e => setLowerUnits(e.target.value === '' ? undefined : Number(e.target.value))}
               style={{ width: '60px', height: '28px', fontSize: '11px', padding: '2px 6px', textAlign: 'center' }}
               title="Lower scenario units"
             />
             <input
               type="number"
               className="input tabular-nums"
-              value={centralUnits}
-              onChange={e => setCentralUnits(Math.max(0, parseInt(e.target.value) || 0))}
+              value={centralUnits ?? ''}
+              onChange={e => setCentralUnits(e.target.value === '' ? undefined : Number(e.target.value))}
               style={{ width: '60px', height: '28px', fontSize: '11px', padding: '2px 6px', textAlign: 'center' }}
               title="Central scenario units"
             />
             <input
               type="number"
               className="input tabular-nums"
-              value={higherUnits}
-              onChange={e => setHigherUnits(Math.max(0, parseInt(e.target.value) || 0))}
+              value={higherUnits ?? ''}
+              onChange={e => setHigherUnits(e.target.value === '' ? undefined : Number(e.target.value))}
               style={{ width: '60px', height: '28px', fontSize: '11px', padding: '2px 6px', textAlign: 'center' }}
               title="Higher scenario units"
             />

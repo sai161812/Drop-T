@@ -208,7 +208,11 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
 
               return (
                 <React.Fragment key={t.profile_id}>
-                  <tr 
+                    <tr
+                      tabIndex={0}
+                      aria-expanded={isExpanded}
+                      aria-label={`Inspect ${t.profile_id}`}
+                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setExpandedProfileId(isExpanded ? null : t.profile_id); } }}
                     style={{ 
                       borderBottom: '1px solid var(--color-border-subtle)', 
                       background: isExpanded ? '#F8FAFC' : idx % 2 === 0 ? 'var(--color-surface)' : 'var(--color-surface-subtle)',

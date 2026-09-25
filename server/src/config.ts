@@ -27,5 +27,5 @@ export const config: ServerConfig = {
   groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
   groqVisionModel: process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview',
   groqTemperature: parseFloat(process.env.GROQ_TEMPERATURE || '0.2'),
-  groqMaxRetries: parseInt(process.env.GROQ_MAX_RETRIES || '3', 10),
+  groqMaxRetries: parseInt(process.env.GROQ_MAX_RETRIES || '5', 10),
 };

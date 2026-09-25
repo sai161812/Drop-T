@@ -8,8 +8,13 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<PageTab>('setup');
   const [testTitle, setTestTitle] = useState('Organic Handloom Linen Shirt');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle');
-  const [activeTestId, setActiveTestId] = useState<string | undefined>(undefined);
+  const [activeTestId, setActiveTestId] = useState<string | undefined>(() => sessionStorage.getItem('droptest_active_test') || undefined);
   const [standaloneFeedbackToken, setStandaloneFeedbackToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTestId) sessionStorage.setItem('droptest_active_test', activeTestId);
+    else sessionStorage.removeItem('droptest_active_test');
+  }, [activeTestId]);
 
   useEffect(() => {
     // Check if user is navigating directly to a public feedback page

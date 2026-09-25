@@ -7,16 +7,18 @@ import { FinancialInputs, FinancialCalculationResult, ScenarioCalculation } from
 export function calculateFinancials(inputs: FinancialInputs): FinancialCalculationResult {
   const missingFields: string[] = [];
 
-  if (inputs.price === undefined || isNaN(inputs.price)) {
+  if (!Number.isFinite(inputs.price) || inputs.price < 0) {
     missingFields.push('Price (P)');
   }
-  if (inputs.variable_cost_per_sale === undefined || isNaN(inputs.variable_cost_per_sale)) {
+  if (inputs.variable_cost_per_sale === undefined || !Number.isFinite(inputs.variable_cost_per_sale) || inputs.variable_cost_per_sale < 0) {
     missingFields.push('Variable cost per sale (C)');
   }
-  if (inputs.fixed_launch_cost === undefined || isNaN(inputs.fixed_launch_cost)) {
+  if (inputs.fixed_launch_cost === undefined || !Number.isFinite(inputs.fixed_launch_cost) || inputs.fixed_launch_cost < 0) {
     missingFields.push('Fixed launch cost (F)');
   }
 
+  if (!inputs.currency?.trim()) missingFields.push('Currency');
+  if (!inputs.period?.trim()) missingFields.push('Period or launch batch');
   if (missingFields.length > 0) {
     return {
       has_sufficient_inputs: false,
@@ -59,7 +61,7 @@ export function calculateFinancials(inputs: FinancialInputs): FinancialCalculati
       return undefined;
     }
 
-    if (units < 0) {
+    if (!Number.isSafeInteger(units) || units < 0) {
       return {
         units,
         revenue: 0,
@@ -67,7 +69,7 @@ export function calculateFinancials(inputs: FinancialInputs): FinancialCalculati
         net_result: 0,
         is_within_capacity: false,
         is_valid: false,
-        validation_error: 'Sales scenario units cannot be negative.'
+        validation_error: units < 0 ? 'Sales scenario units cannot be negative.' : 'Sales scenario units must be finite whole numbers.'
       };
     }
 

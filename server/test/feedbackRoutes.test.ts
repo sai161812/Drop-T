@@ -4,6 +4,8 @@ import { initDatabase, closeDatabase } from '../src/db/database.js';
 import { TestRepository } from '../src/db/testRepository.js';
 import { createApp } from '../src/app.js';
 import { TestDraftPayload } from '@droptest/shared';
+import { generatePanelProfiles } from '../src/simulation/profileGenerator.js';
+import { randomUUID } from 'node:crypto';
 
 describe('Phase 6: Public Feedback Link & Real-Person Validation Tests', () => {
   let app: any;
@@ -89,6 +91,11 @@ describe('Phase 6: Public Feedback Link & Real-Person Validation Tests', () => {
     const saved = TestRepository.saveDraft(payload);
     testId = saved.test.id;
     feedbackToken = saved.test.feedback_token || testId;
+    const profiles = generatePanelProfiles({ testId, domainId: saved.test.domain_id, intendedBuyerDescription: 'Test buyers', adjacentBuyerDescription: 'Adjacent buyers', expectedSpendMin: 500, expectedSpendMax: 1200, audienceMarkets: saved.audience_config.audience_markets });
+    TestRepository.saveProfiles(testId, profiles);
+    const run = TestRepository.createRun(testId, 'price', 12345);
+    TestRepository.saveEvaluations(profiles.flatMap(profile => (['A', 'B'] as const).map(option => ({ id: randomUUID(), run_id: run.id, test_id: testId, profile_id: profile.id, option_id: option, access_status: 'served' as const, response: 'unsure' as const, reason: 'Test fixture response', factor_tags: ['fit' as const], referenced_fields: ['price'], created_at: new Date().toISOString() }))));
+    TestRepository.updateRun(run.id, { status: 'completed', total_evaluations_completed: 100 });
   });
 
   after(async () => {
@@ -119,6 +126,8 @@ describe('Phase 6: Public Feedback Link & Real-Person Validation Tests', () => {
     assert.strictEqual(data.evaluations, undefined);
     assert.strictEqual(data.runs, undefined);
     assert.strictEqual(data.analysis, undefined);
+    assert.strictEqual(data.options.A.variable_cost_per_sale, undefined);
+    assert.strictEqual(data.domain_specific_data.unit_production_cost, undefined);
   });
 
   it('returns 404 for an invalid or non-existent feedback token', async () => {

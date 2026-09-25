@@ -161,6 +161,7 @@ export type DomainSpecificData =
 
 // Domain Entities
 export interface Test {
+  panel_seed?: number;
   id: string;
   title: string;
   domain_id: DomainId;
@@ -171,6 +172,7 @@ export interface Test {
 }
 
 export interface Offering {
+  sales_scenarios?: FinancialInputs['sales_scenarios'];
   id: string;
   test_id: string;
   short_value_prop: string;
@@ -295,7 +297,6 @@ export interface PublicOptionViewData {
   served_markets: string[];
   fulfillment_mode: string;
   images: ImageMetadata[];
-  variable_cost_per_sale?: number;
 }
 
 export interface PublicFeedbackViewData {
@@ -355,6 +356,7 @@ export interface FinancialCalculationResult {
 
 // Aggregate Test Payload (for Setup & Persistence)
 export interface TestDraftPayload {
+  panel_seed?: number;
   test: {
     id?: string;
     title: string;
@@ -362,6 +364,7 @@ export interface TestDraftPayload {
     feedback_token?: string;
   };
   offering: {
+    sales_scenarios?: FinancialInputs['sales_scenarios'];
     short_value_prop: string;
     description: string;
     currency: string;
@@ -583,4 +586,3 @@ export interface ComparisonAnalysis {
     option_b: FinancialCalculationResult;
   };
 }
-

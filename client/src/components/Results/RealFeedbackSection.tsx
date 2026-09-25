@@ -4,12 +4,10 @@ import {
   Copy, 
   Check, 
   ExternalLink, 
-  QrCode, 
   RefreshCw,
   MessageSquare
 } from 'lucide-react';
 import { HumanFeedbackStats, HumanChoice } from '@droptest/shared';
-import { generateQRCodeSVG } from '../../utils/qrCode.js';
 
 interface RealFeedbackSectionProps {
   testId?: string;
@@ -19,14 +17,13 @@ export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId
   const [stats, setStats] = useState<HumanFeedbackStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showQR, setShowQR] = useState(false);
   const [filterChoice, setFilterChoice] = useState<HumanChoice | 'all'>('all');
 
   const fetchStats = useCallback(async () => {
     if (!testId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/feedback/${testId}/stats`);
+      const res = await fetch(`/api/tests/${testId}/feedback-stats`);
       if (res.ok) {
         const data: HumanFeedbackStats = await res.json();
         setStats(data);
@@ -42,7 +39,7 @@ export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId
     fetchStats();
   }, [fetchStats]);
 
-  const feedbackToken = stats?.feedback_token || testId || '';
+  const feedbackToken = stats?.feedback_token || '';
   const feedbackUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/feedback/${feedbackToken}`
     : `http://localhost:5173/feedback/${feedbackToken}`;
@@ -65,6 +62,8 @@ export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId
   const filteredResponses = filterChoice === 'all' 
     ? (stats?.responses || [])
     : (stats?.responses || []).filter(r => r.choice === filterChoice);
+
+  if (!feedbackToken) return <div className="workbench-card"><h3>Responses from real people</h3><p>{isLoading ? 'Loading feedback…' : 'Complete the comparison to create a feedback link.'}</p></div>;
 
   return (
     <div 
@@ -92,29 +91,7 @@ export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={fetchStats}
-            disabled={isLoading}
-            style={{ fontSize: '11px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
-            title="Refresh real-person feedback"
-          >
-            <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
-            {isLoading ? 'Refreshing...' : 'Refresh'}
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setShowQR(!showQR)}
-            style={{ fontSize: '11px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
-            title="Show QR Code for mobile scanning"
-          >
-            <QrCode size={12} />
-            {showQR ? 'Hide QR' : 'QR Code'}
-          </button>
-
+          <button className="btn btn-secondary" onClick={fetchStats} disabled={isLoading}><RefreshCw size={12} /> Refresh</button>
           <a
             href={`/feedback/${feedbackToken}`}
             target="_blank"
@@ -165,26 +142,7 @@ export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId
           </span>
         </div>
 
-        {/* QR Code expansion */}
-        {showQR && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--color-surface)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-            <div 
-              style={{ background: '#FFF', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid #E5E7EB', display: 'inline-block' }}
-              dangerouslySetInnerHTML={{ __html: generateQRCodeSVG(feedbackUrl, 140) }}
-            />
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>
-                Scan with mobile camera
-              </div>
-              <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', maxWidth: '360px', lineHeight: 1.45, marginBottom: '6px' }}>
-                Test on mobile to verify responsive layout and submit feedback from a live mobile browser session.
-              </p>
-              <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                Directly opens unguided voter view asking "Which would you consider?"
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
 
       {/* Recruitment statement and sample size disclaimer */}

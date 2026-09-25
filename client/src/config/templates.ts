@@ -41,7 +41,7 @@ export const DOMAIN_PRESETS: Record<DomainId, DomainPreset> = {
       option_b: {
         name: 'Premium Price ₹899',
         price: 899,
-        primary_message: 'Sustainable luxury crafted with gift packaging included',
+        primary_message: 'Sustainable everyday comfort at an accessible launch price',
         served_markets: ['Koramangala', 'Indiranagar', 'Whitefield'],
         fulfillment_mode: 'Standard postal shipping',
         images: [],
@@ -94,11 +94,11 @@ export const DOMAIN_PRESETS: Record<DomainId, DomainPreset> = {
         capacity_units: 150
       },
       option_b: {
-        name: 'Doorstep Delivery ₹450',
-        price: 450,
-        primary_message: 'Chilled doorstep morning drop before 9 AM',
+        name: 'Expanded availability',
+        price: 350,
+        primary_message: 'Fresh weekend pickup at partner neighborhood cafe',
         served_markets: ['Indiranagar', 'Koramangala', 'HSR Layout'],
-        fulfillment_mode: 'Chilled doorstep direct delivery',
+        fulfillment_mode: 'Weekend cafe counter pickup',
         images: [],
         variable_cost_per_sale: 160,
         fixed_launch_cost: 15000,
@@ -147,10 +147,10 @@ export const DOMAIN_PRESETS: Record<DomainId, DomainPreset> = {
         capacity_units: 500
       },
       option_b: {
-        name: 'Pro $39/mo',
-        price: 39,
-        primary_message: 'Unlimited invoices, multi-currency support & QuickBooks sync',
-        served_markets: ['North America', 'India', 'Europe', 'Australia'],
+        name: 'Alternative message $19/mo',
+        price: 19,
+        primary_message: 'Spend less time entering data: export up to 100 invoices per month',
+        served_markets: ['North America', 'India', 'Europe'],
         fulfillment_mode: 'Instant cloud web dashboard',
         images: [],
         variable_cost_per_sale: 3,

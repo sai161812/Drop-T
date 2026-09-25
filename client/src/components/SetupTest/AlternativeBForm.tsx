@@ -134,7 +134,7 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
           ))}
         </div>
         <span className="form-help">
-          Testing one lever ensures simulated profile differences are attributable to this specific change.
+          Compare one main change. Simulated differences are hypotheses to check with real people.
         </span>
       </div>
 
