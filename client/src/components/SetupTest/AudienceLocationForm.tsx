@@ -54,11 +54,10 @@ export const AudienceLocationForm: React.FC<AudienceLocationFormProps> = ({
       <div className="card-header">
         <div>
           <h2 className="card-title">
-            <span className="card-step-badge">2</span>
-            <span>Audience & Location Assumptions</span>
+            <span>Audience & Location Configuration</span>
           </h2>
           <p className="card-description">
-            Configure the 50-profile simulated panel split (20 intended / 20 adjacent / 10 contrasting) and target markets.
+            Configure buyer personas, target spend range, and serviceable locations.
           </p>
         </div>
       </div>
@@ -67,8 +66,8 @@ export const AudienceLocationForm: React.FC<AudienceLocationFormProps> = ({
       <div className="form-group">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <label className="form-label" htmlFor="intended-buyer">
-            <Users size={14} color="var(--color-intended)" />
-            <span>Intended Buyer Description (20 Profiles)</span>
+            <Users size={14} color="var(--color-text-secondary)" />
+            <span>Intended Buyer Persona</span>
             <span className="required">*</span>
           </label>
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
@@ -94,8 +93,8 @@ export const AudienceLocationForm: React.FC<AudienceLocationFormProps> = ({
       <div className="form-group">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <label className="form-label" htmlFor="adjacent-buyer">
-            <Users size={14} color="var(--color-adjacent)" />
-            <span>Adjacent Buyer Description (20 Profiles)</span>
+            <Users size={14} color="var(--color-text-secondary)" />
+            <span>Adjacent Buyer Persona</span>
             <span className="required">*</span>
           </label>
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>

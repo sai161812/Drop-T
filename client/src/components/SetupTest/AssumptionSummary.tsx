@@ -65,11 +65,11 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
         </div>
 
         <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-          Fixed 20/20/10 allocation across intended, adjacent, and contrasting segments.
+          Audience allocation across intended, adjacent, and contrasting segments.
         </p>
 
-        {/* Visual 20/20/10 Segment Bar */}
-        <div className="panel-distribution-bar" title="Panel Split: 20 Intended / 20 Adjacent / 10 Contrasting">
+        {/* Visual Segment Bar */}
+        <div className="panel-distribution-bar" title="Panel Split: Intended (40%) / Adjacent (40%) / Contrasting (20%)">
           <div className="panel-seg-intended" />
           <div className="panel-seg-adjacent" />
           <div className="panel-seg-contrasting" />
@@ -79,21 +79,18 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
         <div style={{ marginTop: '8px' }}>
           <div className="panel-stat-row">
             <span className="panel-stat-label">
-              <span className="badge badge-intended" style={{ padding: '1px 5px' }}>20</span>
               <span>Intended Segment</span>
             </span>
             <span className="panel-stat-val">40%</span>
           </div>
           <div className="panel-stat-row">
             <span className="panel-stat-label">
-              <span className="badge badge-adjacent" style={{ padding: '1px 5px' }}>20</span>
               <span>Adjacent Segment</span>
             </span>
             <span className="panel-stat-val">40%</span>
           </div>
           <div className="panel-stat-row">
             <span className="panel-stat-label">
-              <span className="badge badge-contrasting" style={{ padding: '1px 5px' }}>10</span>
               <span>Contrasting Segment</span>
             </span>
             <span className="panel-stat-val">20%</span>

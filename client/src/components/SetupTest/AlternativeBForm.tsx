@@ -105,7 +105,6 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
       <div className="card-header">
         <div>
           <h2 className="card-title">
-            <span className="card-step-badge">4</span>
             <span>Comparison Lever & Alternative (Option B)</span>
           </h2>
           <p className="card-description">

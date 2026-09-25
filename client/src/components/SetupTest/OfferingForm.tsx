@@ -92,7 +92,6 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
       <div className="card-header">
         <div>
           <h2 className="card-title">
-            <span className="card-step-badge">3</span>
             <span>Core Offering & Baseline (Option A)</span>
           </h2>
           <p className="card-description">

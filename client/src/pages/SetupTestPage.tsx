@@ -162,6 +162,20 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     fetchDraftsList();
   }, [fetchDraftsList]);
 
+  // Distinct recent drafts list (max 5 distinct items)
+  const distinctDraftsList = useMemo(() => {
+    const seenTitles = new Set<string>();
+    const distinct: Test[] = [];
+    for (const d of savedDraftsList) {
+      if (!seenTitles.has(d.title)) {
+        seenTitles.add(d.title);
+        distinct.push(d);
+        if (distinct.length >= 5) break;
+      }
+    }
+    return distinct;
+  }, [savedDraftsList]);
+
   // Function to apply a preset payload
   const applyPreset = (payload: TestDraftPayload, keepId = false) => {
     if (!keepId) {
@@ -590,9 +604,8 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const isPriceNotSet = linkedProduct ? linkedProduct.price === null : false;
   const isFormValid = missingInputs.length === 0 && !isLocked;
 
-  // Page definitions for the left sidebar
+  // Page definitions for the left sidebar (Clean, professional, enterprise layout)
   const labPages = useMemo(() => {
-    // Check completion status for each page
     const isOfferingComplete = Boolean(
       title.trim() &&
       shortValueProp.trim() &&
@@ -610,47 +623,42 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       expectedSpendMax >= expectedSpendMin
     );
 
-    const isFinancialsComplete = true; // Financials have sensible defaults
+    const isFinancialsComplete = true;
     const isOverviewComplete = true;
 
     return [
       {
         id: 'overview' as LabPageId,
-        stepNum: '01',
-        title: 'Launch Overview',
+        title: 'Overview & Evidence',
         subtitle: 'Review mode & market research',
         icon: Rocket,
         isComplete: isOverviewComplete
       },
       {
         id: 'offering' as LabPageId,
-        stepNum: '02',
         title: 'Product & Offering',
-        subtitle: mode === 'comparison' ? 'Baseline A & Variant B' : 'Core specs & baseline details',
+        subtitle: mode === 'comparison' ? 'Baseline A & Variant B' : 'Specifications & baseline',
         icon: Package,
         isComplete: isOfferingComplete
       },
       {
         id: 'audience' as LabPageId,
-        stepNum: '03',
-        title: 'Audience & Markets',
-        subtitle: 'Buyer profiles & locations',
+        title: 'Target Audience',
+        subtitle: 'Buyer personas & locations',
         icon: Users,
         isComplete: isAudienceComplete
       },
       {
         id: 'financials' as LabPageId,
-        stepNum: '04',
         title: 'Unit Economics',
-        subtitle: 'Costs, margins & sales volume',
+        subtitle: 'Costs & volume scenarios',
         icon: TrendingUp,
         isComplete: isFinancialsComplete
       },
       {
         id: 'simulation' as LabPageId,
-        stepNum: '05',
-        title: 'Panel & Simulation',
-        subtitle: '50 personas & execution',
+        title: 'Simulation Panel',
+        subtitle: '50 Personas & launchpad',
         icon: Cpu,
         isComplete: isFormValid
       }
@@ -688,12 +696,13 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
               <span>Synthetic Lab</span>
             </span>
             <span style={{ 
-              fontSize: '10px', 
-              fontWeight: 700, 
-              padding: '2px 6px', 
+              fontSize: '11px', 
+              fontWeight: 600, 
+              padding: '2px 7px', 
               borderRadius: 'var(--radius-sm)',
-              background: mode === 'comparison' ? '#FEF3C7' : 'var(--color-intended-bg)',
-              color: mode === 'comparison' ? '#92400E' : 'var(--color-intended)'
+              background: 'var(--color-surface-subtle)',
+              border: '1px solid var(--color-border-subtle)',
+              color: 'var(--color-text-secondary)'
             }}>
               {mode === 'comparison' ? 'A/B Test (100)' : 'Single (50)'}
             </span>
@@ -708,7 +717,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         </div>
 
         {/* Step Pages Navigation List */}
-        <nav aria-label="Synthetic Lab Steps">
+        <nav aria-label="Synthetic Lab Sections">
           <ul className="lab-nav-list">
             {labPages.map((page) => {
               const Icon = page.icon;
@@ -726,16 +735,16 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                         <Icon size={14} />
                       </div>
                       <div className="lab-nav-text">
-                        <span className="lab-nav-step-num">Step {page.stepNum}</span>
                         <span className="lab-nav-label">{page.title}</span>
+                        <span className="lab-nav-subtext">{page.subtitle}</span>
                       </div>
                     </div>
 
                     <div className="lab-nav-status-icon">
                       {page.isComplete ? (
-                        <CheckCircle2 size={14} color="var(--color-success)" />
+                        <CheckCircle2 size={13} color="var(--color-text-primary)" />
                       ) : (
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-border-strong)' }} />
+                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-border-strong)' }} />
                       )}
                     </div>
                   </button>
@@ -749,7 +758,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         <div className="lab-sidebar-footer">
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-              <span>Configuration Readiness</span>
+              <span>Configuration Status</span>
               <span className="tabular-nums" style={{ fontWeight: 600 }}>{completedCount}/{labPages.length}</span>
             </div>
             <div className="lab-progress-bar-wrap">
@@ -769,8 +778,8 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
             <span>{isSavingLocal ? 'Saving...' : 'Save Lab Draft'}</span>
           </button>
 
-          {/* Saved Drafts Dropdown (if exists) */}
-          {savedDraftsList.length > 0 && !linkedProduct && (
+          {/* Saved Drafts Dropdown (Only when not in a linked product and there are drafts) */}
+          {!linkedProduct && distinctDraftsList.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <FolderOpen size={13} color="var(--color-text-muted)" />
               <select
@@ -784,10 +793,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 }}
                 disabled={isLoadingDraft}
               >
-                <option value="" disabled>Load saved draft...</option>
-                {savedDraftsList.map(d => (
+                <option value="" disabled>Load recent draft ({distinctDraftsList.length})...</option>
+                {distinctDraftsList.map(d => (
                   <option key={d.id} value={d.id}>
-                    {d.title.length > 20 ? `${d.title.substring(0, 20)}...` : d.title}
+                    {d.title.length > 24 ? `${d.title.substring(0, 24)}...` : d.title}
                   </option>
                 ))}
               </select>
@@ -814,11 +823,11 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         {labLoadError && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '13px', background: 'var(--color-danger-bg)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-danger-border)' }}>{labLoadError}</p>}
         
         {isLocked && (
-          <div className="workbench-card" style={{ background: '#FEFCE8', borderColor: '#FDE047' }}>
+          <div className="workbench-card" style={{ background: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: '#92400E', margin: 0 }}>This test is frozen</p>
-                <p style={{ fontSize: '12px', color: '#78350F', margin: 0 }}>Its inputs, panel and evaluations stay paired with this run.</p>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>This test is frozen</p>
+                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>Its inputs, panel and evaluations stay paired with this run.</p>
               </div>
               <button 
                 className="btn btn-secondary" 
@@ -839,7 +848,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
               : runState.status === 'partial' || runState.status === 'unconfigured' 
                 ? 'var(--color-warning-bg)' 
                 : runState.status === 'running'
-                  ? 'var(--color-intended-bg)'
+                  ? 'var(--color-surface-subtle)'
                   : 'var(--color-danger-bg)',
             border: `1px solid ${
               runState.status === 'completed' 
@@ -847,7 +856,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 : runState.status === 'partial' || runState.status === 'unconfigured' 
                   ? '#FDE68A' 
                   : runState.status === 'running'
-                    ? '#BAE6FD'
+                    ? 'var(--color-border)'
                     : '#FCA5A5'
             }`,
             borderRadius: 'var(--radius-md)',
@@ -857,7 +866,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
               : runState.status === 'partial' || runState.status === 'unconfigured'
                 ? '#92400E'
                 : runState.status === 'running'
-                  ? 'var(--color-intended)'
+                  ? 'var(--color-text-primary)'
                   : 'var(--color-danger)',
             fontSize: 'var(--font-size-sm)',
             display: 'flex',
@@ -924,7 +933,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
-        {/* Page 1: Overview & Research */}
+        {/* Section 1: Overview & Evidence */}
         {activePage === 'overview' && (
           <div className="lab-page-body">
             <div className="lab-page-header">
@@ -932,24 +941,20 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 <div className="lab-page-breadcrumb">
                   <span>Synthetic Lab</span>
                   <span>/</span>
-                  <span>Step 1 of 5</span>
+                  <span>Overview & Evidence</span>
                 </div>
                 <h1 className="lab-page-title">Launch Overview & Market Evidence</h1>
                 <p className="lab-page-desc">
                   Set evaluation mode, verify launch pricing, and extract live competitor search references.
                 </p>
               </div>
-
-              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
-                Stage 1: Preflight
-              </span>
             </div>
 
             {/* Quick Context Highlights */}
             <div className="lab-overview-grid">
               <div className="lab-overview-card">
                 <div className="lab-overview-card-title">
-                  <Cpu size={14} color="var(--color-intended)" />
+                  <Cpu size={14} color="var(--color-text-secondary)" />
                   <span>AI Consumer Panel Engine</span>
                 </div>
                 <div className="lab-overview-card-value">
@@ -959,7 +964,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
               <div className="lab-overview-card">
                 <div className="lab-overview-card-title">
-                  <Sparkles size={14} color="var(--color-adjacent)" />
+                  <Sparkles size={14} color="var(--color-text-secondary)" />
                   <span>Market Intelligence</span>
                 </div>
                 <div className="lab-overview-card-value">
@@ -969,7 +974,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
               <div className="lab-overview-card">
                 <div className="lab-overview-card-title">
-                  <Sliders size={14} color="var(--color-contrasting)" />
+                  <Sliders size={14} color="var(--color-text-secondary)" />
                   <span>Decision Isolation</span>
                 </div>
                 <div className="lab-overview-card-value">
@@ -978,7 +983,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
               </div>
             </div>
 
-            {/* Stage 4/5 Preflight Lab Card */}
+            {/* Preflight Lab Card */}
             <PreflightLabCard
               product={linkedProduct}
               mode={mode}
@@ -994,7 +999,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
-        {/* Page 2: Product & Offering */}
+        {/* Section 2: Product & Offering */}
         {activePage === 'offering' && (
           <div className="lab-page-body">
             <div className="lab-page-header">
@@ -1002,27 +1007,21 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 <div className="lab-page-breadcrumb">
                   <span>Synthetic Lab</span>
                   <span>/</span>
-                  <span>Step 2 of 5</span>
+                  <span>Product & Offering</span>
                 </div>
                 <h1 className="lab-page-title">Product Offering & Baseline Variant</h1>
                 <p className="lab-page-desc">
                   Select your product domain category and detail your core value proposition, specs, and visual creative.
                 </p>
               </div>
-
-              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
-                Stage 2: Offering Specs
-              </span>
             </div>
 
             <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-              {/* Step 1: Domain Selection */}
               <DomainSelector
                 selectedDomain={domainId}
                 onSelectDomain={handleDomainSelect}
               />
 
-              {/* Step 2: Core Offering & Baseline Option A */}
               <OfferingForm
                 domainId={domainId}
                 title={title}
@@ -1044,7 +1043,6 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 validationErrors={validationErrors}
               />
 
-              {/* Step 3: Alternative B & Comparison Lever (Only in Comparison Mode) */}
               {mode === 'comparison' && (
                 <AlternativeBForm
                   comparisonLever={comparisonLever}
@@ -1062,7 +1060,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
-        {/* Page 3: Target Audience & Markets */}
+        {/* Section 3: Target Audience */}
         {activePage === 'audience' && (
           <div className="lab-page-body">
             <div className="lab-page-header">
@@ -1070,17 +1068,13 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 <div className="lab-page-breadcrumb">
                   <span>Synthetic Lab</span>
                   <span>/</span>
-                  <span>Step 3 of 5</span>
+                  <span>Target Audience</span>
                 </div>
-                <h1 className="lab-page-title">Target Audience & Geographic Markets</h1>
+                <h1 className="lab-page-title">Target Audience & Served Markets</h1>
                 <p className="lab-page-desc">
                   Specify your ideal intended customer, adjacent market profiles, expected spend boundaries, and delivery cities.
                 </p>
               </div>
-
-              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
-                Stage 3: Audience
-              </span>
             </div>
 
             <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -1102,7 +1096,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
-        {/* Page 4: Unit Economics & Scenarios */}
+        {/* Section 4: Unit Economics */}
         {activePage === 'financials' && (
           <div className="lab-page-body">
             <div className="lab-page-header">
@@ -1110,17 +1104,13 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 <div className="lab-page-breadcrumb">
                   <span>Synthetic Lab</span>
                   <span>/</span>
-                  <span>Step 4 of 5</span>
+                  <span>Unit Economics</span>
                 </div>
                 <h1 className="lab-page-title">Unit Economics & Sales Scenarios</h1>
                 <p className="lab-page-desc">
                   Model fixed setup costs, variable margins per unit, and projected volume scenarios (conservative, target, optimistic).
                 </p>
               </div>
-
-              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
-                Stage 4: Economics
-              </span>
             </div>
 
             <fieldset disabled={isLocked || isSubmitting || runState.status === 'running'} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -1149,7 +1139,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
-        {/* Page 5: Synthetic Panel & Simulation Run */}
+        {/* Section 5: Simulation Panel */}
         {activePage === 'simulation' && (
           <div className="lab-page-body">
             <div className="lab-page-header">
@@ -1157,27 +1147,23 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 <div className="lab-page-breadcrumb">
                   <span>Synthetic Lab</span>
                   <span>/</span>
-                  <span>Step 5 of 5</span>
+                  <span>Simulation Panel</span>
                 </div>
-                <h1 className="lab-page-title">50-Profile Panel & Simulation Launchpad</h1>
+                <h1 className="lab-page-title">Simulation Panel & Launchpad</h1>
                 <p className="lab-page-desc">
                   Inspect the deterministic 50-consumer persona distribution and launch your AI evaluation run.
                 </p>
               </div>
-
-              <span className="badge badge-intended" style={{ padding: '4px 10px', fontSize: '12px' }}>
-                Stage 5: Mission Control
-              </span>
             </div>
 
             {/* Simulation Readiness Summary Card */}
-            <div className="workbench-card" style={{ background: isFormValid ? 'var(--color-surface)' : '#FFFBEB', borderColor: isFormValid ? 'var(--color-border)' : '#FDE68A' }}>
+            <div className="workbench-card" style={{ background: isFormValid ? 'var(--color-surface)' : 'var(--color-surface-subtle)', borderColor: isFormValid ? 'var(--color-border)' : 'var(--color-border-strong)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {isFormValid ? <CheckCircle2 size={16} color="var(--color-success)" /> : <AlertTriangle size={16} color="var(--color-warning)" />}
+                  {isFormValid ? <CheckCircle2 size={16} color="var(--color-text-primary)" /> : <AlertTriangle size={16} color="var(--color-text-secondary)" />}
                   <span>Simulation Readiness Checklist</span>
                 </h2>
-                <span className={`badge ${isFormValid ? 'badge-intended' : 'badge-contrasting'}`}>
+                <span className="badge" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }}>
                   {isFormValid ? 'All Requirements Met' : `${missingInputs.length} Requirement(s) Needed`}
                 </span>
               </div>
@@ -1187,7 +1173,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                   <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
                     Complete the following required fields to enable the 50-profile evaluation:
                   </p>
-                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#92400E', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {missingInputs.map((item, idx) => (
                       <li key={idx}>{item}</li>
                     ))}
@@ -1249,7 +1235,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         )}
 
-        {/* Page Navigation Footer (Previous / Next Step) */}
+        {/* Page Navigation Footer (Previous / Next Section) */}
         <footer className="lab-page-footer">
           <div className="lab-page-footer-left">
             {prevPage ? (
@@ -1259,11 +1245,11 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 onClick={() => setActivePage(prevPage.id)}
               >
                 <ArrowLeft size={14} />
-                <span>Previous: {prevPage.title}</span>
+                <span>{prevPage.title}</span>
               </button>
             ) : (
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                Step 1 of 5
+                Overview
               </span>
             )}
           </div>
@@ -1275,7 +1261,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 className="btn btn-primary"
                 onClick={() => setActivePage(nextPage.id)}
               >
-                <span>Next: {nextPage.title}</span>
+                <span>{nextPage.title}</span>
                 <ArrowRight size={14} />
               </button>
             ) : (

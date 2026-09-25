@@ -43,8 +43,7 @@ export const DomainSelector: React.FC<DomainSelectorProps> = ({
       <div className="card-header">
         <div>
           <h2 className="card-title">
-            <span className="card-step-badge">1</span>
-            <span>Domain Template</span>
+            <span>Domain Category</span>
           </h2>
           <p className="card-description">Select the category of offering to tailor input fields and evaluation rules.</p>
         </div>

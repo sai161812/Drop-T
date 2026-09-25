@@ -80,7 +80,6 @@ export const FinancialsForm: React.FC<FinancialsFormProps> = ({
       <div className="card-header">
         <div>
           <h2 className="card-title">
-            <span className="card-step-badge">5</span>
             <span>Deterministic Financial Scenarios (Optional)</span>
           </h2>
           <p className="card-description">

@@ -212,7 +212,7 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
               <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                 Simulated Panel & Eligibility Review
               </h3>
-              <span className="badge" style={{ background: 'var(--color-intended-bg)', color: 'var(--color-intended)', fontWeight: 600 }}>
+              <span className="badge" style={{ background: 'var(--color-surface-subtle)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', fontWeight: 600 }}>
                 50 Personas
               </span>
               <span className="badge" style={{ background: 'var(--color-surface-subtle)', color: 'var(--color-text-secondary)', fontSize: '10px' }}>
@@ -220,7 +220,7 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
               </span>
             </div>
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-              20 Intended • 20 Adjacent • 10 Contrasting personas with deterministic market access gating
+              50 Persona Profiles across Intended, Adjacent, and Contrasting segments with market access gating
             </p>
           </div>
         </div>
@@ -273,7 +273,7 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
             alignItems: 'flex-start',
             gap: '8px'
           }}>
-            <ShieldCheck size={16} color="var(--color-intended)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <ShieldCheck size={16} color="var(--color-accent)" style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>
               <strong style={{ color: 'var(--color-text-primary)' }}>Deterministic Panel Lock:</strong> When a simulation run begins, these exact 50 profiles are frozen with identical IDs (<code>prof_01</code>..<code>prof_50</code>) and traits across both options. You may revise audience descriptions or markets above and regenerate the panel anytime before running.
             </div>
@@ -291,15 +291,15 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Audience Segment Split
               </span>
-              <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', margin: '8px 0', background: '#E2E8F0' }}>
-                <div style={{ width: '40%', background: 'var(--color-intended)' }} title="20 Intended (40%)" />
-                <div style={{ width: '40%', background: 'var(--color-adjacent)' }} title="20 Adjacent (40%)" />
-                <div style={{ width: '20%', background: 'var(--color-contrasting)' }} title="10 Contrasting (20%)" />
+              <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', margin: '8px 0', background: 'var(--color-border-subtle)' }}>
+                <div style={{ width: '40%', background: '#1E293B' }} title="Intended Segment (40%)" />
+                <div style={{ width: '40%', background: '#64748B' }} title="Adjacent Segment (40%)" />
+                <div style={{ width: '20%', background: '#CBD5E1' }} title="Contrasting Segment (20%)" />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span style={{ color: 'var(--color-intended)', fontWeight: 600 }}>20 Intended</span>
-                <span style={{ color: 'var(--color-adjacent)', fontWeight: 600 }}>20 Adjacent</span>
-                <span style={{ color: 'var(--color-contrasting)', fontWeight: 600 }}>10 Contrasting</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                <span style={{ fontWeight: 600, color: '#1E293B' }}>Intended (40%)</span>
+                <span style={{ fontWeight: 600, color: '#475569' }}>Adjacent (40%)</span>
+                <span style={{ fontWeight: 600, color: '#64748B' }}>Contrasting (20%)</span>
               </div>
             </div>
 
@@ -313,7 +313,7 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
                   <span 
                     key={market} 
                     className="badge" 
-                    style={{ background: 'var(--color-surface-subtle)', color: 'var(--color-text-primary)', fontSize: '11px', padding: '3px 7px' }}
+                    style={{ background: 'var(--color-surface-subtle)', color: 'var(--color-text-primary)', fontSize: '11px', padding: '3px 7px', border: '1px solid var(--color-border-subtle)' }}
                   >
                     <MapPin size={10} style={{ marginRight: '3px' }} />
                     {market}: <strong>{count}</strong>
@@ -328,7 +328,7 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Option A Access Coverage
                 </span>
-                <span className="badge" style={{ background: statsA && statsA.unserved_count === 0 ? 'var(--color-success-bg)' : 'var(--color-warning-bg)', color: statsA && statsA.unserved_count === 0 ? 'var(--color-success)' : 'var(--color-warning)', fontSize: '10px' }}>
+                <span className="badge" style={{ background: statsA && statsA.unserved_count === 0 ? 'var(--color-success-bg)' : 'var(--color-warning-bg)', color: statsA && statsA.unserved_count === 0 ? 'var(--color-success)' : 'var(--color-warning)', fontSize: '10px', border: '1px solid var(--color-border-subtle)' }}>
                   {statsA ? `${statsA.eligible_count} / ${statsA.total} Served` : 'Calculating...'}
                 </span>
               </div>
@@ -352,7 +352,7 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Option B Access Coverage
                   </span>
-                  <span className="badge" style={{ background: statsB && statsB.unserved_count === 0 ? 'var(--color-success-bg)' : 'var(--color-warning-bg)', color: statsB && statsB.unserved_count === 0 ? 'var(--color-success)' : 'var(--color-warning)', fontSize: '10px' }}>
+                  <span className="badge" style={{ background: statsB && statsB.unserved_count === 0 ? 'var(--color-success-bg)' : 'var(--color-warning-bg)', color: statsB && statsB.unserved_count === 0 ? 'var(--color-success)' : 'var(--color-warning)', fontSize: '10px', border: '1px solid var(--color-border-subtle)' }}>
                     {statsB ? `${statsB.eligible_count} / ${statsB.total} Served` : 'Calculating...'}
                   </span>
                 </div>
@@ -381,7 +381,8 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
             padding: '10px 14px',
             background: 'var(--color-surface-subtle)',
             borderRadius: 'var(--radius-md)',
-            marginBottom: 'var(--space-3)'
+            marginBottom: 'var(--space-3)',
+            border: '1px solid var(--color-border-subtle)'
           }}>
             {/* Segment filter pills */}
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -391,56 +392,56 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
                 className="btn"
                 style={{ 
                   fontSize: '11px', 
-                  padding: '3px 8px',
+                  padding: '3px 10px',
                   background: segmentFilter === 'all' ? 'var(--color-accent)' : 'transparent',
                   color: segmentFilter === 'all' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
                   border: '1px solid ' + (segmentFilter === 'all' ? 'var(--color-accent)' : 'var(--color-border)')
                 }}
                 onClick={() => setSegmentFilter('all')}
               >
-                All ({profiles.length})
+                All Profiles ({profiles.length})
               </button>
               <button
                 type="button"
                 className="btn"
                 style={{ 
                   fontSize: '11px', 
-                  padding: '3px 8px',
-                  background: segmentFilter === 'intended' ? 'var(--color-intended)' : 'transparent',
-                  color: segmentFilter === 'intended' ? 'white' : 'var(--color-intended)',
-                  border: '1px solid ' + (segmentFilter === 'intended' ? 'var(--color-intended)' : 'var(--color-border)')
+                  padding: '3px 10px',
+                  background: segmentFilter === 'intended' ? 'var(--color-accent)' : 'transparent',
+                  color: segmentFilter === 'intended' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                  border: '1px solid ' + (segmentFilter === 'intended' ? 'var(--color-accent)' : 'var(--color-border)')
                 }}
                 onClick={() => setSegmentFilter('intended')}
               >
-                Intended (20)
+                Intended
               </button>
               <button
                 type="button"
                 className="btn"
                 style={{ 
                   fontSize: '11px', 
-                  padding: '3px 8px',
-                  background: segmentFilter === 'adjacent' ? 'var(--color-adjacent)' : 'transparent',
-                  color: segmentFilter === 'adjacent' ? 'white' : 'var(--color-adjacent)',
-                  border: '1px solid ' + (segmentFilter === 'adjacent' ? 'var(--color-adjacent)' : 'var(--color-border)')
+                  padding: '3px 10px',
+                  background: segmentFilter === 'adjacent' ? 'var(--color-accent)' : 'transparent',
+                  color: segmentFilter === 'adjacent' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                  border: '1px solid ' + (segmentFilter === 'adjacent' ? 'var(--color-accent)' : 'var(--color-border)')
                 }}
                 onClick={() => setSegmentFilter('adjacent')}
               >
-                Adjacent (20)
+                Adjacent
               </button>
               <button
                 type="button"
                 className="btn"
                 style={{ 
                   fontSize: '11px', 
-                  padding: '3px 8px',
-                  background: segmentFilter === 'contrasting' ? 'var(--color-contrasting)' : 'transparent',
-                  color: segmentFilter === 'contrasting' ? 'white' : 'var(--color-contrasting)',
-                  border: '1px solid ' + (segmentFilter === 'contrasting' ? 'var(--color-contrasting)' : 'var(--color-border)')
+                  padding: '3px 10px',
+                  background: segmentFilter === 'contrasting' ? 'var(--color-accent)' : 'transparent',
+                  color: segmentFilter === 'contrasting' ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                  border: '1px solid ' + (segmentFilter === 'contrasting' ? 'var(--color-accent)' : 'var(--color-border)')
                 }}
                 onClick={() => setSegmentFilter('contrasting')}
               >
-                Contrasting (10)
+                Contrasting
               </button>
             </div>
 
@@ -523,8 +524,9 @@ export const ProfileReviewPanel: React.FC<ProfileReviewPanelProps> = ({
                           <span 
                             className="badge" 
                             style={{ 
-                              background: prof.segment === 'intended' ? 'var(--color-intended-bg)' : prof.segment === 'adjacent' ? 'var(--color-adjacent-bg)' : 'var(--color-contrasting-bg)',
-                              color: prof.segment === 'intended' ? 'var(--color-intended)' : prof.segment === 'adjacent' ? 'var(--color-adjacent)' : 'var(--color-contrasting)',
+                              background: prof.segment === 'intended' ? '#F1F5F9' : prof.segment === 'adjacent' ? '#F8FAFC' : '#F4F2EE',
+                              color: prof.segment === 'intended' ? '#1E293B' : prof.segment === 'adjacent' ? '#475569' : '#64748B',
+                              border: '1px solid var(--color-border-subtle)',
                               fontSize: '10px',
                               fontWeight: 600,
                               textTransform: 'capitalize'
