@@ -1,75 +1,102 @@
 # DROPTEST
 
-DROPTEST is a product-launch community for early founders. Founders publish a product, other accounts can save it and give structured feedback, and sponsors or other founders can submit a non-binding support proposal. Product owners can use a private Synthetic Lab to research comparable products and evaluate a single product with 50 simulated profiles, or optionally compare A and B with 100 paired evaluations. Simulated results are hypotheses, not evidence of real demand; public-link responses are stored separately.
+DROPTEST is a product-launch validation workbench and community for early-stage startup founders. Founders can publish product proposals, gather structured feedback from real community shoppers and sponsors, receive non-binding financial support proposals, and run deep AI simulations in the **Synthetic Lab**.
 
-The active product contract is [update_prd_v2.md](update_prd_v2.md). The original [DROPTEST_PRD.md](DROPTEST_PRD.md) is background for retained simulation and finance behavior, not the current primary journey. `prompts_v2.md` and `bp_reference_v2.md` were not supplied.
+Simulated results evaluate willingness to pay and objections against 50 targeted synthetic consumer profiles powered by Llama 3.3 70B. Real community responses and simulated evaluations are strictly segregated.
 
-## Run locally
+---
 
-Requirements: Node.js 22.5 or newer (for built-in `node:sqlite`) and npm 10 or newer.
+## 🚀 Getting Started Locally
 
+### Prerequisites
+* **Node.js**: 22.5 or newer (for native `node:sqlite` database support)
+* **npm**: 10 or newer
+
+### Setup & Run
 ```powershell
 npm install
 Copy-Item .env.example .env
-# Add GROQ_API_KEY for real model evaluations. Search API keys are optional.
+# Set GROQ_API_KEY in .env for live LLM evaluations. (Optional: BRAVE_SEARCH_API_KEY / TAVILY_API_KEY / SERPER_API_KEY for market research)
 npm run seed
 npm run dev
 ```
 
-The Vite client runs at [http://localhost:5173](http://localhost:5173) and the API at [http://localhost:3001](http://localhost:3001). The development server seeds the four demo accounts and two products idempotently. It does not seed fake saves, feedback, or support proposals.
+* **Client**: [http://localhost:5173](http://localhost:5173) (Vite + React)
+* **Server & API**: [http://localhost:3001](http://localhost:3001) (Express + SQLite)
 
+### Test & Build
 ```powershell
+# Run the complete test suite (Shared + Server integration tests):
 npm test
+
+# Verify production build compilation:
 npm run build
+
+# Run Playwright E2E acceptance tests:
 npm run test:e2e
-# Or run all three with fresh isolated server data:
-npm run test:acceptance
 ```
 
-The current workspace test suite contains 21 shared and 91 server tests (112 total). The Playwright suite adds 8 real browser journeys across desktop Chromium and a 393px mobile profile. Use disposable `DATA_DIR` and `UPLOAD_DIR` values when running server tests or reproducing behavior; Playwright automatically uses `.cache/playwright-acceptance/`.
+---
 
-## Configuration
+## 🧪 Synthetic Lab Architecture
 
-See [.env.example](.env.example). `PORT`, `DATA_DIR`, and `UPLOAD_DIR` have defaults. `GROQ_API_KEY` is required for actual LLM evaluations; if absent or the provider fails, the app reports an unavailable/failed run and does not substitute heuristic responses. `GROQ_MODEL`, `GROQ_TEMPERATURE`, and `GROQ_MAX_RETRIES` configure the server-side Groq integration.
+The Synthetic Lab is a private founder workspace structured into 5 focused sections with a dedicated left-sidebar navigation:
 
-Comparable-product search chooses the first configured provider in this order: Brave (`BRAVE_SEARCH_API_KEY`), Tavily (`TAVILY_API_KEY`), Serper (`SERPER_API_KEY`), then unauthenticated DuckDuckGo HTML search. It does not automatically cascade to another provider after a selected provider errors. Search failures remain explicit and the founder can retry, add a manual reference, or continue without research. Automated results are retrieved snippets with source URLs and dates; the app does not claim to have read or verified the full source page.
+1. **Overview & Evidence**:
+   * Choose between **Single-Product Review** (50 targeted persona evaluations) or **A/B Comparison Mode** (100 paired evaluations).
+   * Configure launch price verification (with fallback trial pricing if unpriced).
+   * Automated live competitor search and citation selection (Brave / Tavily / Serper / DuckDuckGo).
+2. **Product & Offering**:
+   * Domain-specific schemas: Apparel, Food & Beverage, SaaS & Digital Products, or Custom.
+   * Product specs, value propositions, key differentiators, fulfillment mode, and visual assets.
+   * Variant B configuration when isolating a specific decision lever (Price, Positioning, Packaging, or Markets).
+3. **Target Audience**:
+   * **Intended Buyer Persona** and **Adjacent Buyer Persona** descriptions.
+   * Expected consumer spend boundaries (`min` / `max`).
+   * Serviceable geographic target markets.
+4. **Unit Economics**:
+   * Deterministic financial projections: Fixed launch costs, variable unit costs, and capacity.
+   * Volume scenarios: Conservative, target, and optimistic volume modeling with exact break-even calculations.
+5. **Simulation Panel**:
+   * **50-Profile Panel Preview**: Deterministic allocation across Intended (40%), Adjacent (40%), and Contrasting (20%) consumer segments.
+   * Seed-based determinism (`#12345`) ensuring exact reproducibility.
+   * Simulation Readiness Checklist with live input validation.
+   * Execution controls, live progress tracking, retry handlers for missing evaluations, and deep results breakdown.
 
-## Demo accounts
+---
 
-All four seeded accounts use the demo-only password `Password123!`:
+## 👥 Demo Accounts
 
-| Role | Email |
-| --- | --- |
-| Founder A | `founder.a@droptest.local` |
-| Founder B | `founder.b@droptest.local` |
-| Sponsor | `sponsor@droptest.local` |
-| Community shopper | `shopper@droptest.local` |
+The database comes pre-seeded with 4 default test accounts (Password: `Password123!`):
 
-Do not use these credentials outside a local demo.
+| Role | Email | Capabilities |
+| --- | --- | --- |
+| **Startup Founder A** | `founder.a@droptest.local` | Publish products, run Synthetic Lab, receive feedback & support |
+| **Startup Founder B** | `founder.b@droptest.local` | Publish products, run Synthetic Lab, submit cross-startup support |
+| **Investor / Sponsor** | `sponsor@droptest.local` | Explore feed, save products, submit feedback & support proposals |
+| **Community User** | `shopper@droptest.local` | Explore feed, save products, submit structured buyer feedback |
 
-## Routes
+---
 
-| View | Route |
-| --- | --- |
-| Public landing page | `/` |
-| Explore | `/explore` |
-| Product detail | `/product/:id` |
-| Saved products | `/saved` |
-| Publish or edit | `/publish` or `/publish?edit=:id` |
-| My products | `/my-products` |
-| Product-linked lab | `/lab?product=:id` (optional `review=new`) |
-| Results | `/results?test=:id` |
-| Public feedback | `/feedback/:token` |
+## 🗺️ Application Routes
 
-The browser restores route state on refresh and Back/Forward. Private lab/results endpoints still enforce owner authorization. Unknown client paths return to Explore.
+| View | Route | Access |
+| --- | --- | --- |
+| **Landing Page** | `/` | Public |
+| **Explore Products** | `/explore` | Public / All roles |
+| **Product Detail** | `/product/:id` | Public / All roles |
+| **Saved Products** | `/saved` | Authenticated users |
+| **Publish / Edit** | `/publish` or `/publish?edit=:id` | Startup founders |
+| **My Products** | `/my-products` | Startup founders |
+| **Synthetic Lab** | `/lab?product=:id` | Product owner only |
+| **Simulation Results** | `/results?test=:id` | Product owner only |
+| **Public Feedback** | `/feedback/:token` | Link recipients (Anonymous / Auth) |
 
-## Product boundaries
+---
 
-- Lab profiles are synthetic. Exactly 50 profiles are stored for a single-product review; comparison mode evaluates the same 50 profiles against A and B (100 records).
-- Coverage is based on explicitly entered markets. It is not real travel distance, population reach, or a demand estimate.
-- Finance is arithmetic over founder-entered price and costs. Scenario units are inputs, not model-generated sales forecasts.
-- Real feedback is a convenience sample from link recipients and is never mixed into simulated counts.
-- Support proposals record a proposed amount and message; no payment, equity, or escrow occurs.
-- No social chat/feed, rewards, advertising, market forecasting, or verified-demand claim is part of this MVP.
+## 🔒 Verification & Boundaries
 
-See [walkthrough.md](walkthrough.md) for the current demo path and [issues.md](issues.md) for verification status and known unverified checks.
+* **Simulated Personas**: Exactly 50 profiles are evaluated per single review. They simulate objections and willingness to pay based on defined constraints and live competitor reference claims.
+* **Separation of Evidence**: AI persona simulations and real human community feedback are strictly isolated in storage and analysis.
+* **Deterministic Financials**: Margins, break-evens, and scenario revenues are calculated strictly via deterministic arithmetic.
+* **Non-Binding Support**: Sponsorships and support proposals represent non-binding interest (no financial transaction or escrow).
