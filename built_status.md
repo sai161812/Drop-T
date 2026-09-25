@@ -154,6 +154,37 @@
      - Verifies exact PRD fixture ($F=\text{₹}6000, C=\text{₹}350, P_A=\text{₹}699 \implies 18 \text{ units}, P_B=\text{₹}899 \implies 11 \text{ units}$).
      - Verifies zero fixed costs, negative/zero contribution margins, non-integer ceiling math, capacity overflow, invalid scenario rejection, independent A/B cost structures, and missing input guidance.
 
+### Phase 6: Public Feedback Link & Real-Person Validation Layer
+- **Status:** `COMPLETED & VERIFIED`
+- **Key Deliverables:**
+  1. **Unguessable Public Feedback Endpoint & Routing (`server/src/routes/feedbackRoutes.ts`)**:
+     - `GET /api/feedback/:tokenOrId`: Serves sanitized offering details, images, price, message, availability, and domain specifics for Option A vs Option B.
+     - Strictly exposes **zero** simulated profile results, model prompts, or internal finance cost data.
+     - Supports lookups by unguessable 16-hex token or test ID.
+  2. **Anonymous Response Collection & Deduplication (`POST /api/feedback/:tokenOrId`)**:
+     - Asks central question: *"Which would you consider?"* with choices `A`, `B`, `neither`, `unsure`.
+     - Collects optional short reason (max 500 characters).
+     - Validates and sanitizes text inputs (strips HTML tags and script injections).
+     - Best-effort duplicate prevention: tracks client tokens to update rather than double-count repeat submissions from the same respondent.
+     - Strictly collects **zero** personal information (no names, email addresses, or phone numbers).
+  3. **Standalone Public Voting Interface (`client/src/pages/PublicFeedbackPage.tsx`)**:
+     - Clean, responsive standalone view when accessing `/feedback/:token` or `#feedback` tab.
+     - Option A vs Option B comparison cards with image galleries, visual descriptions, pricing, served markets, and fulfillment modes.
+     - Accessible, keyboard-operable radio choices (`Tab`, `Space`, `Enter`).
+     - Clear submitted confirmation state with instant receipt and update capability.
+     - Share/copy link control with clipboard feedback.
+  4. **Results Workbench Validation Section (`client/src/components/Results/RealFeedbackSection.tsx`)**:
+     - Dedicated **"Responses from real people"** section in results dashboard.
+     - Distinct denominator: e.g. `$N$ responses from real people` (strictly isolated from 50 simulated profiles).
+     - Breakdown cards with exact counts and percentages ($n / \text{total respondents}$) for Option A, Option B, Neither, Unsure.
+     - Filterable qualitative quotes/reasons feed with choice badges and timestamps.
+     - Zero-dependency embedded SVG QR Code generator (`client/src/utils/qrCode.ts`) for instant mobile testing and scanning.
+     - Required statements: *"Responses came from whoever received your link."* and *"Best-effort duplicate prevention. Do not apply statistical confidence or population claims to a convenience sample."*
+     - Empty state when 0 responses: *"No responses yet — copy the feedback link."*
+  5. **Automated Test Suite (`server/test/feedbackRoutes.test.ts` & `shared/test/shared.test.ts`)**:
+     - **38 automated tests passing** across `@droptest/shared` (19 tests) and `@droptest/server` (19 tests).
+     - Verifies public token retrieval, 404 handling for invalid tokens, choice submission sanitization, duplicate protection, and statistics retrieval.
+
 ---
 
 ## 3. Directory Map & Component Structure
@@ -168,14 +199,14 @@ DROP-T/
 │
 ├── shared/                    # Shared TypeScript library
 │   ├── src/
-│   │   ├── types.ts           # Domain entities, enums, interfaces (inc. ComparisonAnalysis & Financials)
+│   │   ├── types.ts           # Domain entities, enums, interfaces (inc. ComparisonAnalysis & PublicFeedbackViewData)
 │   │   ├── validation.ts      # Zod runtime validation schemas
 │   │   ├── finance.ts         # Deterministic financial scenario & break-even engine
 │   │   ├── eligibility.ts     # Deterministic access status & panel stats engine
 │   │   ├── analysis.ts        # Phase 4 comparison metrics & decision card synthesis
 │   │   └── index.ts           # Exports
 │   └── test/
-│       ├── shared.test.ts     # Unit tests for contracts, splits, math, and eligibility
+│       ├── shared.test.ts     # Unit tests for contracts, splits, math, eligibility, and human choice validation
 │       ├── analysis.test.ts   # Unit tests for comparison analysis, transitions & decision card
 │       └── finance.test.ts    # Unit tests for break-even, scenarios, and capacity limits
 │
@@ -187,7 +218,7 @@ DROP-T/
 │   │   │   └── groqEvaluator.ts    # Groq LLM batch evaluator, access gating & retry manager
 │   │   ├── db/
 │   │   │   ├── database.ts    # SQLite DatabaseSync connection wrapper
-│   │   │   ├── migrations.ts  # DDL schema definitions & migrations (tests, profiles, runs, evaluations)
+│   │   │   ├── migrations.ts  # DDL schema definitions & migrations (tests, profiles, runs, evaluations, feedback)
 │   │   │   └── testRepository.ts # SQL queries for test drafts, profiles, runs, evaluations & feedback
 │   │   ├── routes/
 │   │   │   ├── testRoutes.ts  # Test CRUD & panel generation endpoints
@@ -200,12 +231,15 @@ DROP-T/
 │       ├── server.test.ts     # In-memory SQLite API & repository tests
 │       ├── profileGenerator.test.ts # 50-profile generator & eligibility tests
 │       ├── groqEvaluator.test.ts    # Groq evaluator, access gating & recovery tests
-│       └── analysisRoutes.test.ts   # Comparison analysis & decision synthesis tests
+│       ├── analysisRoutes.test.ts   # Comparison analysis & decision synthesis tests
+│       └── feedbackRoutes.test.ts   # Public feedback link, voting, duplicate handling & stats tests
 │
 └── client/                    # Vite + React 19 Frontend
     ├── src/
     │   ├── config/
     │   │   └── templates.ts   # Editable domain presets & starter templates
+    │   ├── utils/
+    │   │   └── qrCode.ts      # Zero-dependency QR Code SVG generator
     │   ├── components/
     │   │   ├── Navbar.tsx     # Workbench header with tab navigation & save state
     │   │   ├── Common/
@@ -225,15 +259,15 @@ DROP-T/
     │   │       ├── TransitionMatrixView.tsx # 4x4 transition matrix & net shifts
     │   │       ├── PersonaTransitionTable.tsx # 50-persona inspectable response rows
     │   │       ├── FinancialScenarioPanel.tsx# Deterministic break-even & scenario comparison
-    │   │       └── RealFeedbackSection.tsx  # Truthful placeholder for real responses
+    │   │       └── RealFeedbackSection.tsx  # Responses from real people & QR code
     │   ├── pages/
     │   │   ├── SetupTestPage.tsx            # Complete interactive workbench with Run simulation trigger
     │   │   ├── ResultsPage.tsx              # Results workbench & synthesis dashboard
-    │   │   └── PublicFeedbackPage.tsx       # Public feedback shell & empty state
+    │   │   └── PublicFeedbackPage.tsx       # Public feedback voting page & receipt state
     │   ├── styles/
     │   │   ├── tokens.css     # CSS custom properties (colors, typography, spacing)
     │   │   └── main.css       # Research workbench layout & utility classes
-    │   ├── App.tsx            # Top-level state, shared activeTestId & tab router
+    │   ├── App.tsx            # Top-level state, routing for /feedback/:token & workbench
     │   └── main.tsx           # React DOM root
     ├── index.html
     └── vite.config.ts         # Vite configuration with API proxy to port 3001
@@ -247,7 +281,7 @@ DROP-T/
 # 1. Install dependencies across all workspaces
 npm install
 
-# 2. Run all unit, database, and simulation tests (32 passing)
+# 2. Run all unit, database, simulation, and feedback tests (38 passing)
 npm test
 
 # 3. Build all packages (shared, server, client)
@@ -256,18 +290,3 @@ npm run build
 # 4. Start local development (Server on :3001, Client on :5173)
 npm run dev
 ```
-
----
-
-## 5. Next Steps for Phase 6 (Incoming Agent Handoff)
-
-When starting Phase 6, implement the Public Shareable Feedback Page and Real Respondent Collection:
-1. **Unguessable Shareable Feedback Link**:
-   - `GET /feedback/:token` public route serving clean, unguided voting view between Option A and Option B.
-   - Shows actual uploaded creative, pricing, primary message, and fulfillment details.
-   - Collects choice: Option A, Option B, Neither, or Unsure with optional text reason.
-2. **Duplicate Prevention & Anonymous Storage**:
-   - Store responses in SQLite `human_responses` table with token hashing, IP rate limiting, and timestamping.
-   - Strict separation of real responses from simulated 50-persona data.
-3. **Live Real Feedback Aggregation**:
-   - Real-time updates on Results workbench under `RealFeedbackSection.tsx` with its own explicit denominator ($n / \text{respondents}$).

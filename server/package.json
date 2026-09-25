@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "test": "node --import tsx --test test/server.test.ts test/profileGenerator.test.ts test/groqEvaluator.test.ts test/analysisRoutes.test.ts"
+    "test": "node --import tsx --test test/server.test.ts test/profileGenerator.test.ts test/groqEvaluator.test.ts test/analysisRoutes.test.ts test/feedbackRoutes.test.ts"
   },
   "dependencies": {
     "@droptest/shared": "file:../shared",

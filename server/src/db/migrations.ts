@@ -12,6 +12,7 @@ export function runMigrations(db: DatabaseSync): void {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       domain_id TEXT NOT NULL,
+      feedback_token TEXT UNIQUE,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'draft'
@@ -127,6 +128,7 @@ export function runMigrations(db: DatabaseSync): void {
       choice TEXT NOT NULL, -- 'A' | 'B' | 'neither' | 'unsure'
       reason TEXT,
       token_hash TEXT,
+      client_token TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
     );
@@ -137,13 +139,27 @@ export function runMigrations(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_runs_test ON runs(test_id);
     CREATE INDEX IF NOT EXISTS idx_evaluations_run ON evaluations(run_id);
     CREATE INDEX IF NOT EXISTS idx_human_responses_test ON human_responses(test_id);
+    CREATE INDEX IF NOT EXISTS idx_tests_feedback_token ON tests(feedback_token);
+    CREATE INDEX IF NOT EXISTS idx_human_responses_client_token ON human_responses(client_token);
   `;
 
   db.exec(schema);
 
-  // Migration for existing databases: ensure model_id column exists
+  // Migration for existing databases
   try {
     db.exec('ALTER TABLE runs ADD COLUMN model_id TEXT;');
+  } catch (_e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec('ALTER TABLE tests ADD COLUMN feedback_token TEXT;');
+  } catch (_e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec('ALTER TABLE human_responses ADD COLUMN client_token TEXT;');
   } catch (_e) {
     // Column already exists
   }

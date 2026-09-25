@@ -97,7 +97,8 @@ export const DomainSpecificDataSchema = z.union([
 export const TestSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().min(3, 'Title must be at least 3 characters').max(120, 'Title cannot exceed 120 characters'),
-  domain_id: DomainIdSchema
+  domain_id: DomainIdSchema,
+  feedback_token: z.string().optional()
 });
 
 // Offering schema
@@ -200,8 +201,12 @@ export const TestDraftPayloadSchema = z.object({
 // Human response submission schema
 export const HumanResponseSubmissionSchema = z.object({
   choice: HumanChoiceSchema,
-  reason: z.string().max(500, 'Reason cannot exceed 500 characters').optional(),
-  token: z.string().optional()
+  reason: z.string()
+    .max(500, 'Reason cannot exceed 500 characters')
+    .transform(val => val ? val.replace(/<[^>]*>?/gm, '').trim() : undefined)
+    .optional(),
+  token: z.string().max(100).optional(),
+  client_token: z.string().max(100).optional()
 });
 
 // Evaluation record schema (for Phase 1 persistence validation)

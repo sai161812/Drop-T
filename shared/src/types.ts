@@ -167,6 +167,7 @@ export interface Test {
   created_at: string;
   updated_at: string;
   status: 'draft' | 'ready' | 'archived';
+  feedback_token?: string;
 }
 
 export interface Offering {
@@ -278,6 +279,42 @@ export interface HumanResponse {
   token_hash?: string;
 }
 
+export interface HumanFeedbackStats {
+  total: number;
+  counts: Record<HumanChoice, number>;
+  responses: HumanResponse[];
+  feedback_token?: string;
+  recruitment_context: string;
+}
+
+export interface PublicOptionViewData {
+  id: OptionId;
+  name: string;
+  price: number;
+  primary_message: string;
+  served_markets: string[];
+  fulfillment_mode: string;
+  images: ImageMetadata[];
+  variable_cost_per_sale?: number;
+}
+
+export interface PublicFeedbackViewData {
+  test_id: string;
+  feedback_token: string;
+  title: string;
+  domain_id: DomainId;
+  short_value_prop: string;
+  description: string;
+  currency: string;
+  period: string;
+  domain_specific_data: DomainSpecificData;
+  comparison_lever: PrimaryLever;
+  options: {
+    A: PublicOptionViewData;
+    B: PublicOptionViewData;
+  };
+}
+
 // Financial Inputs & Scenario Contracts (PRD Section 8)
 export interface FinancialInputs {
   currency: string;
@@ -322,6 +359,7 @@ export interface TestDraftPayload {
     id?: string;
     title: string;
     domain_id: DomainId;
+    feedback_token?: string;
   };
   offering: {
     short_value_prop: string;

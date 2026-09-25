@@ -26,24 +26,25 @@ export class TestRepository {
     const testId = payload.test.id || uuidv4();
 
     // Check if test exists
-    const existingTestStmt = db.prepare('SELECT id FROM tests WHERE id = ?');
-    const existingTest = existingTestStmt.get(testId);
+    const existingTestStmt = db.prepare('SELECT id, feedback_token FROM tests WHERE id = ?');
+    const existingTest = existingTestStmt.get(testId) as { id: string; feedback_token?: string } | undefined;
+    const feedbackToken = existingTest?.feedback_token || payload.test.feedback_token || uuidv4().replace(/-/g, '').substring(0, 16);
 
     if (existingTest) {
       // Update existing test
       const updateTestStmt = db.prepare(`
         UPDATE tests 
-        SET title = ?, domain_id = ?, updated_at = ? 
+        SET title = ?, domain_id = ?, feedback_token = ?, updated_at = ? 
         WHERE id = ?
       `);
-      updateTestStmt.run(payload.test.title, payload.test.domain_id, now, testId);
+      updateTestStmt.run(payload.test.title, payload.test.domain_id, feedbackToken, now, testId);
     } else {
       // Insert new test
       const insertTestStmt = db.prepare(`
-        INSERT INTO tests (id, title, domain_id, created_at, updated_at, status)
-        VALUES (?, ?, ?, ?, ?, 'draft')
+        INSERT INTO tests (id, title, domain_id, feedback_token, created_at, updated_at, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'draft')
       `);
-      insertTestStmt.run(testId, payload.test.title, payload.test.domain_id, now, now);
+      insertTestStmt.run(testId, payload.test.title, payload.test.domain_id, feedbackToken, now, now);
     }
 
     // Save/Update Offering
@@ -218,6 +219,7 @@ export class TestRepository {
       id: testRow.id,
       title: testRow.title,
       domain_id: testRow.domain_id,
+      feedback_token: testRow.feedback_token || testRow.id,
       created_at: testRow.created_at,
       updated_at: testRow.updated_at,
       status: testRow.status
@@ -280,6 +282,16 @@ export class TestRepository {
   }
 
   /**
+   * Get full test by feedback token or test ID
+   */
+  static getByFeedbackToken(tokenOrId: string): FullTestResponse | null {
+    const db = getDatabase();
+    const row = db.prepare('SELECT id FROM tests WHERE feedback_token = ? OR id = ?').get(tokenOrId, tokenOrId) as { id: string } | undefined;
+    if (!row) return null;
+    return this.getById(row.id);
+  }
+
+  /**
    * List all tests
    */
   static listAll(): Test[] {
@@ -289,6 +301,7 @@ export class TestRepository {
       id: r.id,
       title: r.title,
       domain_id: r.domain_id,
+      feedback_token: r.feedback_token || r.id,
       created_at: r.created_at,
       updated_at: r.updated_at,
       status: r.status
@@ -305,34 +318,74 @@ export class TestRepository {
   }
 
   /**
-   * Submit human response
+   * Submit human response with best-effort duplicate protection
    */
-  static recordHumanResponse(testId: string, choice: HumanChoice, reason?: string, tokenHash?: string): HumanResponse {
+  static recordHumanResponse(
+    testId: string, 
+    choice: HumanChoice, 
+    reason?: string, 
+    clientToken?: string,
+    tokenHash?: string
+  ): { response: HumanResponse; is_updated: boolean } {
     const db = getDatabase();
-    const id = uuidv4();
     const now = new Date().toISOString();
 
+    // Check for existing response from this client token to avoid duplicate counts
+    if (clientToken) {
+      const existing = db.prepare('SELECT id FROM human_responses WHERE test_id = ? AND client_token = ?').get(testId, clientToken) as { id: string } | undefined;
+      if (existing) {
+        const updateStmt = db.prepare(`
+          UPDATE human_responses
+          SET choice = ?, reason = ?, token_hash = ?, created_at = ?
+          WHERE id = ?
+        `);
+        updateStmt.run(choice, reason || null, tokenHash || null, now, existing.id);
+        return {
+          response: {
+            id: existing.id,
+            test_id: testId,
+            choice,
+            reason: reason || undefined,
+            created_at: now,
+            token_hash: tokenHash
+          },
+          is_updated: true
+        };
+      }
+    }
+
+    const id = uuidv4();
     const stmt = db.prepare(`
-      INSERT INTO human_responses (id, test_id, choice, reason, token_hash, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO human_responses (id, test_id, choice, reason, token_hash, client_token, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    stmt.run(id, testId, choice, reason || null, tokenHash || null, now);
+    stmt.run(id, testId, choice, reason || null, tokenHash || null, clientToken || null, now);
 
     return {
-      id,
-      test_id: testId,
-      choice,
-      reason,
-      created_at: now,
-      token_hash: tokenHash
+      response: {
+        id,
+        test_id: testId,
+        choice,
+        reason: reason || undefined,
+        created_at: now,
+        token_hash: tokenHash
+      },
+      is_updated: false
     };
   }
 
   /**
    * Get human feedback stats for a test
    */
-  static getHumanFeedback(testId: string): { total: number; counts: Record<HumanChoice, number>; responses: HumanResponse[] } {
+  static getHumanFeedback(testId: string): { 
+    total: number; 
+    counts: Record<HumanChoice, number>; 
+    responses: HumanResponse[];
+    feedback_token?: string;
+    recruitment_context: string;
+  } {
     const db = getDatabase();
+    const testRow = db.prepare('SELECT feedback_token FROM tests WHERE id = ?').get(testId) as { feedback_token?: string } | undefined;
     const rows = db.prepare('SELECT * FROM human_responses WHERE test_id = ? ORDER BY created_at DESC').all(testId) as any[];
 
     const counts: Record<HumanChoice, number> = {
@@ -359,7 +412,9 @@ export class TestRepository {
     return {
       total: responses.length,
       counts,
-      responses
+      responses,
+      feedback_token: testRow?.feedback_token || testId,
+      recruitment_context: 'Responses came from whoever received your link.'
     };
   }
 

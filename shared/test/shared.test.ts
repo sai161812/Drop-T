@@ -5,7 +5,9 @@ import {
   calculateFinancials, 
   PANEL_CONSTANTS,
   PRIMARY_LEVERS,
-  DOMAIN_IDS
+  DOMAIN_IDS,
+  HumanResponseSubmissionSchema,
+  HUMAN_CHOICES
 } from '../src/index.js';
 
 describe('DROPTEST Shared Contracts & Logic', () => {
@@ -132,5 +134,31 @@ describe('DROPTEST Shared Contracts & Logic', () => {
 
     const invalidResult = TestDraftPayloadSchema.safeParse(invalidMarketsPayload);
     assert.strictEqual(invalidResult.success, false);
+  });
+
+  it('validates human feedback choices and sanitizes submission payload', () => {
+    assert.deepStrictEqual(HUMAN_CHOICES, ['A', 'B', 'neither', 'unsure']);
+
+    // Valid choices
+    for (const choice of HUMAN_CHOICES) {
+      const res = HumanResponseSubmissionSchema.safeParse({ choice });
+      assert.strictEqual(res.success, true);
+    }
+
+    // Reason sanitization (stripping HTML)
+    const resWithHtml = HumanResponseSubmissionSchema.safeParse({
+      choice: 'A',
+      reason: '  <strong>Great product!</strong> <script>alert(1)</script>  ',
+      client_token: 'tok_123'
+    });
+    assert.strictEqual(resWithHtml.success, true);
+    if (resWithHtml.success) {
+      assert.strictEqual(resWithHtml.data.reason, 'Great product! alert(1)');
+      assert.strictEqual(resWithHtml.data.client_token, 'tok_123');
+    }
+
+    // Invalid choice rejection
+    const invalidChoice = HumanResponseSubmissionSchema.safeParse({ choice: 'C' });
+    assert.strictEqual(invalidChoice.success, false);
   });
 });
