@@ -2,7 +2,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createApp } from '../src/app.js';
-import { closeDatabase, getDatabase } from '../src/db/database.js';
+import { closeDatabase, getDatabase, initDatabase } from '../src/db/database.js';
 import { AuthRepository } from '../src/db/authRepository.js';
 import { ProductRepository } from '../src/db/productRepository.js';
 import { runSeed } from '../src/db/seed.js';
@@ -18,6 +18,8 @@ describe('Sequence 2: demo persistence, authentication, exact money, and signup 
   let demoFounderBId = '';
 
   before(async () => {
+    initDatabase(':memory:');
+    runSeed();
     server = createServer(createApp());
     await new Promise<void>(resolve => server.listen(0, resolve));
     base = `http://127.0.0.1:${(server.address() as any).port}`;

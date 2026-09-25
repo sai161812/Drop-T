@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
-import { UserRole } from '@droptest/shared';
-import { DEMO_ACCOUNTS } from '@droptest/shared';
-import { X, Sparkles, User, Briefcase, Rocket, LogIn, UserPlus } from 'lucide-react';
+import { UserRole, DEMO_ACCOUNTS } from '@droptest/shared';
+import { X, Mail, Lock, Eye, EyeOff, User, Briefcase, Rocket } from 'lucide-react';
+import './AuthModal.css';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -25,31 +25,64 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [startupName, setStartupName] = useState('');
   const [startupDesc, setStartupDesc] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (defaultRole) {
+      setRole(defaultRole);
+    }
+  }, [defaultRole]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setTab(initialTab);
+    setError(null);
+  }, [isOpen, initialTab]);
+
+  useEffect(() => {
     if (!isOpen) return;
     const previousFocus = document.activeElement as HTMLElement | null;
     const dialog = dialogRef.current;
-    dialog?.querySelector<HTMLElement>('button, input, select, textarea')?.focus();
+    
+    // Focus close button initially
+    const closeBtn = dialog?.querySelector<HTMLElement>('button[aria-label="Close"]');
+    if (closeBtn) {
+      closeBtn.focus();
+    } else {
+      dialog?.querySelector<HTMLElement>('button, input, select, textarea')?.focus();
+    }
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         onClose();
       } else if (event.key === 'Tab' && dialog) {
-        const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(element => element.getClientRects().length > 0);
+        const focusable = Array.from(
+          dialog.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(element => element.getClientRects().length > 0);
+
         if (!focusable.length) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
+
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -109,223 +142,145 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const getRoleDisplayName = (r: UserRole) => {
+    switch (r) {
+      case 'user':
+        return 'User Login';
+      case 'sponsor':
+        return 'Investor Login';
+      default:
+        return 'Startup Login';
+    }
+  };
+
   return (
-    <div className="modal-backdrop" style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0, 0, 0, 0.65)',
-      backdropFilter: 'blur(4px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: 'var(--space-4)'
+    <div className="auth-glass-backdrop" onClick={(e) => {
+      if (e.target === e.currentTarget) onClose();
     }}>
-      <div ref={dialogRef} className="modal-container" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title" style={{
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-lg)',
-        width: '100%',
-        maxWidth: '480px',
-        boxShadow: 'var(--shadow-xl)',
-        overflow: 'hidden',
-        maxHeight: '90vh',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* Modal Header */}
-        <div style={{
-          padding: 'var(--space-4) var(--space-5)',
-          borderBottom: '1px solid var(--color-border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'var(--color-surface-hover)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--color-text-primary)' }}>
-              <span id="auth-dialog-title">{tab === 'signin' ? 'Sign In to DROPTEST' : 'Create an Account'}</span>
-            </span>
+      {/* Background shadow matching dark DROPTEST UI */}
+      <div className="auth-ambient-shadow" aria-hidden="true" />
+
+      {/* The Frosted Glass Card */}
+      <div 
+        ref={dialogRef} 
+        className="auth-glass-card" 
+        role="dialog" 
+        aria-modal="true" 
+        aria-label="Sign In to DROPTEST"
+        aria-labelledby="auth-dialog-title"
+      >
+        {/* Close Button as first focusable element */}
+        <button
+          type="button"
+          className="auth-close-btn"
+          onClick={onClose}
+          aria-label="Close"
+          title="Close dialog"
+        >
+          <X size={16} />
+        </button>
+
+        {/* Top Brand & Role Indicator */}
+        <div className="auth-brand-header">
+          <span className="auth-brand-logo">DROPTEST</span>
+          <div className="auth-role-pill-badge">
+            <span>{getRoleDisplayName(role)}</span>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={{ padding: '4px', borderRadius: '50%', border: 'none', background: 'transparent' }}
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '1px solid var(--color-border)',
-          background: 'var(--color-surface)'
-        }}>
-          <button
-            type="button"
-            style={{
-              flex: 1,
-              padding: '10px',
-              fontSize: '13px',
-              fontWeight: 600,
-              background: tab === 'signin' ? 'var(--color-surface)' : 'var(--color-surface-hover)',
-              border: 'none',
-              borderBottom: tab === 'signin' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              color: tab === 'signin' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-              cursor: 'pointer'
-            }}
-            onClick={() => { setTab('signin'); setError(null); }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              <LogIn size={14} /> Sign In
-            </span>
-          </button>
-          <button
-            type="button"
-            style={{
-              flex: 1,
-              padding: '10px',
-              fontSize: '13px',
-              fontWeight: 600,
-              background: tab === 'signup' ? 'var(--color-surface)' : 'var(--color-surface-hover)',
-              border: 'none',
-              borderBottom: tab === 'signup' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              color: tab === 'signup' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-              cursor: 'pointer'
-            }}
-            onClick={() => { setTab('signup'); setError(null); }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              <UserPlus size={14} /> Create Account
-            </span>
-          </button>
-        </div>
-
-        {/* Form Body */}
-        <div style={{ padding: 'var(--space-5)', overflowY: 'auto' }}>
-          {error && (
-            <div role="alert" style={{
-              background: 'var(--color-danger-bg)',
-              border: '1px solid var(--color-danger-border)',
-              color: 'var(--color-danger)',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '12px',
-              marginBottom: '16px'
-            }}>
-              {error}
-            </div>
+        {/* Main Headline */}
+        <h2 id="auth-dialog-title" className="auth-main-headline">
+          {tab === 'signin' ? (
+            <>Log In, Start Your<br />Validation Journey</>
+          ) : (
+            <>Create Your<br />{role === 'startup' ? 'Founder' : role === 'sponsor' ? 'Investor' : 'Community'} Account</>
           )}
+        </h2>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {tab === 'signup' && (
-              <>
-                {/* 3 Role Selection Cards */}
-                <div>
-                  <label className="form-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Select Your Role
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setRole('startup')}
-                      style={{
-                        padding: '10px 8px',
-                        borderRadius: 'var(--radius-md)',
-                        border: `1.5px solid ${role === 'startup' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        background: role === 'startup' ? 'var(--color-primary-subtle)' : 'var(--color-surface)',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Rocket size={18} color={role === 'startup' ? 'var(--color-primary)' : 'var(--color-text-muted)'} />
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Startup</span>
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Publish & test</span>
-                    </button>
+        {error && (
+          <div role="alert" className="auth-error-banner">
+            {error}
+          </div>
+        )}
 
-                    <button
-                      type="button"
-                      onClick={() => setRole('sponsor')}
-                      style={{
-                        padding: '10px 8px',
-                        borderRadius: 'var(--radius-md)',
-                        border: `1.5px solid ${role === 'sponsor' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        background: role === 'sponsor' ? 'var(--color-primary-subtle)' : 'var(--color-surface)',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Briefcase size={18} color={role === 'sponsor' ? 'var(--color-primary)' : 'var(--color-text-muted)'} />
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Sponsor</span>
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Back & support</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRole('user')}
-                      style={{
-                        padding: '10px 8px',
-                        borderRadius: 'var(--radius-md)',
-                        border: `1.5px solid ${role === 'user' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        background: role === 'user' ? 'var(--color-primary-subtle)' : 'var(--color-surface)',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <User size={18} color={role === 'user' ? 'var(--color-primary)' : 'var(--color-text-muted)'} />
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Community</span>
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Save & feedback</span>
-                    </button>
-                  </div>
+        <form onSubmit={handleSubmit} className="auth-form">
+          {tab === 'signup' && (
+            <>
+              {/* Role Selection Tabs */}
+              <div className="auth-field-group">
+                <label className="auth-field-label">Select Account Type</label>
+                <div className="auth-role-tabs-grid">
+                  <button
+                    type="button"
+                    className={`auth-role-tab-btn ${role === 'user' ? 'active' : ''}`}
+                    onClick={() => setRole('user')}
+                  >
+                    <User size={15} />
+                    <span>User</span>
+                    <span className="role-sub">Shopper</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`auth-role-tab-btn ${role === 'startup' ? 'active' : ''}`}
+                    onClick={() => setRole('startup')}
+                  >
+                    <Rocket size={15} />
+                    <span>Startup</span>
+                    <span className="role-sub">Founder</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`auth-role-tab-btn ${role === 'sponsor' ? 'active' : ''}`}
+                    onClick={() => setRole('sponsor')}
+                  >
+                    <Briefcase size={15} />
+                    <span>Investor</span>
+                    <span className="role-sub">Sponsor</span>
+                  </button>
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label className="form-label" htmlFor="auth-display-name">Display Name *</label>
+              {/* Display Name */}
+              <div className="auth-field-group">
+                <label className="auth-field-label" htmlFor="auth-display-name">Display Name *</label>
+                <div className="auth-pill-input-wrap">
+                  <User size={16} className="auth-pill-icon" />
                   <input
                     id="auth-display-name"
                     type="text"
-                    className="form-input"
-                    placeholder="e.g. Aarav Sharma"
+                    className="auth-pill-input"
+                    placeholder="Enter your name"
                     value={displayName}
                     onChange={e => setDisplayName(e.target.value)}
                     required
                   />
                 </div>
+              </div>
 
-                {role === 'startup' && (
-                  <>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="auth-startup-name">Startup / Brand Name *</label>
+              {/* Startup Specific Fields */}
+              {role === 'startup' && (
+                <>
+                  <div className="auth-field-group">
+                    <label className="auth-field-label" htmlFor="auth-startup-name">Startup / Brand Name *</label>
+                    <div className="auth-pill-input-wrap">
+                      <Rocket size={16} className="auth-pill-icon" />
                       <input
                         id="auth-startup-name"
                         type="text"
-                        className="form-input"
-                        placeholder="e.g. EcoThreads Apparel"
+                        className="auth-pill-input"
+                        placeholder="e.g. EcoHemp Labs"
                         value={startupName}
                         onChange={e => setStartupName(e.target.value)}
                         required
                       />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="auth-startup-description">Startup Short Description *</label>
+                  </div>
+                  <div className="auth-field-group">
+                    <label className="auth-field-label" htmlFor="auth-startup-description">Startup Description *</label>
+                    <div className="auth-pill-input-wrap auth-pill-textarea-wrap">
                       <textarea
                         id="auth-startup-description"
-                        className="form-textarea"
+                        className="auth-pill-textarea"
                         rows={2}
                         placeholder="What problem does your startup solve?"
                         value={startupDesc}
@@ -333,116 +288,154 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         required
                       />
                     </div>
-                  </>
-                )}
-              </>
-            )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="auth-email">Email Address *</label>
+          {/* Email Field */}
+          <div className="auth-field-group">
+            <label className="auth-field-label" htmlFor="auth-email">Email</label>
+            <div className="auth-pill-input-wrap">
+              <Mail size={16} className="auth-pill-icon" />
               <input
                 id="auth-email"
                 type="email"
-                className="form-input"
-                placeholder="you@example.com"
+                className="auth-pill-input"
+                placeholder="Enter your email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
               />
             </div>
+          </div>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="auth-password">Password *</label>
+          {/* Password Field */}
+          <div className="auth-field-group">
+            <label className="auth-field-label" htmlFor="auth-password">Password</label>
+            <div className="auth-pill-input-wrap">
+              <Lock size={16} className="auth-pill-icon" />
               <input
                 id="auth-password"
-                type="password"
-                className="form-input"
-                placeholder="Enter password (min 6 characters)"
+                type={showPassword ? 'text' : 'password'}
+                className="auth-pill-input"
+                placeholder="Enter your password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
               />
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ marginTop: '8px', padding: '10px', fontSize: '13px', width: '100%' }}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Processing...' : tab === 'signin' ? 'Sign In' : 'Create Account'}
-            </button>
-          </form>
-
-          {/* Quick Demo Switcher */}
-          <div style={{
-            marginTop: '20px',
-            paddingTop: '14px',
-            borderTop: '1px solid var(--color-border)',
-            background: 'var(--color-surface-hover)',
-            padding: '12px',
-            borderRadius: 'var(--radius-md)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-              <Sparkles size={14} color="var(--color-primary)" />
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                1-Click Demo Accounts (For Judging)
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-              {DEMO_ACCOUNTS.map(account => (
-                <button
-                  key={account.email}
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ fontSize: '11px', padding: '5px 8px', justifyContent: 'flex-start' }}
-                  onClick={() => handleQuickLogin(account.email)}
-                  disabled={isSubmitting}
-                >
-                  {account.button_label}
-                </button>
-              ))}
-              <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-text-muted)' }}>
-                Demo password: {DEMO_ACCOUNTS[0].password}
-              </div>
               <button
                 type="button"
-                className="btn btn-secondary"
-                style={{ display: 'none' }}
-                onClick={() => handleQuickLogin(DEMO_ACCOUNTS[0].email)}
-                disabled={isSubmitting}
+                className="auth-password-toggle"
+                onClick={() => setShowPassword(prev => !prev)}
+                title={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                🚀 Aarav (Apparel Startup)
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ display: 'none' }}
-                onClick={() => handleQuickLogin(DEMO_ACCOUNTS[1].email)}
-                disabled={isSubmitting}
-              >
-                🥖 Maya (Food Startup)
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ display: 'none' }}
-                onClick={() => handleQuickLogin(DEMO_ACCOUNTS[2].email)}
-                disabled={isSubmitting}
-              >
-                💼 Vikram (Sponsor)
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ display: 'none' }}
-                onClick={() => handleQuickLogin(DEMO_ACCOUNTS[3].email)}
-                disabled={isSubmitting}
-              >
-                🛍️ Riya (Shopper)
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
+
+          {/* Remember me & Quick Switch */}
+          <div className="auth-options-row">
+            <label className="auth-checkbox-label">
+              <input
+                type="checkbox"
+                className="auth-custom-checkbox"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+              />
+              <span>Remember me</span>
+            </label>
+
+            {tab === 'signin' && (
+              <button
+                type="button"
+                className="auth-switch-role-btn"
+                onClick={() => {
+                  const nextRole: UserRole = role === 'startup' ? 'sponsor' : role === 'sponsor' ? 'user' : 'startup';
+                  setRole(nextRole);
+                }}
+              >
+                Switch to {role === 'startup' ? 'Investor' : role === 'sponsor' ? 'User' : 'Startup'}
+              </button>
+            )}
+          </div>
+
+          {/* Main Action Button */}
+          <button
+            type="submit"
+            className="auth-main-submit-btn"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Processing...' : tab === 'signin' ? 'Login' : 'Create Account'}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="auth-divider-wrap">
+          <span className="auth-divider-line" />
+          <span className="auth-divider-text">Or continue with</span>
+          <span className="auth-divider-line" />
+        </div>
+
+        {/* 1-Click Demo Accounts (Pill Styled for Judging & Instant Verification) */}
+        <div className="auth-quick-demo-grid">
+          {DEMO_ACCOUNTS.map(account => (
+            <button
+              key={account.email}
+              type="button"
+              className="auth-quick-pill-btn"
+              onClick={() => handleQuickLogin(account.email)}
+              disabled={isSubmitting}
+            >
+              <span>{account.button_label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Hidden compatibility buttons for legacy test selectors */}
+        <div style={{ display: 'none' }} aria-hidden="true">
+          <button type="button" onClick={() => handleQuickLogin(DEMO_ACCOUNTS[0].email)}>
+            🚀 Aarav (Apparel Startup)
+          </button>
+          <button type="button" onClick={() => handleQuickLogin(DEMO_ACCOUNTS[1].email)}>
+            🥖 Maya (Food Startup)
+          </button>
+          <button type="button" onClick={() => handleQuickLogin(DEMO_ACCOUNTS[2].email)}>
+            💼 Vikram (Sponsor)
+          </button>
+          <button type="button" onClick={() => handleQuickLogin(DEMO_ACCOUNTS[3].email)}>
+            🛍️ Riya (Shopper)
+          </button>
+        </div>
+
+        {/* Bottom Toggle Link */}
+        <div className="auth-footer-toggle">
+          {tab === 'signin' ? (
+            <span>
+              Don't have an account?{' '}
+              <button
+                type="button"
+                className="auth-toggle-link-btn"
+                onClick={() => { setTab('signup'); setError(null); }}
+              >
+                Create an account
+              </button>
+            </span>
+          ) : (
+            <span>
+              Already have an account?{' '}
+              <button
+                type="button"
+                className="auth-toggle-link-btn"
+                onClick={() => { setTab('signin'); setError(null); }}
+              >
+                Log in
+              </button>
+            </span>
+          )}
         </div>
       </div>
     </div>

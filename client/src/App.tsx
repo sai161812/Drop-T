@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import type { UserRole } from '@droptest/shared';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { Navbar, PageTab } from './components/Navbar.js';
 import { AuthModal } from './components/Auth/AuthModal.js';
@@ -15,10 +16,19 @@ import { LandingPage } from './pages/LandingPage.js';
 const MainApp: React.FC = () => {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<PageTab>('explore');
+  const [showLanding, setShowLanding] = useState(() => window.location.pathname === '/');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | undefined>(undefined);
   const [activeTestId, setActiveTestId] = useState<string | undefined>();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authDefaultRole, setAuthDefaultRole] = useState<UserRole>('startup');
+
+  const handleOpenAuthModal = (role?: UserRole) => {
+    if (role) {
+      setAuthDefaultRole(role);
+    }
+    setIsAuthModalOpen(true);
+  };
   const [standaloneFeedbackToken, setStandaloneFeedbackToken] = useState<string | null>(null);
   const [labRequest, setLabRequest] = useState<{ productId?: string; review: 'resume' | 'new' }>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -45,6 +55,7 @@ const MainApp: React.FC = () => {
   useEffect(() => {
     const handleUrlNavigation = () => {
       const pathname = window.location.pathname;
+      setShowLanding(pathname === '/');
 
       const params = new URLSearchParams(window.location.search);
       setStandaloneFeedbackToken(null);
@@ -85,6 +96,7 @@ const MainApp: React.FC = () => {
         setActiveTab('results');
       } else {
         window.history.replaceState({}, '', '/');
+        setShowLanding(true);
         setActiveTab('explore');
         setSelectedProductId(null);
         setEditingProductId(undefined);
@@ -178,19 +190,21 @@ const MainApp: React.FC = () => {
     );
   }
 
-  if (!isAuthLoading && !user && activeTab === 'explore' && window.location.pathname === '/') {
+  if (!isAuthLoading && !user && activeTab === 'explore' && showLanding) {
     return (
       <>
         <LandingPage
           onExplore={() => {
             window.history.pushState({}, '', '/explore');
+            setShowLanding(false);
             setActiveTab('explore');
           }}
-          onSignIn={() => setIsAuthModalOpen(true)}
+          onSignIn={handleOpenAuthModal}
           onOpenProduct={handleOpenProduct}
         />
         <AuthModal
           isOpen={isAuthModalOpen}
+          defaultRole={authDefaultRole}
           onClose={() => setIsAuthModalOpen(false)}
         />
       </>
@@ -202,7 +216,7 @@ const MainApp: React.FC = () => {
       <Navbar
         activeTab={activeTab}
         onTabChange={navigateToTab}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenAuthModal={handleOpenAuthModal}
       />
 
       <main className="workbench-main" style={{ minHeight: 'calc(100vh - 60px)', paddingBottom: 'var(--space-8)' }}>
@@ -277,6 +291,7 @@ const MainApp: React.FC = () => {
       {/* Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
+        defaultRole={authDefaultRole}
         onClose={() => setIsAuthModalOpen(false)}
       />
     </div>

@@ -1,5 +1,7 @@
 import React from 'react';
+import type { UserRole } from '@droptest/shared';
 import { useAuth } from '../context/AuthContext.js';
+import { ElectricBrandMark } from './Common/ElectricBrandMark.js';
 import { 
   Compass, 
   Bookmark,
@@ -18,7 +20,7 @@ export type PageTab = 'explore' | 'saved' | 'product-detail' | 'publish' | 'my-p
 interface NavbarProps {
   activeTab: PageTab;
   onTabChange: (tab: PageTab) => void;
-  onOpenAuthModal: () => void;
+  onOpenAuthModal: (role?: UserRole) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -60,7 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 0, padding: 0, background: 'transparent', color: 'inherit' }}
         onClick={() => onTabChange('explore')}
       >
-        <span className="brand-badge" style={{ background: 'var(--color-primary)', color: '#FFF', padding: '3px 7px', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: 800 }}>
+        <ElectricBrandMark />
+        <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '-0.03em', color: 'var(--color-text-primary)' }}>
           DROPTEST
         </span>
         <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--color-text-primary)' }}>
@@ -175,14 +178,46 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 14px' }}
-            onClick={onOpenAuthModal}
-          >
-            <LogIn size={14} /> Sign In / Sign Up
-          </button>
+          <div className="signup-dropdown-wrapper">
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 14px' }}
+              onClick={() => onOpenAuthModal()}
+              aria-haspopup="menu"
+            >
+              <LogIn size={14} /> Sign In / Sign Up
+            </button>
+            <div className="signup-dropdown-menu" role="menu">
+              <button
+                type="button"
+                className="signup-dropdown-item"
+                role="menuitem"
+                onClick={() => onOpenAuthModal('user')}
+              >
+                <span className="dropdown-item-num">1.</span>
+                <span>User Login</span>
+              </button>
+              <button
+                type="button"
+                className="signup-dropdown-item"
+                role="menuitem"
+                onClick={() => onOpenAuthModal('startup')}
+              >
+                <span className="dropdown-item-num">2.</span>
+                <span>Startup Login</span>
+              </button>
+              <button
+                type="button"
+                className="signup-dropdown-item"
+                role="menuitem"
+                onClick={() => onOpenAuthModal('sponsor')}
+              >
+                <span className="dropdown-item-num">3.</span>
+                <span>Investor Login</span>
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </header>

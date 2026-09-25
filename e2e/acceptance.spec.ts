@@ -25,6 +25,8 @@ test.describe('DROPTEST browser acceptance', () => {
     page.on('pageerror', error => runtimeErrors.push(error.message));
 
     await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Validate your product before you commit.' })).toBeVisible();
+    await page.getByRole('button', { name: 'Explore products', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Explore Startup Product Launches' })).toBeVisible();
     await expect(page.getByRole('link', { name: SEEDED_PRODUCT })).toBeVisible();
 
@@ -47,6 +49,8 @@ test.describe('DROPTEST browser acceptance', () => {
 
     await page.goto('/unknown-route');
     await expect(page).toHaveURL('/');
+    await expect(page.getByRole('heading', { name: 'Validate your product before you commit.' })).toBeVisible();
+    await page.getByRole('button', { name: 'Explore products', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Explore Startup Product Launches' })).toBeVisible();
 
     const trigger = page.getByRole('button', { name: 'Sign In / Sign Up' });

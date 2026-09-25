@@ -4,27 +4,16 @@ import './LightRays.css';
 
 export interface LightRaysProps {
   raysOrigin?: 'top-center' | 'top-left' | 'top-right' | 'left' | 'right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
-  raysColor?: string;
   raysSpeed?: number;
   lightSpread?: number;
   rayLength?: number;
   pulsating?: boolean;
   fadeDistance?: number;
-  saturation?: number;
   followMouse?: boolean;
   mouseInfluence?: number;
-  noiseAmount?: number;
   distortion?: number;
-  lightMode?: boolean;
   className?: string;
 }
-
-const DEFAULT_COLOR = '#ffffff';
-
-const hexToRgb = (hex: string): [number, number, number] => {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return m ? [parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255] : [1, 1, 1];
-};
 
 const getAnchorAndDir = (origin: string, w: number, h: number): { anchor: [number, number]; dir: [number, number] } => {
   const outside = 0.2;
@@ -50,18 +39,14 @@ const getAnchorAndDir = (origin: string, w: number, h: number): { anchor: [numbe
 
 export const LightRays: React.FC<LightRaysProps> = ({
   raysOrigin = 'top-center',
-  raysColor = DEFAULT_COLOR,
   raysSpeed = 1,
   lightSpread = 0.5,
   rayLength = 3,
   pulsating = false,
   fadeDistance = 1.0,
-  saturation = 1.0,
   followMouse = true,
   mouseInfluence = 0.1,
-  noiseAmount = 0.0,
   distortion = 0.0,
-  lightMode = false,
   className = ''
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -137,9 +122,7 @@ export const LightRays: React.FC<LightRaysProps> = ({
 
         const vert = `
 attribute vec2 position;
-varying vec2 vUv;
 void main() {
-  vUv = position * 0.5 + 0.5;
   gl_Position = vec4(position, 0.0, 1.0);
 }`;
 
@@ -150,24 +133,14 @@ uniform vec2  iResolution;
 
 uniform vec2  rayPos;
 uniform vec2  rayDir;
-uniform vec3  raysColor;
 uniform float raysSpeed;
 uniform float lightSpread;
 uniform float rayLength;
 uniform float pulsating;
 uniform float fadeDistance;
-uniform float saturation;
 uniform vec2  mousePos;
 uniform float mouseInfluence;
-uniform float noiseAmount;
 uniform float distortion;
-uniform float lightMode;
-
-varying vec2 vUv;
-
-float noise(vec2 st) {
-  return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
-}
 
 float rayStrength(vec2 raySource, vec2 rayRefDirection, vec2 coord,
                   float seedA, float seedB, float speed) {
@@ -181,9 +154,13 @@ float rayStrength(vec2 raySource, vec2 rayRefDirection, vec2 coord,
 
   float distance = length(sourceToCoord);
   float maxDistance = iResolution.x * rayLength;
-  float lengthFalloff = clamp((maxDistance - distance) / maxDistance, 0.0, 1.0);
-  
-  float fadeFalloff = clamp((iResolution.x * fadeDistance - distance) / (iResolution.x * fadeDistance), 0.5, 1.0);
+  float normalizedDistance = distance / max(maxDistance, 1.0);
+  float distanceWindow = 1.0 - smoothstep(0.35, 1.0, normalizedDistance);
+  float inverseSquare = 1.0 / (1.0 + 10.0 * normalizedDistance * normalizedDistance);
+
+  float fadeRadius = max(iResolution.x * fadeDistance, 1.0);
+  float fadeRatio = distance / fadeRadius;
+  float fadeFalloff = 1.0 / (1.0 + 4.0 * fadeRatio * fadeRatio);
   float pulse = pulsating > 0.5 ? (0.8 + 0.2 * sin(iTime * speed * 3.0)) : 1.0;
 
   float baseStrength = clamp(
@@ -192,7 +169,7 @@ float rayStrength(vec2 raySource, vec2 rayRefDirection, vec2 coord,
     0.0, 1.0
   );
 
-  return baseStrength * lengthFalloff * fadeFalloff * spreadFactor * pulse;
+  return baseStrength * distanceWindow * inverseSquare * fadeFalloff * spreadFactor * pulse;
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
@@ -205,39 +182,12 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     finalRayDir = normalize(mix(rayDir, mouseDirection, mouseInfluence));
   }
 
-  vec4 rays1 = vec4(1.0) *
-               rayStrength(rayPos, finalRayDir, coord, 36.2214, 21.11349,
+  float rayA = rayStrength(rayPos, finalRayDir, coord, 36.2214, 21.11349,
                            1.5 * raysSpeed);
-  vec4 rays2 = vec4(1.0) *
-               rayStrength(rayPos, finalRayDir, coord, 22.3991, 18.0234,
+  float rayB = rayStrength(rayPos, finalRayDir, coord, 22.3991, 18.0234,
                            1.1 * raysSpeed);
-
-  fragColor = rays1 * 0.5 + rays2 * 0.4;
-
-  if (noiseAmount > 0.0) {
-    float n = noise(coord * 0.01 + iTime * 0.1);
-    fragColor.rgb *= (1.0 - noiseAmount + noiseAmount * n);
-  }
-
-  float brightness = 1.0 - (coord.y / iResolution.y);
-  fragColor.x *= 0.1 + brightness * 0.8;
-  fragColor.y *= 0.3 + brightness * 0.6;
-  fragColor.z *= 0.5 + brightness * 0.5;
-
-  if (saturation != 1.0) {
-    float gray = dot(fragColor.rgb, vec3(0.299, 0.587, 0.114));
-    fragColor.rgb = mix(vec3(gray), fragColor.rgb, saturation);
-  }
-
-  fragColor.rgb *= raysColor;
-
-  if (lightMode > 0.5) {
-    vec3 mapped = vec3(1.0) - exp(-max(fragColor.rgb, vec3(0.0)) * 1.35);
-    float energy = clamp(max(mapped.r, max(mapped.g, mapped.b)), 0.0, 1.0);
-    vec3 hue = mapped / max(energy, 0.0001);
-    vec3 ink = mix(hue * 0.25, hue * 0.72, energy);
-    fragColor = vec4(mix(vec3(1.0), ink, energy), 1.0);
-  }
+  float luminance = clamp(rayA * 0.56 + rayB * 0.44, 0.0, 1.0);
+  fragColor = vec4(vec3(1.0) * luminance, luminance);
 }
 
 void main() {
@@ -251,18 +201,14 @@ void main() {
           iResolution: { value: [1, 1] },
           rayPos: { value: [0, 0] },
           rayDir: { value: [0, 1] },
-          raysColor: { value: hexToRgb(raysColor) },
           raysSpeed: { value: raysSpeed },
           lightSpread: { value: lightSpread },
           rayLength: { value: rayLength },
           pulsating: { value: pulsating ? 1.0 : 0.0 },
           fadeDistance: { value: fadeDistance },
-          saturation: { value: saturation },
           mousePos: { value: [0.5, 0.5] },
           mouseInfluence: { value: mouseInfluence },
-          noiseAmount: { value: noiseAmount },
-          distortion: { value: distortion },
-          lightMode: { value: lightMode ? 1.0 : 0.0 }
+          distortion: { value: distortion }
         };
         uniformsRef.current = uniforms;
 
@@ -354,18 +300,14 @@ void main() {
   }, [
     isVisible,
     raysOrigin,
-    raysColor,
     raysSpeed,
     lightSpread,
     rayLength,
     pulsating,
     fadeDistance,
-    saturation,
     followMouse,
     mouseInfluence,
-    noiseAmount,
-    distortion,
-    lightMode
+    distortion
   ]);
 
   useEffect(() => {
@@ -374,17 +316,13 @@ void main() {
     const u = uniformsRef.current;
     const renderer = rendererRef.current;
 
-    u.raysColor.value = hexToRgb(raysColor);
     u.raysSpeed.value = raysSpeed;
     u.lightSpread.value = lightSpread;
     u.rayLength.value = rayLength;
     u.pulsating.value = pulsating ? 1.0 : 0.0;
     u.fadeDistance.value = fadeDistance;
-    u.saturation.value = saturation;
     u.mouseInfluence.value = mouseInfluence;
-    u.noiseAmount.value = noiseAmount;
     u.distortion.value = distortion;
-    u.lightMode.value = lightMode ? 1.0 : 0.0;
 
     const { clientWidth: wCSS, clientHeight: hCSS } = containerRef.current;
     const dpr = renderer.dpr;
@@ -392,18 +330,14 @@ void main() {
     u.rayPos.value = anchor;
     u.rayDir.value = dir;
   }, [
-    raysColor,
     raysSpeed,
     lightSpread,
     raysOrigin,
     rayLength,
     pulsating,
     fadeDistance,
-    saturation,
     mouseInfluence,
-    noiseAmount,
-    distortion,
-    lightMode
+    distortion
   ]);
 
   useEffect(() => {

@@ -1,0 +1,16 @@
+.electric-brand-mark {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 0;
+  background: #000000;
+}
+
+.electric-brand-mark svg {
+  width: 21px;
+  height: 21px;
+  fill: #ffffff;
+}
