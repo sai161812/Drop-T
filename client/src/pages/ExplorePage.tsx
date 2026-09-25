@@ -18,6 +18,23 @@ interface ExplorePageProps {
   onPromptAuth: () => void;
 }
 
+const CATEGORY_FALLBACK_IMAGES: Record<ProductCategory, string> = {
+  clothing_accessories: '/images/products/category-apparel-accessories.png',
+  local_food_beverages: '/images/products/category-food-beverage.png',
+  digital_products_services: '/images/products/category-digital-services.png',
+  other: '/images/products/category-other-products.png'
+};
+
+const getLegacyDemoImage = (url?: string): string | undefined => {
+  if (url?.includes('images.unsplash.com/photo-1521572267360-ee0c2909d518')) {
+    return '/images/products/organic-hemp-summer-tee.png';
+  }
+  if (url?.includes('images.unsplash.com/photo-1514432324607-a09d9b4aefdd')) {
+    return '/images/products/cold-brew-press-tumbler.png';
+  }
+  return undefined;
+};
+
 export const ExplorePage: React.FC<ExplorePageProps> = ({
   onOpenProduct,
   onNavigateToPublish,
@@ -29,6 +46,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [togglingSaveId, setTogglingSaveId] = useState<string | null>(null);
 
   const fetchProducts = async () => {
@@ -39,7 +57,9 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
       if (category !== 'all') params.append('category', category);
       if (searchQuery.trim()) params.append('q', searchQuery.trim());
 
-      const res = await fetch(`/api/products?${params.toString()}`);
+      const res = await fetch(`/api/products?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (!res.ok) throw new Error('Failed to load feed');
       const data = await res.json();
       setProducts(data.products || []);
@@ -52,7 +72,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
 
   useEffect(() => {
     fetchProducts();
-  }, [category]);
+  }, [category, token]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +80,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
   };
 
   const handleToggleSave = async (e: React.MouseEvent, productId: string) => {
+    e.preventDefault();
     e.stopPropagation();
     if (!token) {
       onPromptAuth();
@@ -67,6 +88,9 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
     }
 
     setTogglingSaveId(productId);
+    setSaveError(null);
+    const product = products.find(item => item.id === productId);
+    const saved = !product?.is_saved;
     try {
       const res = await fetch(`/api/products/${productId}/save`, {
         method: 'POST',
@@ -74,19 +98,19 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({})
+        body: JSON.stringify({ saved })
       });
       if (!res.ok) throw new Error('Failed to update save status');
       const result = await res.json();
       
       setProducts(prev => prev.map(p => {
         if (p.id === productId) {
-          return { ...p, save_count: result.save_count };
+          return { ...p, save_count: result.save_count, is_saved: result.is_saved };
         }
         return p;
       }));
     } catch (err) {
-      console.error(err);
+      setSaveError('Could not update saved products. Please try again.');
     } finally {
       setTogglingSaveId(null);
     }
@@ -205,9 +229,10 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
           {error}
         </div>
       )}
+      {saveError && <div role="alert" style={{ padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)', color: 'var(--color-danger)', background: 'var(--color-danger-bg)', borderRadius: 'var(--radius-md)' }}>{saveError}</div>}
 
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
           <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Loading verified products...</div>
         </div>
       ) : products.length === 0 ? (
@@ -236,13 +261,16 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
           gap: 'var(--space-4)'
         }}>
           {products.map(product => {
             const stageStyle = getStageBadgeColor(product.stage);
+            const uploadedImage = product.images?.[0];
+            const fallbackImage = CATEGORY_FALLBACK_IMAGES[product.category];
+            const displayImage = getLegacyDemoImage(uploadedImage?.url) || uploadedImage?.url || fallbackImage;
             return (
-              <div
+              <article
                 key={product.id}
                 style={{
                   background: 'var(--color-surface)',
@@ -251,11 +279,9 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
-                  cursor: 'pointer',
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   boxShadow: 'var(--shadow-sm)'
                 }}
-                onClick={() => onOpenProduct(product.id)}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
                   (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)';
@@ -275,16 +301,30 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                   position: 'relative',
                   borderBottom: '1px solid var(--color-border-subtle)'
                 }}>
-                  {product.images && product.images.length > 0 ? (
-                    <img
-                      src={product.images[0].url}
-                      alt={product.images[0].confirmed_visual_description || product.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'var(--color-text-muted)' }}>
-                      {getCategoryIcon(product.category)}
-                      <span style={{ fontSize: '11px', fontWeight: 500 }}>No image uploaded</span>
+                  <img
+                    src={displayImage}
+                    alt={uploadedImage?.confirmed_visual_description || `${product.category.replace(/_/g, ' ')} category artwork for ${product.name}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={event => {
+                      if (!event.currentTarget.src.endsWith(fallbackImage)) {
+                        event.currentTarget.src = fallbackImage;
+                      }
+                    }}
+                  />
+
+                  {!uploadedImage && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      padding: '2px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'rgba(0, 0, 0, 0.58)',
+                      color: '#fff',
+                      fontSize: '9px',
+                      fontWeight: 500
+                    }}>
+                      Category artwork
                     </div>
                   )}
 
@@ -336,7 +376,9 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
 
                     {/* Product Name */}
                     <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px', lineHeight: '1.3' }}>
-                      {product.name}
+                      <a href={`/product/${encodeURIComponent(product.id)}`} onClick={e => { e.preventDefault(); onOpenProduct(product.id); }} style={{ color: 'inherit', textDecoration: 'none' }}>
+                        {product.name}
+                      </a>
                     </h3>
 
                     {/* Summary */}
@@ -373,7 +415,9 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                         type="button"
                         onClick={(e) => handleToggleSave(e, product.id)}
                         disabled={togglingSaveId === product.id}
-                        title="Toggle Save"
+                        aria-label={`${product.is_saved ? 'Remove' : 'Save'} ${product.name}`}
+                        aria-pressed={Boolean(product.is_saved)}
+                        title={product.is_saved ? 'Remove from saved products' : 'Save product'}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -388,7 +432,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                         onMouseEnter={e => e.currentTarget.style.color = 'var(--color-primary)'}
                         onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}
                       >
-                        <Bookmark size={13} /> {product.save_count}
+                        <Bookmark size={13} aria-hidden="true" /> {product.is_saved ? 'Saved' : 'Save'} <span aria-label={`${product.save_count} saves`}>({product.save_count})</span>
                       </button>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }} title={`${product.feedback_count} community responses`}>
                         <MessageSquare size={13} /> {product.feedback_count}
@@ -396,7 +440,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                     </div>
                   </div>
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>

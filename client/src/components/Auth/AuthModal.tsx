@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
 import { UserRole } from '@droptest/shared';
 import { DEMO_ACCOUNTS } from '@droptest/shared';
@@ -18,6 +18,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialTab = 'signin'
 }) => {
   const { signIn, signUp, quickDemoLogin } = useAuth();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<'signin' | 'signup'>(initialTab);
   const [role, setRole] = useState<UserRole>(defaultRole);
 
@@ -30,6 +31,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLElement>('button, input, select, textarea')?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      } else if (event.key === 'Tab' && dialog) {
+        const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(element => element.getClientRects().length > 0);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -95,7 +121,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       zIndex: 1000,
       padding: 'var(--space-4)'
     }}>
-      <div className="modal-container" style={{
+      <div ref={dialogRef} className="modal-container" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title" style={{
         background: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius-lg)',
@@ -118,7 +144,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--color-text-primary)' }}>
-              {tab === 'signin' ? 'Sign In to DROPTEST' : 'Create an Account'}
+              <span id="auth-dialog-title">{tab === 'signin' ? 'Sign In to DROPTEST' : 'Create an Account'}</span>
             </span>
           </div>
           <button
@@ -269,8 +295,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Display Name *</label>
+                  <label className="form-label" htmlFor="auth-display-name">Display Name *</label>
                   <input
+                    id="auth-display-name"
                     type="text"
                     className="form-input"
                     placeholder="e.g. Aarav Sharma"
@@ -283,8 +310,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 {role === 'startup' && (
                   <>
                     <div className="form-group">
-                      <label className="form-label">Startup / Brand Name *</label>
+                      <label className="form-label" htmlFor="auth-startup-name">Startup / Brand Name *</label>
                       <input
+                        id="auth-startup-name"
                         type="text"
                         className="form-input"
                         placeholder="e.g. EcoThreads Apparel"
@@ -294,8 +322,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Startup Short Description *</label>
+                      <label className="form-label" htmlFor="auth-startup-description">Startup Short Description *</label>
                       <textarea
+                        id="auth-startup-description"
                         className="form-textarea"
                         rows={2}
                         placeholder="What problem does your startup solve?"
@@ -310,8 +339,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             )}
 
             <div className="form-group">
-              <label className="form-label">Email Address *</label>
+              <label className="form-label" htmlFor="auth-email">Email Address *</label>
               <input
+                id="auth-email"
                 type="email"
                 className="form-input"
                 placeholder="you@example.com"
@@ -322,8 +352,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">Password *</label>
+              <label className="form-label" htmlFor="auth-password">Password *</label>
               <input
+                id="auth-password"
                 type="password"
                 className="form-input"
                 placeholder="Enter password (min 6 characters)"

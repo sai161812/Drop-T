@@ -7,14 +7,14 @@ import {
   RefreshCw,
   MessageSquare
 } from 'lucide-react';
-import { HumanFeedbackStats, HumanChoice } from '@droptest/shared';
+import { HumanFeedbackStats, HumanChoice, FounderFeedbackBreakdown } from '@droptest/shared';
 import { useAuth } from '../../context/AuthContext.js';
 
 interface RealFeedbackSectionProps {
   testId?: string;
 }
 
-export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId }) => {
+const LegacyRealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId }) => {
   const { token } = useAuth();
   const [stats, setStats] = useState<HumanFeedbackStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -310,3 +310,81 @@ export const RealFeedbackSection: React.FC<RealFeedbackSectionProps> = ({ testId
     </div>
   );
 };
+
+interface RealFeedbackResultsProps {
+  testId?: string;
+  productId?: string;
+  showLegacyFeedback?: boolean;
+}
+
+const CommunityFeedbackPanel: React.FC<{ productId: string }> = ({ productId }) => {
+  const { token } = useAuth();
+  const [breakdown, setBreakdown] = useState<FounderFeedbackBreakdown | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    fetch(`/api/products/${productId}/feedback/breakdown`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    }).then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not load product feedback.');
+      if (!cancelled) setBreakdown(data);
+    }).catch((err: Error) => {
+      if (!cancelled) setError(err.message);
+    }).finally(() => {
+      if (!cancelled) setIsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [productId, token]);
+
+  const counts = breakdown?.counts || { yes: 0, maybe: 0, no: 0 };
+  return (
+    <section className="card" aria-labelledby="community-feedback-title" style={{ marginBottom: 'var(--space-5)', border: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: 'var(--space-4)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div>
+          <h4 id="community-feedback-title" style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)' }}>Product Community Feedback</h4>
+          <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>Responses from product visitors. Counts are separate from Synthetic Lab personas and anonymous test-link responses.</p>
+        </div>
+        <a href={`/product/${productId}`} className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: 11 }}>
+          View public product <ExternalLink size={12} />
+        </a>
+      </div>
+      {isLoading ? <p role="status">Loading community feedback…</p> : error ? <p role="alert" style={{ color: 'var(--color-danger)' }}>{error}</p> : (
+        <>
+          <div style={{ fontSize: 12, marginBottom: 10 }}><strong>{breakdown?.total || 0}</strong> unique respondents</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 12 }}>
+            {([['Yes', counts.yes], ['Maybe', counts.maybe], ['No', counts.no]] as const).map(([label, count]) => (
+              <div key={label} style={{ background: 'var(--color-surface-subtle)', border: '1px solid var(--color-border-subtle)', borderRadius: 6, padding: 10 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{label}</span>
+                <div className="tabular-nums" style={{ fontSize: 20, fontWeight: 700 }}>{count}</div>
+              </div>
+            ))}
+          </div>
+          {breakdown?.responses.length ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
+              {breakdown.responses.filter(response => response.reason?.trim()).map(response => (
+                <article key={response.id} style={{ border: '1px solid var(--color-border-subtle)', borderRadius: 6, padding: '9px 11px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                    <strong>{response.choice.toUpperCase()}</strong> · {response.factor.replace(/_/g, ' ')} · {response.author.display_name}
+                  </div>
+                  <p style={{ margin: '5px 0 0', fontSize: 12 }}>{response.reason}</p>
+                </article>
+              ))}
+            </div>
+          ) : <p style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>No community responses yet. Feedback will appear here after visitors respond on the product page.</p>}
+        </>
+      )}
+    </section>
+  );
+};
+
+export const RealFeedbackSection: React.FC<RealFeedbackResultsProps> = ({ testId, productId, showLegacyFeedback = false }) => (
+  <>
+    {productId && <CommunityFeedbackPanel productId={productId} />}
+    {showLegacyFeedback && testId && <LegacyRealFeedbackSection testId={testId} />}
+  </>
+);

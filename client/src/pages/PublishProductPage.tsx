@@ -175,7 +175,10 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData
       });
-      if (!res.ok) throw new Error('Image upload failed. Size limit is 5MB.');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Image upload failed. Check the file type and 5 MB size limit.');
+      }
       const meta: ImageMetadata = await res.json();
       setImages(prev => [...prev, meta]);
     } catch (err: any) {
@@ -351,8 +354,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
             </h3>
 
             <div className="form-group">
-              <label className="form-label">Product Name *</label>
+              <label className="form-label" htmlFor="product-name">Product Name *</label>
               <input
+                id="product-name"
                 type="text"
                 className="form-input"
                 placeholder="e.g. Organic Flax Linen Minimalist T-Shirt"
@@ -364,8 +368,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div className="form-group">
-                <label className="form-label">Category *</label>
+                <label className="form-label" htmlFor="product-category">Category *</label>
                 <select
+                  id="product-category"
                   className="form-select"
                   value={category}
                   onChange={e => setCategory(e.target.value as ProductCategory)}
@@ -378,8 +383,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
               </div>
 
               <div className="form-group">
-                <label className="form-label">Current Stage *</label>
+                <label className="form-label" htmlFor="product-stage">Current Stage *</label>
                 <select
+                  id="product-stage"
                   className="form-select"
                   value={stage}
                   onChange={e => setStage(e.target.value as ProductStage)}
@@ -393,8 +399,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">Product Summary (What it is and why choose it) *</label>
+              <label className="form-label" htmlFor="product-summary">Product Summary (What it is and why choose it) *</label>
               <textarea
+                id="product-summary"
                 className="form-textarea"
                 rows={3}
                 placeholder="Describe your product clearly. E.g. Breathable, hypoallergenic 100% natural organic flax linen shirt designed for casual everyday wear in warm climates."
@@ -405,8 +412,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">Intended Buyer Description *</label>
+              <label className="form-label" htmlFor="product-intended-buyer">Intended Buyer Description *</label>
               <input
+                id="product-intended-buyer"
                 type="text"
                 className="form-input"
                 placeholder="e.g. Young eco-conscious working professionals (25-35) looking for sustainable minimalist apparel"
@@ -417,8 +425,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">Your Feedback Question for the Community *</label>
+              <label className="form-label" htmlFor="product-feedback-question">Your Feedback Question for the Community *</label>
               <input
+                id="product-feedback-question"
                 type="text"
                 className="form-input"
                 placeholder="e.g. Would you pay ₹699 for an unbleached organic flax shirt with lifetime seam repairs?"
@@ -452,8 +461,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
             {!priceNotSet && (
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
                 <div className="form-group">
-                  <label className="form-label">Target Launch Price *</label>
+                  <label className="form-label" htmlFor="product-price">Target Launch Price *</label>
                   <input
+                    id="product-price"
                     type="number"
                     className="form-input"
                     placeholder="699"
@@ -464,8 +474,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Currency</label>
+                  <label className="form-label" htmlFor="product-currency">Currency</label>
                   <select
+                    id="product-currency"
                     className="form-select"
                     value={currency}
                     onChange={e => setCurrency(e.target.value)}
@@ -488,7 +499,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
 
             <div className="form-group">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label className="form-label" style={{ margin: 0 }}>Available / Served Markets</label>
+                <label className="form-label" htmlFor="product-markets" style={{ margin: 0 }}>Available / Served Markets</label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -500,6 +511,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
               </div>
               {!marketsNotDecided && (
                 <input
+                  id="product-markets"
                   type="text"
                   className="form-input"
                   placeholder="e.g. Koramangala, Indiranagar, Whitefield (comma-separated)"
@@ -511,7 +523,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
 
             <div className="form-group">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label className="form-label" style={{ margin: 0 }}>Fulfillment & Delivery Mode</label>
+                <label className="form-label" htmlFor="product-fulfillment" style={{ margin: 0 }}>Fulfillment & Delivery Mode</label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -523,6 +535,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
               </div>
               {!fulfillmentNotDecided && (
                 <input
+                  id="product-fulfillment"
                   type="text"
                   className="form-input"
                   placeholder="e.g. Standard postal shipping with recycled kraft packaging"
@@ -544,8 +557,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div className="form-group">
-                    <label className="form-label">Material / Fabric *</label>
+                    <label className="form-label" htmlFor="product-clothing-material">Material / Fabric *</label>
                     <input
+                      id="product-clothing-material"
                       type="text"
                       className="form-input"
                       placeholder="e.g. 100% Organic Flax Linen"
@@ -554,8 +568,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Fit / Cut</label>
+                    <label className="form-label" htmlFor="product-clothing-fit">Fit / Cut</label>
                     <input
+                      id="product-clothing-fit"
                       type="text"
                       className="form-input"
                       placeholder="e.g. Relaxed Regular Fit"
@@ -565,8 +580,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Available Sizes (comma-separated)</label>
+                  <label className="form-label" htmlFor="product-clothing-sizes">Available Sizes (comma-separated)</label>
                   <input
+                    id="product-clothing-sizes"
                     type="text"
                     className="form-input"
                     placeholder="e.g. S, M, L, XL"
@@ -581,8 +597,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div className="form-group">
-                    <label className="form-label">Portion / Weight *</label>
+                    <label className="form-label" htmlFor="product-food-portion">Portion / Weight *</label>
                     <input
+                      id="product-food-portion"
                       type="text"
                       className="form-input"
                       placeholder="e.g. 750g baked loaf"
@@ -591,8 +608,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Delivery / Pickup Mode</label>
+                    <label className="form-label" htmlFor="product-food-mode">Delivery / Pickup Mode</label>
                     <input
+                      id="product-food-mode"
                       type="text"
                       className="form-input"
                       placeholder="e.g. Morning home delivery within 5 km"
@@ -602,8 +620,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Known Ingredients & Allergens *</label>
+                  <label className="form-label" htmlFor="product-food-ingredients">Known Ingredients & Allergens *</label>
                   <input
+                    id="product-food-ingredients"
                     type="text"
                     className="form-input"
                     placeholder="e.g. Stoneground wheat flour, water, sea salt, wild starter. Contains gluten."
@@ -618,8 +637,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                   <div className="form-group">
-                    <label className="form-label">Platform / Stack *</label>
+                    <label className="form-label" htmlFor="product-digital-platform">Platform / Stack *</label>
                     <input
+                      id="product-digital-platform"
                       type="text"
                       className="form-input"
                       placeholder="e.g. Web Cloud SaaS"
@@ -628,8 +648,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Language</label>
+                    <label className="form-label" htmlFor="product-digital-language">Language</label>
                     <input
+                      id="product-digital-language"
                       type="text"
                       className="form-input"
                       placeholder="e.g. TypeScript / React"
@@ -638,8 +659,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Primary Use Case</label>
+                    <label className="form-label" htmlFor="product-digital-use-case">Primary Use Case</label>
                     <input
+                      id="product-digital-use-case"
                       type="text"
                       className="form-input"
                       placeholder="e.g. Launch decision workbench"
@@ -662,8 +684,9 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
 
             {category === 'other' && (
               <div className="form-group">
-                <label className="form-label">Technical Specifications / Key Details</label>
+                <label className="form-label" htmlFor="product-other-specs">Technical Specifications / Key Details</label>
                 <textarea
+                  id="product-other-specs"
                   className="form-textarea"
                   rows={2}
                   placeholder="Enter specific dimensions, features, or materials"
@@ -721,6 +744,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     <img src={img.url} alt={`Upload ${idx + 1}`} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />
                     <div style={{ padding: '8px' }}>
                       <input
+                        aria-label={`Confirmed visual description for image ${idx + 1}`}
                         type="text"
                         className="form-input"
                         style={{ fontSize: '11px', padding: '4px 6px', marginBottom: '6px' }}

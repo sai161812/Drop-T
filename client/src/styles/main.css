@@ -281,6 +281,11 @@ html, body {
   box-shadow: var(--focus-ring);
 }
 
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-accent, #2563eb);
+  outline-offset: 2px;
+}
+
 .form-textarea {
   min-height: 80px;
   resize: vertical;

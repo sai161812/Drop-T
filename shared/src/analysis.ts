@@ -18,7 +18,8 @@ import {
   SingleLeverDiffData,
   ComparisonAnalysis,
   ResponseCategory,
-  FactorTag
+  FactorTag,
+  PersonaResponse
 } from './types.js';
 import { calculateFinancials } from './finance.js';
 
@@ -44,11 +45,13 @@ export function computeOptionSummary(
   let notInterestedTotal = 0;
   let unavailableTotal = 0;
   let eligibleCount = 0;
+  let missingTotal = 0;
+  const servedMarkets = new Set(option.served_markets || []);
 
   const segmentBreakdowns: Record<AudienceSegment, SegmentResultBreakdown> = {
-    intended: { interested: 0, unsure: 0, not_interested: 0, unavailable: 0, total: 0, eligible: 0 },
-    adjacent: { interested: 0, unsure: 0, not_interested: 0, unavailable: 0, total: 0, eligible: 0 },
-    contrasting: { interested: 0, unsure: 0, not_interested: 0, unavailable: 0, total: 0, eligible: 0 }
+    intended: { interested: 0, unsure: 0, not_interested: 0, unavailable: 0, total: 0, eligible: 0, missing: 0 },
+    adjacent: { interested: 0, unsure: 0, not_interested: 0, unavailable: 0, total: 0, eligible: 0, missing: 0 },
+    contrasting: { interested: 0, unsure: 0, not_interested: 0, unavailable: 0, total: 0, eligible: 0, missing: 0 }
   };
 
   const marketBreakdowns: Record<string, MarketResultBreakdown> = {};
@@ -69,20 +72,23 @@ export function computeOptionSummary(
         unavailable: 0,
         total: 0,
         eligible: 0,
+        missing: 0,
         access_status: isMarketServed ? 'served' : 'unserved'
       };
     }
     marketBreakdowns[profile.market].total++;
-
-    if (!evaluation) {
-      // Evaluation missing / incomplete
-      continue;
-    }
-
-    if (evaluation.access_status === 'served') {
+    const isEligible = servedMarkets.has(profile.market);
+    if (isEligible) {
       eligibleCount++;
       segmentBreakdowns[seg].eligible++;
       marketBreakdowns[profile.market].eligible++;
+    }
+
+    if (!evaluation) {
+      missingTotal++;
+      segmentBreakdowns[seg].missing++;
+      marketBreakdowns[profile.market].missing++;
+      continue;
     }
 
     const resp = evaluation.response;
@@ -138,6 +144,7 @@ export function computeOptionSummary(
     unsure_total: unsureTotal,
     not_interested_total: notInterestedTotal,
     unavailable_total: unavailableTotal,
+    missing_total: missingTotal,
     by_segment: segmentBreakdowns,
     by_market: marketBreakdowns,
     dominant_objections: dominantObjections
@@ -200,11 +207,12 @@ export function computeEligibilityChanges(
  * Classify single profile transition between Option A and Option B
  */
 export function classifyTransition(
-  respA: ResponseCategory,
-  respB: ResponseCategory,
+  respA: PersonaResponse,
+  respB: PersonaResponse,
   accessA: 'served' | 'unserved',
   accessB: 'served' | 'unserved'
 ): TransitionType {
+  if (respA === 'missing' || respB === 'missing') return 'incomplete';
   if (accessA === 'unserved' && accessB === 'served') {
     return respB === 'interested' ? 'became_interested' : 'access_opened';
   }
@@ -233,7 +241,9 @@ export function classifyTransition(
 export function computeProfileTransitions(
   profiles: Profile[],
   evaluationsA: Evaluation[],
-  evaluationsB: Evaluation[]
+  evaluationsB: Evaluation[],
+  optionA?: Option,
+  optionB?: Option
 ): ProfileTransition[] {
   const mapA = new Map<string, Evaluation>();
   for (const e of evaluationsA) {
@@ -249,10 +259,10 @@ export function computeProfileTransitions(
     const evalA = mapA.get(profile.id);
     const evalB = mapB.get(profile.id);
 
-    const respA: ResponseCategory = evalA?.response || 'unavailable';
-    const respB: ResponseCategory = evalB?.response || 'unavailable';
-    const accessA = evalA?.access_status || 'unserved';
-    const accessB = evalB?.access_status || 'unserved';
+    const respA: PersonaResponse = evalA?.response || 'missing';
+    const respB: PersonaResponse = evalB?.response || 'missing';
+    const accessA = evalA?.access_status || ((optionA?.served_markets || []).includes(profile.market) ? 'served' : 'unserved');
+    const accessB = evalB?.access_status || ((optionB?.served_markets || []).includes(profile.market) ? 'served' : 'unserved');
 
     const transitionType = classifyTransition(respA, respB, accessA, accessB);
 
@@ -268,6 +278,8 @@ export function computeProfileTransitions(
       access_mode: profile.access_mode,
       response_a: respA,
       response_b: respB,
+      evaluation_status_a: evalA ? 'complete' : 'missing',
+      evaluation_status_b: evalB ? 'complete' : 'missing',
       access_status_a: accessA,
       access_status_b: accessB,
       reason_a: evalA?.reason || 'Evaluation missing or unserved',
@@ -306,8 +318,13 @@ export function computeTransitionMatrix(transitions: ProfileTransition[]): Trans
 
   let totalInterestedA = 0;
   let totalInterestedB = 0;
+  let incompletePairs = 0;
 
   for (const t of transitions) {
+    if (t.response_a === 'missing' || t.response_b === 'missing') {
+      incompletePairs++;
+      continue;
+    }
     matrix[t.response_a][t.response_b]++;
 
     if (t.response_a === 'interested') totalInterestedA++;
@@ -339,6 +356,7 @@ export function computeTransitionMatrix(transitions: ProfileTransition[]): Trans
     matrix,
     top_transitions: topTransitions,
     net_interested_change: totalInterestedB - totalInterestedA,
+    incomplete_pairs: incompletePairs,
     segment_switches: segmentSwitches
   };
 }
@@ -641,7 +659,7 @@ export function computeComparisonAnalysis(
   let singleLeverDiff: SingleLeverDiffData | undefined;
 
   if (isComparison && fullTest.options.B) {
-    transitions = computeProfileTransitions(profiles, evaluationsA, evaluationsB);
+    transitions = computeProfileTransitions(profiles, evaluationsA, evaluationsB, fullTest.options.A, fullTest.options.B);
     transitionMatrix = computeTransitionMatrix(transitions);
     singleLeverDiff = computeSingleLeverDiff(fullTest);
   } else {
@@ -660,9 +678,11 @@ export function computeComparisonAnalysis(
         constraints: p.constraints,
         priorities: p.priorities,
         access_mode: p.access_mode,
-        response_a: evalA?.response || 'unavailable',
-        response_b: 'unavailable',
-        access_status_a: evalA?.access_status || 'unserved',
+        response_a: evalA?.response || 'missing',
+        response_b: 'missing',
+        evaluation_status_a: evalA ? 'complete' : 'missing',
+        evaluation_status_b: 'missing',
+        access_status_a: evalA?.access_status || ((fullTest.options.A.served_markets || []).includes(p.market) ? 'served' : 'unserved'),
         access_status_b: 'unserved',
         reason_a: evalA?.reason || 'Evaluation missing or unserved',
         reason_b: 'Single product review',
@@ -673,7 +693,7 @@ export function computeComparisonAnalysis(
         referenced_fields_b: [],
         source_ids_a: evalA?.source_ids || [],
         source_ids_b: [],
-        transition_type: evalA?.response === 'interested' ? 'remained_interested' : 'remained_hesitant'
+        transition_type: evalA ? (evalA.response === 'interested' ? 'remained_interested' : 'remained_hesitant') : 'incomplete'
       };
     });
   }

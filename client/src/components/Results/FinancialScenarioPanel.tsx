@@ -12,7 +12,8 @@ interface FinancialScenarioPanelProps {
   currency: string;
   period: string;
   nameA: string;
-  nameB: string;
+  nameB?: string;
+  hasOptionB?: boolean;
   priceA: number;
   priceB: number;
   varCostA?: number;
@@ -22,7 +23,7 @@ interface FinancialScenarioPanelProps {
   capacityA?: number;
   capacityB?: number;
   financeA: FinancialCalculationResult;
-  financeB: FinancialCalculationResult;
+  financeB?: FinancialCalculationResult;
 }
 
 export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
@@ -30,6 +31,7 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
   period,
   nameA,
   nameB,
+  hasOptionB = Boolean(nameB),
   priceA,
   priceB,
   varCostA,
@@ -47,7 +49,7 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
   const [higherUnits, setHigherUnits] = useState<number | undefined>(financeA.scenarios?.higher?.units);
 
   const hasCostsA = financeA.has_sufficient_inputs;
-  const hasCostsB = financeB.has_sufficient_inputs;
+  const hasCostsB = hasOptionB && Boolean(financeB?.has_sufficient_inputs);
 
   // Live calculation based on current user-entered scenario units
   const liveFinanceA = calculateFinancials({
@@ -67,7 +69,7 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
   const liveFinanceB = calculateFinancials({
     currency,
     period,
-    price: priceB,
+    price: hasOptionB ? priceB : priceA,
     variable_cost_per_sale: varCostB,
     fixed_launch_cost: fixedCostB,
     capacity_units: capacityB,
@@ -216,6 +218,7 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
           )}
         </div>
 
+        {hasOptionB && <>
         {/* Option B Economics */}
         <div style={{ background: 'var(--color-surface-subtle)', border: '1px solid var(--color-border-subtle)', borderRadius: 'var(--radius-md)', padding: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -272,6 +275,7 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
             </div>
           )}
         </div>
+        </>}
       </div>
 
       {/* Interactive Sales Scenario Matrix */}
@@ -323,15 +327,15 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
                 <th style={{ padding: '8px 10px', fontWeight: 600 }}>Scenario</th>
                 <th style={{ padding: '8px 10px', fontWeight: 600 }}>Units ($Q$)</th>
                 <th style={{ padding: '8px 10px', fontWeight: 600 }}>Option A Net Profit / Loss</th>
-                <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-accent)' }}>Option B Net Profit / Loss</th>
-                <th style={{ padding: '8px 10px', fontWeight: 600, textAlign: 'right' }}>Variance (B − A)</th>
+                {hasOptionB && <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-accent)' }}>Option B Net Profit / Loss</th>}
+                {hasOptionB && <th style={{ padding: '8px 10px', fontWeight: 600, textAlign: 'right' }}>Variance (B minus A)</th>}
               </tr>
             </thead>
             <tbody>
               {[
-                { label: 'Lower Volume', scA: liveFinanceA.scenarios?.lower, scB: liveFinanceB.scenarios?.lower },
-                { label: 'Central Volume', scA: liveFinanceA.scenarios?.central, scB: liveFinanceB.scenarios?.central },
-                { label: 'Higher Volume', scA: liveFinanceA.scenarios?.higher, scB: liveFinanceB.scenarios?.higher }
+                { label: 'Lower Volume', scA: liveFinanceA.scenarios?.lower, scB: hasOptionB ? liveFinanceB.scenarios?.lower : undefined },
+                { label: 'Central Volume', scA: liveFinanceA.scenarios?.central, scB: hasOptionB ? liveFinanceB.scenarios?.central : undefined },
+                { label: 'Higher Volume', scA: liveFinanceA.scenarios?.higher, scB: hasOptionB ? liveFinanceB.scenarios?.higher : undefined }
               ].map((row, idx) => {
                 const netA = row.scA?.net_result;
                 const netB = row.scB?.net_result;
@@ -356,7 +360,7 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '8px 10px' }} className="tabular-nums">
+                    {hasOptionB && <td style={{ padding: '8px 10px' }} className="tabular-nums">
                       {row.scB?.is_valid ? (
                         <span style={{ fontWeight: 600, color: (netB || 0) >= 0 ? '#166534' : '#991B1B' }}>
                           {currency} {netB}
@@ -366,14 +370,14 @@ export const FinancialScenarioPanel: React.FC<FinancialScenarioPanelProps> = ({
                           {row.scB?.validation_error || 'Invalid scenario'}
                         </span>
                       )}
-                    </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }} className="tabular-nums">
+                    </td>}
+                    {hasOptionB && <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }} className="tabular-nums">
                       {variance !== undefined ? (
                         <span style={{ color: variance >= 0 ? '#166534' : '#991B1B' }}>
                           {variance >= 0 ? `+${currency} ${variance}` : `${currency} ${variance}`}
                         </span>
                       ) : '–'}
-                    </td>
+                    </td>}
                   </tr>
                 );
               })}

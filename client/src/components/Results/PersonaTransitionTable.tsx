@@ -3,7 +3,8 @@ import {
   ProfileTransition, 
   AudienceSegment, 
   ResponseCategory, 
-  TransitionType 
+  TransitionType,
+  CompetitorReference
 } from '@droptest/shared';
 import { 
   Search, 
@@ -16,12 +17,14 @@ interface PersonaTransitionTableProps {
   transitions: ProfileTransition[];
   nameA: string;
   nameB?: string;
+  references?: CompetitorReference[];
 }
 
 export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
   transitions,
   nameA,
-  nameB
+  nameB,
+  references = []
 }) => {
   const isComparison = Boolean(nameB);
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,7 +62,7 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
     });
   }, [transitions, segmentFilter, marketFilter, transitionFilter, searchQuery, isComparison]);
 
-  const getResponseBadge = (resp: ResponseCategory) => {
+  const getResponseBadge = (resp: ResponseCategory | 'missing') => {
     switch (resp) {
       case 'interested':
         return (
@@ -85,6 +88,8 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
             Unserved
           </span>
         );
+      case 'missing':
+        return <span className="badge" style={{ background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>Missing response</span>;
     }
   };
 
@@ -105,6 +110,19 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
         return <span className="badge" style={{ background: '#F1F5F9', color: '#64748B', fontSize: '10px' }}>Remained Hesitant</span>;
     }
   };
+
+  const citationLinks = (sourceIds?: string[]) => sourceIds?.map(sourceId => {
+    const index = references.findIndex(ref => ref.id === sourceId);
+    const ref = references[index];
+    if (!ref) return null;
+    return (
+      <a key={sourceId} href={ref.url} target="_blank" rel="noreferrer"
+        onClick={event => event.stopPropagation()} className="badge"
+        style={{ background: '#EFF6FF', color: '#1D4ED8', fontSize: '9px', fontWeight: 600, textDecoration: 'none' }}>
+        REF-{index + 1}
+      </a>
+    );
+  });
 
   return (
     <div 
@@ -256,6 +274,7 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
                       </p>
                       {t.source_ids_a && t.source_ids_a.length > 0 && (
                         <div style={{ marginTop: '4px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {citationLinks(t.source_ids_a)}
                           <span className="badge" style={{ background: '#EFF6FF', color: '#1D4ED8', fontSize: '9px', fontWeight: 600 }}>
                             🔗 Compares with market reference
                           </span>
@@ -277,6 +296,11 @@ export const PersonaTransitionTable: React.FC<PersonaTransitionTableProps> = ({
                         <p style={{ color: 'var(--color-text-primary)', fontSize: '11px', lineHeight: '1.4', margin: 0 }}>
                           {t.reason_b}
                         </p>
+                        {t.source_ids_b && t.source_ids_b.length > 0 && (
+                          <div style={{ marginTop: '4px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {citationLinks(t.source_ids_b)}
+                          </div>
+                        )}
                       </td>
                     )}
 

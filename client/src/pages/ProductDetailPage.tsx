@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ProductPublicDetail, 
   ProductCategory, 
@@ -80,6 +80,30 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   // Support Proposal Modal state
   const [isSupportModalOpen, setIsSupportModalOpen] = useState<boolean>(false);
+  const supportDialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isSupportModalOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    supportDialogRef.current?.querySelector<HTMLElement>('button, input, select, textarea')?.focus();
+    const handleDialogKeys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsSupportModalOpen(false);
+      } else if (event.key === 'Tab' && supportDialogRef.current) {
+        const focusable = Array.from(supportDialogRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(element => element.getClientRects().length > 0);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', handleDialogKeys);
+    return () => {
+      document.removeEventListener('keydown', handleDialogKeys);
+      previousFocus?.focus();
+    };
+  }, [isSupportModalOpen]);
   const [supportAmount, setSupportAmount] = useState<number | ''>(500);
   const [supportCurrency, setSupportCurrency] = useState<string>('INR');
   const [supportMessage, setSupportMessage] = useState<string>('');
@@ -1161,7 +1185,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           zIndex: 1000,
           padding: '20px'
         }}>
-          <div className="workbench-card" style={{
+          <div ref={supportDialogRef} className="workbench-card" role="dialog" aria-modal="true" aria-labelledby="support-dialog-title" style={{
             maxWidth: '520px',
             width: '100%',
             background: 'var(--color-surface)',
@@ -1175,7 +1199,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                   <HandCoins size={20} color="var(--color-primary)" />
-                  <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                  <h3 id="support-dialog-title" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
                     {hasSentProposal ? 'Update Support Proposal' : 'Offer Support'}
                   </h3>
                 </div>

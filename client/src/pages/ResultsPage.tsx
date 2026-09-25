@@ -254,7 +254,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
       )}
 
       {/* 3. Interest & Coverage Breakdown Table */}
-      {isCompleted && (
+      {(
         <>
           <BreakdownTable
             summaryA={analysis.option_a_summary}
@@ -289,7 +289,8 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
         capacityA={analysis.options.A.capacity_units}
         capacityB={isComparison && analysis.options.B ? analysis.options.B.capacity_units : undefined}
         financeA={analysis.finance_analysis.option_a}
-        financeB={isComparison && analysis.finance_analysis.option_b ? analysis.finance_analysis.option_b : analysis.finance_analysis.option_a}
+        hasOptionB={isComparison}
+        financeB={isComparison ? analysis.finance_analysis.option_b : undefined}
       />
 
       {/* 5.5 Market Research & Comparable Alternatives (Stage 5) */}
@@ -309,6 +310,11 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
           <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '12px' }}>
             These live market references were frozen with this simulation run and provided as context to persona evaluations.
           </p>
+          {analysis.reference_summary && (
+            <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '11px', lineHeight: 1.5, background: '#F8FAFC', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px', marginBottom: '12px' }}>
+              {analysis.reference_summary}
+            </pre>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
             {analysis.references.map((ref, idx) => (
               <div key={ref.id} style={{ background: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', padding: '10px' }}>
@@ -344,11 +350,14 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
         transitions={analysis.transitions}
         nameA={analysis.option_a_summary.option_name}
         nameB={isComparison ? analysis.option_b_summary?.option_name : undefined}
+        references={analysis.references || []}
       />
 
       {/* 7. Real Person Feedback Section (Distinguished from Simulated 50 Personas) */}
       <RealFeedbackSection
         testId={analysis.test_id}
+        productId={analysis.product_id}
+        showLegacyFeedback={isComparison}
       />
     </div>
   );

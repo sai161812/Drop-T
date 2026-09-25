@@ -43,6 +43,11 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
         <h4 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
           Simulated Interest & Coverage Breakdown (50 AI Personas)
         </h4>
+        {(summaryA.missing_total > 0 || (summaryB?.missing_total || 0) > 0) && (
+          <p role="status" style={{ fontSize: 11, color: '#92400E', marginBottom: 8 }}>
+            Missing evaluations are shown separately from unserved personas. Coverage counts use the saved market settings; incomplete responses are excluded from the interest totals.
+          </p>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: isComparison ? 'repeat(auto-fit, minmax(240px, 1fr))' : '1fr', gap: 'var(--space-3)' }}>
           {/* Option A Rates */}
@@ -73,7 +78,7 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
             </div>
             {summaryA.unserved_count > 0 && (
               <div style={{ fontSize: '10px', color: '#991B1B', marginTop: '6px' }}>
-                {summaryA.unserved_count} profiles unserved by configured coverage
+                {summaryA.unserved_count} profiles outside configured coverage; {summaryA.missing_total} evaluations missing
               </div>
             )}
           </div>
@@ -107,7 +112,7 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
               </div>
               {summaryB.unserved_count > 0 && (
                 <div style={{ fontSize: '10px', color: '#991B1B', marginTop: '6px' }}>
-                  {summaryB.unserved_count} profiles unserved by configured coverage
+                  {summaryB.unserved_count} profiles outside configured coverage; {summaryB.missing_total} evaluations missing
                 </div>
               )}
             </div>
@@ -160,8 +165,8 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
               <tr style={{ background: 'var(--color-surface-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
                 <th style={{ padding: '8px 12px', fontWeight: 600 }}>Segment</th>
                 <th style={{ padding: '8px 12px', fontWeight: 600 }}>Total ($n$)</th>
-                <th style={{ padding: '8px 12px', fontWeight: 600, color: '#166534' }}>{isComparison ? 'Option A (Int / Unsure / Not / Unavail)' : 'Responses (Int / Unsure / Not / Unavail)'}</th>
-                {summaryB && <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--color-accent)' }}>Option B (Int / Unsure / Not / Unavail)</th>}
+                <th style={{ padding: '8px 12px', fontWeight: 600, color: '#166534' }}>{isComparison ? 'Option A (Int / Unsure / Not / Unserved / Missing)' : 'Responses (Int / Unsure / Not / Unserved / Missing)'}</th>
+                {summaryB && <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--color-accent)' }}>Option B (Int / Unsure / Not / Unserved / Missing)</th>}
                 {summaryB && <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Net Int. Change</th>}
               </tr>
             </thead>
@@ -185,14 +190,16 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
                       <span style={{ color: '#166534', fontWeight: 600 }}>{a.interested}</span> / 
                       <span style={{ color: '#92400E' }}> {a.unsure}</span> / 
                       <span style={{ color: '#991B1B' }}> {a.not_interested}</span> / 
-                      <span style={{ color: 'var(--color-text-muted)' }}> {a.unavailable}</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}> {a.unavailable}</span> /
+                      <span style={{ color: '#92400E' }}> {a.missing}</span>
                     </td>
                     {b && (
                       <td style={{ padding: '8px 12px' }} className="tabular-nums">
                         <span style={{ color: '#166534', fontWeight: 600 }}>{b.interested}</span> / 
                         <span style={{ color: '#92400E' }}> {b.unsure}</span> / 
                         <span style={{ color: '#991B1B' }}> {b.not_interested}</span> / 
-                        <span style={{ color: 'var(--color-text-muted)' }}> {b.unavailable}</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}> {b.unavailable}</span> /
+                        <span style={{ color: '#92400E' }}> {b.missing}</span>
                       </td>
                     )}
                     {b && (
@@ -224,8 +231,8 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
             </thead>
             <tbody>
               {markets.map(mkt => {
-                const a = summaryA.by_market[mkt] || { total: 0, interested: 0, unsure: 0, not_interested: 0, unavailable: 0, access_status: 'unserved' };
-                const b = summaryB?.by_market[mkt] || { total: 0, interested: 0, unsure: 0, not_interested: 0, unavailable: 0, access_status: 'unserved' };
+                const a = summaryA.by_market[mkt] || { total: 0, interested: 0, unsure: 0, not_interested: 0, unavailable: 0, missing: 0, access_status: 'unserved' as const };
+                const b = summaryB?.by_market[mkt] || { total: 0, interested: 0, unsure: 0, not_interested: 0, unavailable: 0, missing: 0, access_status: 'unserved' as const };
 
                 return (
                   <tr key={mkt} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
@@ -239,7 +246,7 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
                           {a.access_status.toUpperCase()}
                         </span>
                         <span className="tabular-nums">
-                          {a.access_status === 'served' ? `${a.interested} int / ${a.unsure} unsure / ${a.not_interested} not` : `${a.total} unserved`}
+                          {a.access_status === 'served' ? `${a.interested} int / ${a.unsure} unsure / ${a.not_interested} not / ${a.missing} missing` : `${a.total} unserved / ${a.missing} missing`}
                         </span>
                       </div>
                     </td>
@@ -250,7 +257,7 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
                             {b.access_status.toUpperCase()}
                           </span>
                           <span className="tabular-nums">
-                            {b.access_status === 'served' ? `${b.interested} int / ${b.unsure} unsure / ${b.not_interested} not` : `${b.total} unserved`}
+                          {b.access_status === 'served' ? `${b.interested} int / ${b.unsure} unsure / ${b.not_interested} not / ${b.missing} missing` : `${b.total} unserved / ${b.missing} missing`}
                           </span>
                         </div>
                       </td>

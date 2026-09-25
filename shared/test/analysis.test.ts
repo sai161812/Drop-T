@@ -316,8 +316,11 @@ describe('Phase 4: Comparison Analysis, Matrix & Decision Synthesis Tests', () =
     assert.strictEqual(analysis.test_id, 'test_123');
     assert.strictEqual(analysis.run_id, 'run_done');
     assert.strictEqual(analysis.decision_card.is_run_complete, true);
-    assert.strictEqual(analysis.decision_card.winner_declared, true);
-    assert.ok(analysis.decision_card.key_simulated_observation.includes('20/20 intended interest'));
+    // Option B gains simulated interest while also leaving more of the panel unserved.
+    // That is a conflicting signal, not enough evidence to declare a winner.
+    assert.strictEqual(analysis.decision_card.winner_declared, false);
+    assert.match(analysis.decision_card.status_headline, /Conflicting signal/);
+    assert.ok(analysis.decision_card.key_simulated_observation.includes('Option B 20/20 vs Option A 0/20'));
     
     // Check financial break-even calculation
     // Option A: Price 60, VarCost 20, Margin 40, Fixed 1000 -> Break-even = ceil(1000/40) = 25

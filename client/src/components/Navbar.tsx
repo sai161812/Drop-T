@@ -53,9 +53,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       zIndex: 100
     }}>
       {/* Brand */}
-      <div 
+      <button
+        type="button"
         className="navbar-brand" 
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+        aria-label="DROPTEST home"
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 0, padding: 0, background: 'transparent', color: 'inherit' }}
         onClick={() => onTabChange('explore')}
       >
         <span className="brand-badge" style={{ background: 'var(--color-primary)', color: '#FFF', padding: '3px 7px', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: 800 }}>
@@ -64,13 +66,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--color-text-primary)' }}>
           Launch Workbench
         </span>
-      </div>
+      </button>
 
       {/* Main Nav Tabs */}
       <nav className="nav-tabs" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <button
           type="button"
           className={`nav-tab-btn ${activeTab === 'explore' || activeTab === 'product-detail' ? 'active' : ''}`}
+          aria-current={activeTab === 'explore' || activeTab === 'product-detail' ? 'page' : undefined}
           onClick={() => onTabChange('explore')}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
         >
@@ -82,6 +85,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             className={`nav-tab-btn ${activeTab === 'saved' ? 'active' : ''}`}
+            aria-current={activeTab === 'saved' ? 'page' : undefined}
             onClick={() => onTabChange('saved')}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
           >
@@ -95,6 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               className={`nav-tab-btn ${activeTab === 'publish' ? 'active' : ''}`}
+              aria-current={activeTab === 'publish' ? 'page' : undefined}
               onClick={() => onTabChange('publish')}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
             >
@@ -105,6 +110,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               className={`nav-tab-btn ${activeTab === 'my-products' ? 'active' : ''}`}
+              aria-current={activeTab === 'my-products' ? 'page' : undefined}
               onClick={() => onTabChange('my-products')}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
             >
@@ -116,7 +122,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <button
           type="button"
-          className={`nav-tab-btn ${activeTab === 'setup' || activeTab === 'results' ? 'active' : ''}`}
+              className={`nav-tab-btn ${activeTab === 'setup' || activeTab === 'results' ? 'active' : ''}`}
+              aria-current={activeTab === 'setup' || activeTab === 'results' ? 'page' : undefined}
           onClick={() => onTabChange('setup')}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
           title="Synthetic Simulation Lab"

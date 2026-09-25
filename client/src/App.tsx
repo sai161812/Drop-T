@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { Navbar, PageTab } from './components/Navbar.js';
 import { AuthModal } from './components/Auth/AuthModal.js';
@@ -12,43 +12,81 @@ import { ResultsPage } from './pages/ResultsPage.js';
 import { PublicFeedbackPage } from './pages/PublicFeedbackPage.js';
 
 const MainApp: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<PageTab>('explore');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | undefined>(undefined);
-  const [activeTestId, setActiveTestId] = useState<string | undefined>(() => sessionStorage.getItem('droptest_active_test') || undefined);
+  const [activeTestId, setActiveTestId] = useState<string | undefined>();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [standaloneFeedbackToken, setStandaloneFeedbackToken] = useState<string | null>(null);
+  const [labRequest, setLabRequest] = useState<{ productId?: string; review: 'resume' | 'new' }>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      productId: params.get('product') || params.get('product_id') || undefined,
+      review: params.get('review') === 'new' ? 'new' : 'resume'
+    };
+  });
 
+  const priorAccountId = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (activeTestId) sessionStorage.setItem('droptest_active_test', activeTestId);
-    else sessionStorage.removeItem('droptest_active_test');
-  }, [activeTestId]);
+    if (isAuthLoading) return;
+    const nextAccountId = user?.id || null;
+    if (priorAccountId.current !== undefined && priorAccountId.current !== nextAccountId) {
+      setActiveTestId(undefined);
+      setLabRequest({ review: 'resume' });
+      const path = window.location.pathname;
+      if (path === '/lab' || path === '/results') window.history.replaceState({}, '', path);
+    }
+    priorAccountId.current = nextAccountId;
+  }, [user?.id, isAuthLoading]);
 
   // Handle URL parsing on mount / popstate
   useEffect(() => {
     const handleUrlNavigation = () => {
       const pathname = window.location.pathname;
 
+      const params = new URLSearchParams(window.location.search);
+      setStandaloneFeedbackToken(null);
       if (pathname.startsWith('/product/')) {
-        const pId = pathname.replace('/product/', '').split('/')[0];
+        const pId = decodeURIComponent(pathname.replace('/product/', '').split('/')[0]);
         if (pId) {
           setSelectedProductId(pId);
+          setEditingProductId(undefined);
           setActiveTab('product-detail');
         }
       } else if (pathname.startsWith('/feedback/')) {
-        const token = pathname.replace('/feedback/', '').split('/')[0];
+        const token = decodeURIComponent(pathname.replace('/feedback/', '').split('/')[0]);
         if (token) {
           setStandaloneFeedbackToken(token);
         }
+      } else if (pathname === '/') {
+        setSelectedProductId(null);
+        setEditingProductId(undefined);
+        setActiveTab('explore');
       } else if (pathname === '/saved') {
+        setSelectedProductId(null);
         setActiveTab('saved');
       } else if (pathname === '/publish') {
+        setEditingProductId(params.get('edit') || undefined);
         setActiveTab('publish');
       } else if (pathname === '/my-products') {
+        setEditingProductId(undefined);
         setActiveTab('my-products');
       } else if (pathname === '/lab') {
+        setLabRequest({
+          productId: params.get('product') || params.get('product_id') || undefined,
+          review: params.get('review') === 'new' ? 'new' : 'resume'
+        });
+        setActiveTestId(params.get('test') || params.get('run') || undefined);
         setActiveTab('setup');
+      } else if (pathname === '/results') {
+        setActiveTestId(params.get('test') || params.get('run') || undefined);
+        setActiveTab('results');
+      } else {
+        window.history.replaceState({}, '', '/');
+        setActiveTab('explore');
+        setSelectedProductId(null);
+        setEditingProductId(undefined);
       }
     };
 
@@ -82,7 +120,9 @@ const MainApp: React.FC = () => {
       }
       window.history.pushState({}, '', '/my-products');
     } else if (tab === 'setup') {
-      window.history.pushState({}, '', '/lab');
+      setLabRequest({ review: 'resume' });
+      const testQuery = activeTestId ? `?test=${encodeURIComponent(activeTestId)}` : '';
+      window.history.pushState({}, '', `/lab${testQuery}`);
     }
   };
 
@@ -99,9 +139,27 @@ const MainApp: React.FC = () => {
   };
 
   const handleOpenSyntheticLab = (productId: string, review: 'resume' | 'new' = 'resume') => {
+    setLabRequest({ productId, review });
     setActiveTab('setup');
     setActiveTestId(undefined);
     window.history.pushState({}, '', `/lab?product=${productId}${review === 'new' ? '&review=new' : ''}`);
+  };
+
+  const navigateToResults = () => {
+    setActiveTab('results');
+    const testQuery = activeTestId ? `?test=${encodeURIComponent(activeTestId)}` : '';
+    window.history.pushState({}, '', `/results${testQuery}`);
+  };
+
+  const handleTestIdChange = (testId?: string) => {
+    setActiveTestId(testId);
+    if (window.location.pathname === '/lab') {
+      const query = new URLSearchParams(window.location.search);
+      if (testId) query.set('test', testId);
+      else query.delete('test');
+      const queryString = query.toString();
+      window.history.replaceState({}, '', `/lab${queryString ? `?${queryString}` : ''}`);
+    }
   };
 
   // If in standalone public feedback view
@@ -112,11 +170,7 @@ const MainApp: React.FC = () => {
           <PublicFeedbackPage
             tokenOrId={standaloneFeedbackToken}
             isStandalone={true}
-            onNavigateToSetup={() => {
-              setStandaloneFeedbackToken(null);
-              window.history.pushState({}, '', '/');
-              setActiveTab('explore');
-            }}
+            onNavigateToSetup={() => navigateToTab('explore')}
           />
         </main>
       </div>
@@ -175,7 +229,7 @@ const MainApp: React.FC = () => {
           <MyProductsPage
             onOpenProduct={handleOpenProduct}
             onEditProduct={handleEditProduct}
-            onNavigateToPublish={() => { setEditingProductId(undefined); setActiveTab('publish'); }}
+            onNavigateToPublish={() => navigateToTab('publish')}
             onOpenSyntheticLab={handleOpenSyntheticLab}
           />
         )}
@@ -183,9 +237,11 @@ const MainApp: React.FC = () => {
         {/* Synthetic Lab (Launch Workbench) */}
         {activeTab === 'setup' && (
           <SetupTestPage
-            onNavigateToResults={() => setActiveTab('results')}
+            onNavigateToResults={navigateToResults}
             activeTestId={activeTestId}
-            onTestIdChange={setActiveTestId}
+            onTestIdChange={handleTestIdChange}
+            linkedProductId={labRequest.productId}
+            linkedProductReview={labRequest.review}
           />
         )}
 
@@ -193,7 +249,7 @@ const MainApp: React.FC = () => {
         {activeTab === 'results' && (
           <ResultsPage
             testId={activeTestId}
-            onNavigateToSetup={() => setActiveTab('setup')}
+            onNavigateToSetup={() => navigateToTab('setup')}
           />
         )}
       </main>

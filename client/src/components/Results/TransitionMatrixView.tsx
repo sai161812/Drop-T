@@ -42,7 +42,7 @@ export const TransitionMatrixView: React.FC<TransitionMatrixViewProps> = ({
             </h4>
           </div>
           <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-            Tracking how the identical 50 profiles shifted their evaluation from Option A ({nameA}) to Option B ({nameB})
+            Paired movement from Option A ({nameA}) to Option B ({nameB}) includes profiles with both evaluations. Missing pairs: {matrixData.incomplete_pairs}. Coverage access is tracked separately.
           </p>
         </div>
 
