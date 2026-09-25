@@ -8,6 +8,7 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<PageTab>('setup');
   const [testTitle, setTestTitle] = useState('Organic Handloom Linen Shirt');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle');
+  const [activeTestId, setActiveTestId] = useState<string | undefined>(undefined);
 
   return (
     <div className="app-container">
@@ -24,11 +25,14 @@ export const App: React.FC = () => {
             onUpdateHeaderTitle={setTestTitle}
             onNavigateToResults={() => setActiveTab('results')}
             setSaveStatus={setSaveStatus}
+            activeTestId={activeTestId}
+            onTestIdChange={setActiveTestId}
           />
         )}
 
         {activeTab === 'results' && (
           <ResultsPage
+            testId={activeTestId}
             onNavigateToSetup={() => setActiveTab('setup')}
           />
         )}

@@ -233,6 +233,7 @@ export interface Run {
   status: RunStatus;
   primary_lever: PrimaryLever;
   profile_seed: number;
+  model_id?: string;
   created_at: string;
   completed_at?: string;
   total_evaluations_expected: number; // 100
@@ -253,6 +254,19 @@ export interface Evaluation {
   factor_tags: FactorTag[];
   referenced_fields: string[];
   created_at: string;
+}
+
+export interface GroqEvaluationItem {
+  profile_id: string;
+  response: 'interested' | 'unsure' | 'not_interested';
+  reason: string;
+  primary_objection?: string | null;
+  factor_tags: FactorTag[];
+  referenced_fields: string[];
+}
+
+export interface GroqBatchEvaluationResponse {
+  evaluations: GroqEvaluationItem[];
 }
 
 export interface HumanResponse {

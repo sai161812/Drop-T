@@ -215,3 +215,19 @@ export const EvaluationRecordSchema = z.object({
   factor_tags: z.array(FactorTagSchema),
   referenced_fields: z.array(z.string().min(1).max(100))
 });
+
+// Groq structured batch item schema
+export const GroqEvaluationItemSchema = z.object({
+  profile_id: z.string().min(1),
+  response: z.enum(['interested', 'unsure', 'not_interested']),
+  reason: z.string().min(3).max(1000),
+  primary_objection: z.string().max(500).optional().nullable(),
+  factor_tags: z.array(FactorTagSchema).min(1),
+  referenced_fields: z.array(z.string().min(1)).min(1)
+});
+
+// Groq structured batch response schema
+export const GroqBatchEvaluationResponseSchema = z.object({
+  evaluations: z.array(GroqEvaluationItemSchema)
+});
+

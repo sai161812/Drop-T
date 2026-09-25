@@ -33,10 +33,8 @@
   - Audience & location configuration with character trackers, expected spend bounds, and 1–4 audience markets.
   - Option B single-lever comparison and A &rarr; B diff engine (`price`, `message`, `served_markets`, `creative`).
   - Deterministic finance scenario calculator (PRD Section 8) with break-even $\lceil F / (P - C) \rceil$ and net calculations.
-  - 35% sticky assumption sidebar and validation readiness gate.
-
 ### Phase 2: 50-Profile Builder, Deterministic Eligibility Engine & UI Review Panel
-- **Status:** `COMPLETED & VERIFIED`
+- **Status:** `COMPLETED & VERIFIED` (Local commit: `c23f012`, `ea63b72`)
 - **Key Deliverables:**
   1. **Deterministic 50-Profile Builder (`server/src/simulation/profileGenerator.ts`)**:
      - Generates exactly 50 distinct personas: **20 Intended**, **20 Adjacent**, **10 Contrasting**.
@@ -71,9 +69,33 @@
      - Inspectable 50-row persona table with Option A & Option B access badges and explicit unserved reason tooltips.
      - Expandable persona inspection card detailing use cases, purchasing constraints, priorities, and access channels.
      - Explicit panel lock disclaimer: *"When a simulation run begins, these exact 50 profiles are frozen with identical IDs and traits across both options."*
-  6. **Automated Test Suite (`server/test/profileGenerator.test.ts`)**:
-     - 14 automated tests passing across `@droptest/shared` and `@droptest/server`.
-     - Verifies 50 profile count, 20/20/10 split, stable IDs, budget independence, deterministic coverage transitions, attribute uniqueness, and domain drafts (Clothing, Food, SaaS).
+
+### Phase 3: Real Groq LLM Evaluation Engine, Access Gating & Run Recovery
+- **Status:** `COMPLETED & VERIFIED`
+- **Key Deliverables:**
+  1. **Groq Evaluator Engine (`server/src/simulation/groqEvaluator.ts`)**:
+     - Evaluates Option A and Option B independently across the frozen 50 profiles (total 100 evaluation records).
+     - **Deterministic access pre-gating**: Profiles in unserved markets are immediately recorded as `access_status: 'unserved'`, `response: 'unavailable'`, and explicit coverage reasons (e.g. `Market "Chennai Central" is outside "Option B" served markets (Bangalore Urban)`) with **zero** Groq API calls.
+     - **Batching & Concurrency**: Served profiles are grouped into batches of 5–10 profiles per API request, executed with bounded concurrency (default 2 parallel batches) via `Promise.all` chunking.
+     - **Timeouts & Exponential Retries**: 30-second `AbortSignal.timeout` per API request, exponential backoff (1s, 2s, 4s) with `retry-after` header extraction on HTTP 429 / 5xx errors.
+     - **Zod Response Validation**: `GroqBatchEvaluationResponseSchema` validates structured JSON responses; rejects/repairs invalid response enums or missing profile IDs with bounded retries; never invents missing output.
+     - **Partial Run Resumption**: Persists each batch immediately to SQLite `evaluations` table. Resuming or retrying an incomplete run evaluates strictly missing `(profile_id, option_id)` tuples without altering the frozen panel or re-evaluating completed profiles.
+  2. **Database & Repository Persistence (`server/src/db/testRepository.ts`)**:
+     - `createRun()`, `updateRun()`, `getRunById()`, `getLatestRunByTestId()` for simulation run lifecycle (`pending`, `running`, `completed`, `partial`, `failed`).
+     - `saveEvaluations()`, `getEvaluationsByRunId()`, `getMissingEvaluations()` for evaluation records.
+     - Extended SQLite `runs` table schema with `model_id`.
+  3. **Server API Routes (`server/src/routes/runRoutes.ts`)**:
+     - `GET /api/simulation/status` & `POST /api/simulation/smoke-test` — Reports Groq configuration state and executes smoke test.
+     - `POST /api/tests/:id/run` — Freezes test draft and profiles, runs 100 evaluations (Option A & B).
+     - `GET /api/tests/:id/runs/latest` & `GET /api/tests/:id/runs/:runId` — Retrieves run progress and evaluation records.
+     - `POST /api/tests/:id/runs/:runId/retry` — Resumes incomplete runs targeting only missing profiles.
+  4. **Frontend Workbench & Results UI**:
+     - **Simulation Run Controller (`client/src/pages/SetupTestPage.tsx`)**: Run simulation action with live banner indicating state (`running`, `completed (100/100)`, `partial (X/100)`, `unconfigured`, `failed`), link to Results tab, and "Retry Incomplete" button.
+     - **Results Workbench (`client/src/pages/ResultsPage.tsx`)**: Displays run metadata, model ID, response counts for Option A vs Option B, side-by-side 50-persona evaluation table with qualitative reasons, objections, factor tags, and "Retry Missing Evaluations" action.
+     - **App Navigation (`client/src/App.tsx`)**: Manages shared `activeTestId` across tabs and navigates seamlessly to Results.
+  5. **Automated Test Suite (`server/test/groqEvaluator.test.ts`)**:
+     - 18 automated tests passing across `@droptest/shared` and `@droptest/server`.
+     - Verifies schema validation, unconfigured smoke test behavior, deterministic access gating with zero model calls, and partial run tracking with clean retry resumption to 100 records.
 
 ---
 
@@ -89,8 +111,8 @@ DROP-T/
 │
 ├── shared/                    # Shared TypeScript library
 │   ├── src/
-│   │   ├── types.ts           # Domain entities, enums, interfaces
-│   │   ├── validation.ts      # Zod runtime validation schemas
+│   │   ├── types.ts           # Domain entities, enums, interfaces (TestDraft, Profile, Run, Evaluation)
+│   │   ├── validation.ts      # Zod runtime validation schemas (inc. GroqBatchEvaluationResponseSchema)
 │   │   ├── finance.ts         # Deterministic financial scenario engine
 │   │   ├── eligibility.ts     # Deterministic access status & panel stats engine
 │   │   └── index.ts           # Exports
@@ -101,20 +123,23 @@ DROP-T/
 │   ├── src/
 │   │   ├── config.ts          # Server-only env & Groq model configuration
 │   │   ├── simulation/
-│   │   │   └── profileGenerator.ts # 50-profile generator & domain traits matrix
+│   │   │   ├── profileGenerator.ts # 50-profile generator & domain traits matrix
+│   │   │   └── groqEvaluator.ts    # Groq LLM batch evaluator, access gating & retry manager
 │   │   ├── db/
 │   │   │   ├── database.ts    # SQLite DatabaseSync connection wrapper
-│   │   │   ├── migrations.ts  # DDL schema definitions & migrations
-│   │   │   └── testRepository.ts # SQL queries for test drafts, profiles & feedback
+│   │   │   ├── migrations.ts  # DDL schema definitions & migrations (tests, profiles, runs, evaluations)
+│   │   │   └── testRepository.ts # SQL queries for test drafts, profiles, runs, evaluations & feedback
 │   │   ├── routes/
 │   │   │   ├── testRoutes.ts  # Test CRUD & panel generation endpoints
+│   │   │   ├── runRoutes.ts   # Simulation run, status, smoke test & retry endpoints
 │   │   │   ├── uploadRoutes.ts# Multer file upload & delete endpoints
 │   │   │   └── feedbackRoutes.ts # Public feedback submission & stats
 │   │   ├── app.ts             # Express application setup & middleware
 │   │   └── index.ts           # Server entrypoint (Port 3001)
 │   └── test/
 │       ├── server.test.ts     # In-memory SQLite API & repository tests
-│       └── profileGenerator.test.ts # 50-profile generator & eligibility tests
+│       ├── profileGenerator.test.ts # 50-profile generator & eligibility tests
+│       └── groqEvaluator.test.ts    # Groq evaluator, access gating & recovery tests
 │
 └── client/                    # Vite + React 19 Frontend
     ├── src/
@@ -133,13 +158,13 @@ DROP-T/
     │   │       ├── ProfileReviewPanel.tsx   # 50-persona preview & eligibility review
     │   │       └── AssumptionSummary.tsx    # 35% sticky assumption sidebar
     │   ├── pages/
-    │   │   ├── SetupTestPage.tsx            # Complete interactive workbench
-    │   │   ├── ResultsPage.tsx              # Results shell & actionable empty state
+    │   │   ├── SetupTestPage.tsx            # Complete interactive workbench with Run simulation trigger
+    │   │   ├── ResultsPage.tsx              # Results workbench & 50-persona evaluation matrix
     │   │   └── PublicFeedbackPage.tsx       # Public feedback shell & empty state
     │   ├── styles/
     │   │   ├── tokens.css     # CSS custom properties (colors, typography, spacing)
     │   │   └── main.css       # Research workbench layout & utility classes
-    │   ├── App.tsx            # Top-level state & tab router
+    │   ├── App.tsx            # Top-level state, shared activeTestId & tab router
     │   └── main.tsx           # React DOM root
     ├── index.html
     └── vite.config.ts         # Vite configuration with API proxy to port 3001
@@ -153,7 +178,7 @@ DROP-T/
 # 1. Install dependencies across all workspaces
 npm install
 
-# 2. Run all unit, database, and simulation tests (14 passing)
+# 2. Run all unit, database, and simulation tests (18 passing)
 npm test
 
 # 3. Build all packages (shared, server, client)
@@ -165,19 +190,17 @@ npm run dev
 
 ---
 
-## 5. Next Steps for Phase 3 (Incoming Agent Handoff)
+## 5. Next Steps for Phase 4 (Incoming Agent Handoff)
 
-When starting Phase 3, implement the LLM Simulation Runner and Results Dashboard:
-1. **Groq LLM Evaluation Engine (`server/src/simulation/groqEvaluator.ts`)**:
-   - Evaluate Option A and Option B across the frozen 50 profiles in batches (5–10 per request).
-   - Deterministic access gate: profiles in unserved markets are immediately recorded as `unavailable` with explicit coverage reasons, skipping LLM calls.
-   - For served profiles, call Groq model using structured JSON prompt (`interested`, `unsure`, `not_interested`) with qualitative reason, primary objection, factor tags, and referenced input fields.
-   - Bounded retries on rate limits (`429`) with exponential backoff and partial run resumption.
-2. **Simulation Run Controller (`server/src/routes/runRoutes.ts`)**:
-   - `POST /api/tests/:id/run` — Freeze test & profiles, initiate simulation run, execute 100 evaluations.
-   - `GET /api/tests/:id/runs/:runId` — Poll run progress (evaluations completed / 100).
-3. **Results UI (`client/src/pages/ResultsPage.tsx`)**:
-   - Top decision card (best next test, key simulated observation, main objection, missing evidence).
-   - Paired A &rarr; B transition matrix (e.g. Unsure &rarr; Interested, Not Interested &rarr; Unsure).
-   - Segment & market breakdowns with visible denominators ($n / 20$, $n / 50$).
-   - Inspectable persona response drawer with full reasoning and objection tags.
+When starting Phase 4, implement the Deep Results & Decision Synthesis Dashboard:
+1. **Decision Summary & Synthesis Engine**:
+   - Compute top recommendation / decision card: Best next test, key simulated observation, dominant objection, missing evidence required before launch.
+   - Paired A &rarr; B transition matrix (e.g. `unsure -> interested`, `not_interested -> unsure`, `interested -> unsure`).
+   - Break-even vs simulated conversion comparison (mapping simulated demand against required units to avoid financial loss).
+2. **Detailed Breakdown Views**:
+   - Segment breakdowns (Intended 20, Adjacent 20, Contrasting 10) with exact denominators ($n / 20$, $n / 50$).
+   - Market-by-market breakdown highlighting served vs unserved access barriers.
+   - Persona drill-down drawer with full rationale, objection tags, and references to user's input fields.
+3. **Evidence Strength & Uncertainty Badges**:
+   - Distinguish high-confidence signals from sensitive/fragile assumptions.
+   - Flag unserved markets where zero demand was due to distribution/access rather than offering flaws.

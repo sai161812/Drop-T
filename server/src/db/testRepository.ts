@@ -10,7 +10,10 @@ import {
   PrimaryLever,
   HumanResponse,
   HumanChoice,
-  Profile
+  Profile,
+  Run,
+  Evaluation,
+  RunStatus
 } from '@droptest/shared';
 
 export class TestRepository {
@@ -434,5 +437,201 @@ export class TestRepository {
     const result = db.prepare('DELETE FROM profiles WHERE test_id = ?').run(testId);
     return result.changes > 0;
   }
+
+  /**
+   * Create a new simulation run
+   */
+  static createRun(testId: string, primaryLever: PrimaryLever, profileSeed: number, modelId?: string): Run {
+    const db = getDatabase();
+    const id = uuidv4();
+    const now = new Date().toISOString();
+
+    const stmt = db.prepare(`
+      INSERT INTO runs (
+        id, test_id, status, primary_lever, profile_seed, model_id,
+        created_at, total_evaluations_expected, total_evaluations_completed
+      )
+      VALUES (?, ?, 'running', ?, ?, ?, ?, 100, 0)
+    `);
+    stmt.run(id, testId, primaryLever, profileSeed, modelId || null, now);
+
+    return {
+      id,
+      test_id: testId,
+      status: 'running',
+      primary_lever: primaryLever,
+      profile_seed: profileSeed,
+      model_id: modelId,
+      created_at: now,
+      total_evaluations_expected: 100,
+      total_evaluations_completed: 0
+    };
+  }
+
+  /**
+   * Update run progress or status
+   */
+  static updateRun(
+    runId: string,
+    updates: {
+      status?: RunStatus;
+      total_evaluations_completed?: number;
+      error_message?: string | null;
+      completed_at?: string | null;
+    }
+  ): Run | null {
+    const db = getDatabase();
+    const current = this.getRunById(runId);
+    if (!current) return null;
+
+    const newStatus = updates.status !== undefined ? updates.status : current.status;
+    const newCompleted = updates.total_evaluations_completed !== undefined 
+      ? updates.total_evaluations_completed 
+      : current.total_evaluations_completed;
+    const newError = updates.error_message !== undefined ? updates.error_message : current.error_message;
+    const newCompletedAt = updates.completed_at !== undefined ? updates.completed_at : current.completed_at;
+
+    const stmt = db.prepare(`
+      UPDATE runs 
+      SET status = ?, total_evaluations_completed = ?, error_message = ?, completed_at = ?
+      WHERE id = ?
+    `);
+    stmt.run(newStatus, newCompleted, newError || null, newCompletedAt || null, runId);
+
+    return this.getRunById(runId);
+  }
+
+  /**
+   * Get run by ID
+   */
+  static getRunById(runId: string): Run | null {
+    const db = getDatabase();
+    const row = db.prepare('SELECT * FROM runs WHERE id = ?').get(runId) as any;
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      test_id: row.test_id,
+      status: row.status as RunStatus,
+      primary_lever: row.primary_lever as PrimaryLever,
+      profile_seed: row.profile_seed,
+      model_id: row.model_id || undefined,
+      created_at: row.created_at,
+      completed_at: row.completed_at || undefined,
+      total_evaluations_expected: row.total_evaluations_expected,
+      total_evaluations_completed: row.total_evaluations_completed,
+      error_message: row.error_message || undefined
+    };
+  }
+
+  /**
+   * Get latest run for a test
+   */
+  static getLatestRunByTestId(testId: string): Run | null {
+    const db = getDatabase();
+    const row = db.prepare('SELECT * FROM runs WHERE test_id = ? ORDER BY created_at DESC LIMIT 1').get(testId) as any;
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      test_id: row.test_id,
+      status: row.status as RunStatus,
+      primary_lever: row.primary_lever as PrimaryLever,
+      profile_seed: row.profile_seed,
+      model_id: row.model_id || undefined,
+      created_at: row.created_at,
+      completed_at: row.completed_at || undefined,
+      total_evaluations_expected: row.total_evaluations_expected,
+      total_evaluations_completed: row.total_evaluations_completed,
+      error_message: row.error_message || undefined
+    };
+  }
+
+  /**
+   * Save / Upsert a batch of evaluations
+   */
+  static saveEvaluations(evaluations: Evaluation[]): void {
+    if (evaluations.length === 0) return;
+    const db = getDatabase();
+
+    const insertStmt = db.prepare(`
+      INSERT OR REPLACE INTO evaluations (
+        id, run_id, test_id, profile_id, option_id, access_status,
+        response, reason, primary_objection, factor_tags, referenced_fields, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      for (const ev of evaluations) {
+        insertStmt.run(
+          ev.id || uuidv4(),
+          ev.run_id,
+          ev.test_id,
+          ev.profile_id,
+          ev.option_id,
+          ev.access_status,
+          ev.response,
+          ev.reason,
+          ev.primary_objection || null,
+          JSON.stringify(ev.factor_tags),
+          JSON.stringify(ev.referenced_fields),
+          ev.created_at
+        );
+      }
+      db.exec('COMMIT;');
+    } catch (err) {
+      db.exec('ROLLBACK;');
+      throw err;
+    }
+  }
+
+  /**
+   * Get all evaluations for a run
+   */
+  static getEvaluationsByRunId(runId: string): Evaluation[] {
+    const db = getDatabase();
+    const rows = db.prepare('SELECT * FROM evaluations WHERE run_id = ? ORDER BY profile_id ASC, option_id ASC').all(runId) as any[];
+
+    return rows.map(r => ({
+      id: r.id,
+      run_id: r.run_id,
+      test_id: r.test_id,
+      profile_id: r.profile_id,
+      option_id: r.option_id as 'A' | 'B',
+      access_status: r.access_status as 'served' | 'unserved',
+      response: r.response as any,
+      reason: r.reason,
+      primary_objection: r.primary_objection || undefined,
+      factor_tags: JSON.parse(r.factor_tags || '[]'),
+      referenced_fields: JSON.parse(r.referenced_fields || '[]'),
+      created_at: r.created_at
+    }));
+  }
+
+  /**
+   * Check which evaluations are missing for a run
+   */
+  static getMissingEvaluations(runId: string, testId: string): { option_a_missing: string[]; option_b_missing: string[] } {
+    const existing = this.getEvaluationsByRunId(runId);
+    const existingA = new Set(existing.filter(e => e.option_id === 'A').map(e => e.profile_id));
+    const existingB = new Set(existing.filter(e => e.option_id === 'B').map(e => e.profile_id));
+
+    const profiles = this.getProfiles(testId);
+    const missingA: string[] = [];
+    const missingB: string[] = [];
+
+    for (const p of profiles) {
+      if (!existingA.has(p.id)) missingA.push(p.id);
+      if (!existingB.has(p.id)) missingB.push(p.id);
+    }
+
+    return {
+      option_a_missing: missingA,
+      option_b_missing: missingB
+    };
+  }
 }
+
 

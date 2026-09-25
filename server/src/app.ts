@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { config } from './config.js';
 import { testRouter } from './routes/testRoutes.js';
+import { runRouter } from './routes/runRoutes.js';
 import { uploadRouter } from './routes/uploadRoutes.js';
 import { feedbackRouter } from './routes/feedbackRoutes.js';
 import { initDatabase } from './db/database.js';
@@ -32,7 +33,9 @@ export function createApp(): Express {
   });
 
   // API Routes
+  app.use('/api/tests', runRouter);
   app.use('/api/tests', testRouter);
+  app.use('/api/simulation', runRouter);
   app.use('/api/upload', uploadRouter);
   app.use('/api/feedback', feedbackRouter);
 

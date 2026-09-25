@@ -93,6 +93,7 @@ export function runMigrations(db: DatabaseSync): void {
       status TEXT NOT NULL DEFAULT 'pending',
       primary_lever TEXT NOT NULL,
       profile_seed INTEGER NOT NULL,
+      model_id TEXT,
       created_at TEXT NOT NULL,
       completed_at TEXT,
       total_evaluations_expected INTEGER NOT NULL DEFAULT 100,
@@ -139,4 +140,12 @@ export function runMigrations(db: DatabaseSync): void {
   `;
 
   db.exec(schema);
+
+  // Migration for existing databases: ensure model_id column exists
+  try {
+    db.exec('ALTER TABLE runs ADD COLUMN model_id TEXT;');
+  } catch (_e) {
+    // Column already exists
+  }
 }
+

@@ -22,16 +22,20 @@ interface SetupTestPageProps {
   onNavigateToResults?: () => void;
   onUpdateHeaderTitle?: (title: string) => void;
   setSaveStatus?: (status: 'saved' | 'saving' | 'error' | 'idle') => void;
+  activeTestId?: string;
+  onTestIdChange?: (id: string) => void;
 }
 
 export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   onSaveSuccess,
-  onNavigateToResults: _onNavigateToResults,
+  onNavigateToResults,
   onUpdateHeaderTitle,
-  setSaveStatus
+  setSaveStatus,
+  activeTestId,
+  onTestIdChange
 }) => {
   // Active test ID if saved
-  const [testId, setTestId] = useState<string | undefined>(undefined);
+  const [testId, setTestId] = useState<string | undefined>(activeTestId);
   const [savedDraftsList, setSavedDraftsList] = useState<Test[]>([]);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
 
@@ -95,7 +99,6 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [missingInputs, setMissingInputs] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [phase0Notice, setPhase0Notice] = useState<string | null>(null);
 
   // Fetch saved drafts list from SQLite
   const fetchDraftsList = useCallback(async () => {
@@ -265,7 +268,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     expectedSpendMin, expectedSpendMax, audienceMarkets, fixedCost, varCostA, varCostB, capacityUnits
   ]);
 
-  const handleSaveDraft = async (): Promise<boolean> => {
+  const handleSaveDraft = async (): Promise<string | null> => {
     if (setSaveStatus) setSaveStatus('saving');
     try {
       const res = await fetch('/api/tests', {
@@ -278,31 +281,122 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         const err = await res.json();
         console.error('Save error:', err);
         if (setSaveStatus) setSaveStatus('error');
-        return false;
+        return null;
       }
 
       const saved = await res.json();
-      setTestId(saved.test.id);
+      const savedId = saved.test.id;
+      setTestId(savedId);
+      if (onTestIdChange) onTestIdChange(savedId);
       if (setSaveStatus) setSaveStatus('saved');
       if (onSaveSuccess) onSaveSuccess(saved);
       fetchDraftsList();
-      return true;
+      return savedId;
     } catch (e) {
       console.error('Save network error:', e);
       if (setSaveStatus) setSaveStatus('error');
-      return false;
+      return null;
     }
   };
 
+  const [runState, setRunState] = useState<{
+    status: 'idle' | 'running' | 'completed' | 'partial' | 'failed' | 'unconfigured';
+    runId?: string;
+    completedCount?: number;
+    message?: string;
+  }>({ status: 'idle' });
+
   const handleRunSimulation = async () => {
     setIsSubmitting(true);
-    const saved = await handleSaveDraft();
-    setIsSubmitting(false);
+    setRunState({ status: 'running', message: 'Saving test configuration and initiating 50-profile evaluation...' });
 
-    if (saved) {
-      setPhase0Notice(
-        'Test configuration saved successfully to SQLite database with locked schema and 50-profile contracts. (Phase 1 intake complete; simulation runner executes in Phase 2).'
-      );
+    const savedId = await handleSaveDraft();
+    if (!savedId) {
+      setRunState({ status: 'failed', message: 'Failed to save test draft before starting simulation.' });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Now execute simulation run via backend
+    try {
+      setRunState({ status: 'running', message: 'Executing 100 evaluations across Option A and Option B...' });
+      const runRes = await fetch(`/api/tests/${savedId}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await runRes.json();
+
+      if (!runRes.ok || data.run?.status === 'failed') {
+        const errorMsg = data.run?.error_message || data.error || data.message || 'Simulation run failed';
+        const isUnconfigured = errorMsg.includes('GROQ_API_KEY') || errorMsg.includes('not configured');
+        setRunState({
+          status: isUnconfigured ? 'unconfigured' : 'failed',
+          runId: data.run?.id,
+          completedCount: data.evaluations?.length || 0,
+          message: errorMsg
+        });
+      } else if (data.run?.status === 'partial') {
+        setRunState({
+          status: 'partial',
+          runId: data.run.id,
+          completedCount: data.evaluations?.length || 0,
+          message: data.run.error_message || `Incomplete run: ${data.evaluations?.length || 0} / 100 evaluations recorded.`
+        });
+      } else {
+        setRunState({
+          status: 'completed',
+          runId: data.run?.id,
+          completedCount: data.evaluations?.length || 100,
+          message: '100 / 100 paired evaluations complete! Results ready for analysis.'
+        });
+      }
+    } catch (runErr: any) {
+      console.error('Run execution error:', runErr);
+      setRunState({
+        status: 'failed',
+        message: `Simulation execution error: ${runErr.message}`
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRetryIncompleteRun = async (runId: string) => {
+    if (!testId) return;
+    setIsSubmitting(true);
+    setRunState({ status: 'running', message: 'Retrying missing/incomplete evaluations without altering panel...' });
+
+    try {
+      const res = await fetch(`/api/tests/${testId}/runs/${runId}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+
+      if (data.run?.status === 'completed') {
+        setRunState({
+          status: 'completed',
+          runId: data.run.id,
+          completedCount: data.evaluations?.length || 100,
+          message: 'All 100 evaluations successfully completed!'
+        });
+      } else {
+        setRunState({
+          status: data.run?.status || 'partial',
+          runId: data.run?.id || runId,
+          completedCount: data.evaluations?.length || 0,
+          message: data.run?.error_message || `Partial progress: ${data.evaluations?.length || 0} / 100 recorded.`
+        });
+      }
+    } catch (err: any) {
+      setRunState({
+        status: 'failed',
+        runId,
+        message: `Retry error: ${err.message}`
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -425,17 +519,96 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           </div>
         </div>
 
-        {phase0Notice && (
-          <div style={{ background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', color: '#166534', fontSize: 'var(--font-size-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{phase0Notice}</span>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: '12px', padding: '4px 8px' }}
-              onClick={() => setPhase0Notice(null)}
-            >
-              Dismiss
-            </button>
+        {/* Simulation Execution State Banner */}
+        {runState.status !== 'idle' && (
+          <div style={{
+            background: runState.status === 'completed' 
+              ? 'var(--color-success-bg)' 
+              : runState.status === 'partial' || runState.status === 'unconfigured' 
+                ? 'var(--color-warning-bg)' 
+                : runState.status === 'running'
+                  ? 'var(--color-intended-bg)'
+                  : 'var(--color-danger-bg)',
+            border: `1px solid ${
+              runState.status === 'completed' 
+                ? '#86EFAC' 
+                : runState.status === 'partial' || runState.status === 'unconfigured' 
+                  ? '#FDE68A' 
+                  : runState.status === 'running'
+                    ? '#BAE6FD'
+                    : '#FCA5A5'
+            }`,
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-4)',
+            color: runState.status === 'completed'
+              ? 'var(--color-success)'
+              : runState.status === 'partial' || runState.status === 'unconfigured'
+                ? '#92400E'
+                : runState.status === 'running'
+                  ? 'var(--color-intended)'
+                  : 'var(--color-danger)',
+            fontSize: 'var(--font-size-sm)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontWeight: 600 }}>
+                {runState.status === 'running' && '⏳ Running Simulation:'}
+                {runState.status === 'completed' && '✓ Simulation Complete:'}
+                {runState.status === 'partial' && '⚠️ Incomplete Run:'}
+                {runState.status === 'unconfigured' && '⚙️ Configuration Required:'}
+                {runState.status === 'failed' && '✕ Run Error:'}
+              </span>
+              <span>{runState.message}</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {runState.status === 'completed' && onNavigateToResults && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ fontSize: '12px', padding: '4px 10px' }}
+                  onClick={onNavigateToResults}
+                >
+                  View Comparative Results &rarr;
+                </button>
+              )}
+
+              {runState.status === 'partial' && runState.runId && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ fontSize: '12px', padding: '4px 10px' }}
+                  onClick={() => handleRetryIncompleteRun(runState.runId!)}
+                  disabled={isSubmitting}
+                >
+                  Retry Incomplete Evaluations
+                </button>
+              )}
+
+              {runState.status === 'partial' && onNavigateToResults && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
+                  onClick={onNavigateToResults}
+                >
+                  View Partial Results
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => setRunState({ status: 'idle' })}
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
