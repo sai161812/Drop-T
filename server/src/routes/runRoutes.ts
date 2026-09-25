@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { computeComparisonAnalysis } from '@droptest/shared';
 import { GroqEvaluator } from '../simulation/groqEvaluator.js';
 import { TestRepository } from '../db/testRepository.js';
 import { generatePanelProfiles } from '../simulation/profileGenerator.js';
@@ -90,6 +91,57 @@ runRouter.get('/:id/runs/:runId', (req: Request, res: Response) => {
     res.json({ run, evaluations });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to retrieve run', message: error.message });
+  }
+});
+
+// GET /api/tests/:id/runs/:runId/analysis - Get full comparison analysis for a specific run
+runRouter.get('/:id/runs/:runId/analysis', (req: Request, res: Response) => {
+  try {
+    const testId = String(req.params.id);
+    const runId = String(req.params.runId);
+
+    const fullTest = TestRepository.getById(testId);
+    if (!fullTest) {
+      return res.status(404).json({ error: 'Test not found' });
+    }
+
+    const run = TestRepository.getRunById(runId);
+    if (!run) {
+      return res.status(404).json({ error: 'Run not found' });
+    }
+
+    const profiles = TestRepository.getProfiles(testId);
+    const evaluations = TestRepository.getEvaluationsByRunId(runId);
+
+    const analysis = computeComparisonAnalysis(fullTest, run, profiles, evaluations);
+    res.json(analysis);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to compute comparison analysis', message: error.message });
+  }
+});
+
+// GET /api/tests/:id/analysis - Get full comparison analysis for the latest run
+runRouter.get('/:id/analysis', (req: Request, res: Response) => {
+  try {
+    const testId = String(req.params.id);
+
+    const fullTest = TestRepository.getById(testId);
+    if (!fullTest) {
+      return res.status(404).json({ error: 'Test not found' });
+    }
+
+    const run = TestRepository.getLatestRunByTestId(testId);
+    if (!run) {
+      return res.json({ analysis: null, message: 'No runs recorded for this test' });
+    }
+
+    const profiles = TestRepository.getProfiles(testId);
+    const evaluations = TestRepository.getEvaluationsByRunId(run.id);
+
+    const analysis = computeComparisonAnalysis(fullTest, run, profiles, evaluations);
+    res.json(analysis);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to compute comparison analysis', message: error.message });
   }
 });
 

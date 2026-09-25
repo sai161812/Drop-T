@@ -370,3 +370,159 @@ export interface FullTestResponse {
   audience_config: AudienceConfig;
   comparison_lever: PrimaryLever;
 }
+
+// Phase 4: Comparison Result & Analysis Contracts
+export interface SegmentResultBreakdown {
+  interested: number;
+  unsure: number;
+  not_interested: number;
+  unavailable: number;
+  total: number;
+  eligible: number;
+}
+
+export interface MarketResultBreakdown {
+  market: string;
+  interested: number;
+  unsure: number;
+  not_interested: number;
+  unavailable: number;
+  total: number;
+  eligible: number;
+  access_status: AccessStatus;
+}
+
+export interface ObjectionSummaryItem {
+  tag: FactorTag | string;
+  count: number;
+  sample_objections: string[];
+}
+
+export interface OptionResultSummary {
+  option_id: OptionId;
+  option_name: string;
+  total_profiles: number; // always 50
+  eligible_count: number;
+  unserved_count: number;
+  interested_total: number; // interested / 50
+  interested_eligible: number; // interested / eligible
+  unsure_total: number;
+  not_interested_total: number;
+  unavailable_total: number;
+  by_segment: Record<AudienceSegment, SegmentResultBreakdown>;
+  by_market: Record<string, MarketResultBreakdown>;
+  dominant_objections: ObjectionSummaryItem[];
+}
+
+export type TransitionType = 
+  | 'became_interested'
+  | 'lost_interest'
+  | 'remained_interested'
+  | 'remained_hesitant'
+  | 'remained_unavailable'
+  | 'access_opened'
+  | 'access_closed';
+
+export interface ProfileTransition {
+  profile_id: string;
+  segment: AudienceSegment;
+  market: string;
+  budget_min: number;
+  budget_max: number;
+  use_case: string;
+  constraints: string[];
+  priorities: string[];
+  access_mode: string;
+  response_a: ResponseCategory;
+  response_b: ResponseCategory;
+  access_status_a: AccessStatus;
+  access_status_b: AccessStatus;
+  reason_a: string;
+  reason_b: string;
+  primary_objection_a?: string;
+  primary_objection_b?: string;
+  factor_tags_a: FactorTag[];
+  factor_tags_b: FactorTag[];
+  referenced_fields_a: string[];
+  referenced_fields_b: string[];
+  transition_type: TransitionType;
+}
+
+export interface TransitionMatrix {
+  matrix: Record<ResponseCategory, Record<ResponseCategory, number>>;
+  top_transitions: Array<{ from: ResponseCategory; to: ResponseCategory; count: number }>;
+  net_interested_change: number; // interested_B - interested_A
+  segment_switches: Record<AudienceSegment, {
+    gained_interested: number;
+    lost_interested: number;
+    net: number;
+  }>;
+}
+
+export interface EligibilityChangeSummary {
+  market: string;
+  status_a: AccessStatus;
+  status_b: AccessStatus;
+  profile_count: number;
+  profiles_affected: string[];
+  change_type: 'became_eligible' | 'became_ineligible' | 'unchanged';
+  coverage_note: string;
+}
+
+export interface DecisionCardData {
+  is_run_complete: boolean;
+  total_completed: number;
+  total_expected: number; // 100
+  winner_declared: boolean; // false if conflicted or incomplete
+  status_headline: string;
+  recommended_next_test: string;
+  key_simulated_observation: string;
+  leading_objection: string;
+  location_access_caveat: string;
+  missing_evidence: string;
+  finance_comparison?: {
+    has_finance: boolean;
+    break_even_a?: number | null;
+    break_even_b?: number | null;
+    break_even_status_a?: string;
+    break_even_status_b?: string;
+    note: string;
+  };
+}
+
+export interface SingleLeverDiffData {
+  lever: PrimaryLever;
+  field_diffs: Array<{
+    field: string;
+    label: string;
+    val_a: string | number | string[];
+    val_b: string | number | string[];
+  }>;
+  cost_diff?: {
+    var_cost_a?: number;
+    var_cost_b?: number;
+    fixed_cost_a?: number;
+    fixed_cost_b?: number;
+    has_cost_variance: boolean;
+  };
+}
+
+export interface ComparisonAnalysis {
+  test_id: string;
+  run_id: string;
+  run_status: RunStatus;
+  primary_lever: PrimaryLever;
+  model_id?: string;
+  option_a_summary: OptionResultSummary;
+  option_b_summary: OptionResultSummary;
+  eligibility_changes: EligibilityChangeSummary[];
+  transitions: ProfileTransition[];
+  transition_matrix: TransitionMatrix;
+  decision_card: DecisionCardData;
+  single_lever_diff: SingleLeverDiffData;
+  finance_analysis: {
+    option_a: FinancialCalculationResult;
+    option_b: FinancialCalculationResult;
+  };
+}
+

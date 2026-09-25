@@ -98,6 +98,31 @@
      - Verifies schema validation, unconfigured smoke test behavior, deterministic access gating with zero model calls, and partial run tracking with clean retry resumption to 100 records.
      - Live Groq API key configured in server environment (`.env`) and verified working with `openai/gpt-oss-120b` via official `groq-sdk`.
 
+### Phase 4: Comparison Analysis, Transition Matrix & Decision Synthesis Layer
+- **Status:** `COMPLETED & VERIFIED`
+- **Key Deliverables:**
+  1. **Deterministic Comparison Engine (`shared/src/analysis.ts`)**:
+     - `computeOptionSummary(optionId, option, profiles, evaluations)`: Computes `interested / 50 total profiles` and `interested / eligible profiles` with visible denominators, per-segment breakdowns (Intended 20 / Adjacent 20 / Contrasting 10), per-market breakdowns (1–4 audience markets), and dominant objection clusters.
+     - `computeEligibilityChanges(profiles, optionA, optionB)`: Computes exact market access shifts (`became_eligible`, `became_ineligible`, `unchanged`) when Option B modifies served markets, tracking affected persona counts and IDs.
+     - `computeProfileTransitions(profiles, evaluationsA, evaluationsB)`: Pairs 50 persona responses across Option A and Option B with transition classifications (`became_interested`, `lost_interest`, `remained_interested`, `remained_hesitant`, `access_opened`, `access_closed`, `remained_unavailable`).
+     - `computeTransitionMatrix(transitions)`: Computes 4x4 response shift matrix and segment-by-segment net interested changes.
+     - `computeSingleLeverDiff(fullTest)`: Computes exact single-lever diff (`price`, `message`, `served_markets`, `creative`) and discloses linked unit cost variance.
+     - `generateDecisionCard(fullTest, run, summaryA, summaryB, matrix, eligibilityChanges)`: Synthesizes top decision card with actionable next test, supporting simulated observation with explicit numerators/denominators ($n/20$, $n/50$), leading objection quote and count, location/access caveat, missing evidence requirement, and truthful break-even financial comparison (or missing-input notice). Refuses to pick a winner on incomplete runs or conflicted signals.
+     - `computeComparisonAnalysis(...)`: Master analysis assembler.
+  2. **Server API Routes (`server/src/routes/runRoutes.ts`)**:
+     - `GET /api/tests/:id/analysis` — Retrieves comparison analysis for latest run.
+     - `GET /api/tests/:id/runs/:runId/analysis` — Retrieves comparison analysis for a specific run.
+  3. **Results Workbench UI Components (`client/src/components/Results/...`)**:
+     - `DecisionCard.tsx`: Compact decision card with next test recommendation, observation with denominators, leading friction, location caveats, and break-even check.
+     - `SingleLeverDiffBanner.tsx`: Exact A &rarr; B diff on tested single lever and unit cost variance disclosures.
+     - `BreakdownTable.tsx`: Tabular rates with visible denominators ($n/50$, $n/\text{eligible}$), segment tabs (20/20/10), market tabs, and eligibility transition notes.
+     - `TransitionMatrixView.tsx`: 4x4 visual transition grid, net interest shift badge, and segment movement bars.
+     - `PersonaTransitionTable.tsx`: 50-persona response rows with keyword search, multi-axis filtering (segment, market, transition type), and expandable drill-down drawer for persona traits and referenced facts.
+     - `RealFeedbackSection.tsx`: Truthful placeholder section keeping real-person feedback separated from simulated data until Phase 6.
+  4. **Automated Test Suites (`shared/test/analysis.test.ts` & `server/test/analysisRoutes.test.ts`)**:
+     - **24 automated tests passing** across `@droptest/shared` and `@droptest/server`.
+     - Verifies rate denominators, market eligibility transitions, transition matrix math, incomplete run protection, break-even scenario math, and server repository integration.
+
 ---
 
 ## 3. Directory Map & Component Structure
@@ -112,13 +137,15 @@ DROP-T/
 │
 ├── shared/                    # Shared TypeScript library
 │   ├── src/
-│   │   ├── types.ts           # Domain entities, enums, interfaces (TestDraft, Profile, Run, Evaluation)
-│   │   ├── validation.ts      # Zod runtime validation schemas (inc. GroqBatchEvaluationResponseSchema)
+│   │   ├── types.ts           # Domain entities, enums, interfaces (inc. ComparisonAnalysis)
+│   │   ├── validation.ts      # Zod runtime validation schemas
 │   │   ├── finance.ts         # Deterministic financial scenario engine
 │   │   ├── eligibility.ts     # Deterministic access status & panel stats engine
+│   │   ├── analysis.ts        # Phase 4 comparison metrics & decision card synthesis
 │   │   └── index.ts           # Exports
 │   └── test/
-│       └── shared.test.ts     # Unit tests for contracts, splits, math, and eligibility
+│       ├── shared.test.ts     # Unit tests for contracts, splits, math, and eligibility
+│       └── analysis.test.ts   # Unit tests for comparison analysis, transitions & decision card
 │
 ├── server/                    # Express + SQLite Backend
 │   ├── src/
@@ -132,7 +159,7 @@ DROP-T/
 │   │   │   └── testRepository.ts # SQL queries for test drafts, profiles, runs, evaluations & feedback
 │   │   ├── routes/
 │   │   │   ├── testRoutes.ts  # Test CRUD & panel generation endpoints
-│   │   │   ├── runRoutes.ts   # Simulation run, status, smoke test & retry endpoints
+│   │   │   ├── runRoutes.ts   # Simulation run, status, smoke test, analysis & retry endpoints
 │   │   │   ├── uploadRoutes.ts# Multer file upload & delete endpoints
 │   │   │   └── feedbackRoutes.ts # Public feedback submission & stats
 │   │   ├── app.ts             # Express application setup & middleware
@@ -140,7 +167,8 @@ DROP-T/
 │   └── test/
 │       ├── server.test.ts     # In-memory SQLite API & repository tests
 │       ├── profileGenerator.test.ts # 50-profile generator & eligibility tests
-│       └── groqEvaluator.test.ts    # Groq evaluator, access gating & recovery tests
+│       ├── groqEvaluator.test.ts    # Groq evaluator, access gating & recovery tests
+│       └── analysisRoutes.test.ts   # Comparison analysis & decision synthesis tests
 │
 └── client/                    # Vite + React 19 Frontend
     ├── src/
@@ -150,17 +178,24 @@ DROP-T/
     │   │   ├── Navbar.tsx     # Workbench header with tab navigation & save state
     │   │   ├── Common/
     │   │   │   └── EmptyState.tsx # Actionable empty state component
-    │   │   └── SetupTest/
-    │   │       ├── DomainSelector.tsx       # 3 domain template selectors
-    │   │       ├── AudienceLocationForm.tsx # 1-4 markets, 20/20 audience, budget
-    │   │       ├── OfferingForm.tsx         # Baseline A & domain-specific fields
-    │   │       ├── AlternativeBForm.tsx     # Option B diff & comparison lever
-    │   │       ├── FinancialsForm.tsx       # Fixed/variable costs & scenarios
-    │   │       ├── ProfileReviewPanel.tsx   # 50-persona preview & eligibility review
-    │   │       └── AssumptionSummary.tsx    # 35% sticky assumption sidebar
+    │   │   ├── SetupTest/
+    │   │   │   ├── DomainSelector.tsx       # 3 domain template selectors
+    │   │   │   ├── AudienceLocationForm.tsx # 1-4 markets, 20/20 audience, budget
+    │   │   │   ├── OfferingForm.tsx         # Baseline A & domain-specific fields
+    │   │   │   ├── AlternativeBForm.tsx     # Option B diff & comparison lever
+    │   │   │   ├── FinancialsForm.tsx       # Fixed/variable costs & scenarios
+    │   │   │   ├── ProfileReviewPanel.tsx   # 50-persona preview & eligibility review
+    │   │   │   └── AssumptionSummary.tsx    # 35% sticky assumption sidebar
+    │   │   └── Results/
+    │   │       ├── DecisionCard.tsx         # Top decision card with next test & observation
+    │   │       ├── SingleLeverDiffBanner.tsx# Single lever A -> B diff banner
+    │   │       ├── BreakdownTable.tsx       # Denominators, segment & market breakdowns
+    │   │       ├── TransitionMatrixView.tsx # 4x4 transition matrix & net shifts
+    │   │       ├── PersonaTransitionTable.tsx # 50-persona inspectable response rows
+    │   │       └── RealFeedbackSection.tsx  # Truthful placeholder for real responses
     │   ├── pages/
     │   │   ├── SetupTestPage.tsx            # Complete interactive workbench with Run simulation trigger
-    │   │   ├── ResultsPage.tsx              # Results workbench & 50-persona evaluation matrix
+    │   │   ├── ResultsPage.tsx              # Results workbench & synthesis dashboard
     │   │   └── PublicFeedbackPage.tsx       # Public feedback shell & empty state
     │   ├── styles/
     │   │   ├── tokens.css     # CSS custom properties (colors, typography, spacing)
@@ -179,7 +214,7 @@ DROP-T/
 # 1. Install dependencies across all workspaces
 npm install
 
-# 2. Run all unit, database, and simulation tests (18 passing)
+# 2. Run all unit, database, and simulation tests (24 passing)
 npm test
 
 # 3. Build all packages (shared, server, client)
@@ -191,17 +226,15 @@ npm run dev
 
 ---
 
-## 5. Next Steps for Phase 4 (Incoming Agent Handoff)
+## 5. Next Steps for Phase 5 / Phase 6 (Incoming Agent Handoff)
 
-When starting Phase 4, implement the Deep Results & Decision Synthesis Dashboard:
-1. **Decision Summary & Synthesis Engine**:
-   - Compute top recommendation / decision card: Best next test, key simulated observation, dominant objection, missing evidence required before launch.
-   - Paired A &rarr; B transition matrix (e.g. `unsure -> interested`, `not_interested -> unsure`, `interested -> unsure`).
-   - Break-even vs simulated conversion comparison (mapping simulated demand against required units to avoid financial loss).
-2. **Detailed Breakdown Views**:
-   - Segment breakdowns (Intended 20, Adjacent 20, Contrasting 10) with exact denominators ($n / 20$, $n / 50$).
-   - Market-by-market breakdown highlighting served vs unserved access barriers.
-   - Persona drill-down drawer with full rationale, objection tags, and references to user's input fields.
-3. **Evidence Strength & Uncertainty Badges**:
-   - Distinguish high-confidence signals from sensitive/fragile assumptions.
-   - Flag unserved markets where zero demand was due to distribution/access rather than offering flaws.
+When starting Phase 5 & 6, implement the Public Shareable Feedback Page and Real Respondent Collection:
+1. **Unguessable Shareable Feedback Link**:
+   - `GET /feedback/:token` public route serving clean, unguided voting view between Option A and Option B.
+   - Shows actual uploaded creative, pricing, primary message, and fulfillment details.
+   - Collects choice: Option A, Option B, Neither, or Unsure with optional text reason.
+2. **Duplicate Prevention & Anonymous Storage**:
+   - Store responses in SQLite `human_responses` table with token hashing, IP rate limiting, and timestamping.
+   - Strict separation of real responses from simulated 50-persona data.
+3. **Live Real Feedback Aggregation**:
+   - Real-time updates on Results workbench under `RealFeedbackSection.tsx` with its own explicit denominator ($n / \text{respondents}$).
