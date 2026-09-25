@@ -359,7 +359,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                 id="product-name"
                 type="text"
                 className="form-input"
-                placeholder="e.g. Organic Flax Linen Minimalist T-Shirt"
+                placeholder="e.g. Organic Linen Shirt"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
@@ -404,7 +404,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                 id="product-summary"
                 className="form-textarea"
                 rows={3}
-                placeholder="Describe your product clearly. E.g. Breathable, hypoallergenic 100% natural organic flax linen shirt designed for casual everyday wear in warm climates."
+                placeholder="What it is, key features, and core benefit..."
                 value={summary}
                 onChange={e => setSummary(e.target.value)}
                 required
@@ -417,7 +417,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                 id="product-intended-buyer"
                 type="text"
                 className="form-input"
-                placeholder="e.g. Young eco-conscious working professionals (25-35) looking for sustainable minimalist apparel"
+                placeholder="e.g. Eco-conscious professionals (25–35)"
                 value={intendedBuyer}
                 onChange={e => setIntendedBuyer(e.target.value)}
                 required
@@ -430,7 +430,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                 id="product-feedback-question"
                 type="text"
                 className="form-input"
-                placeholder="e.g. Would you pay ₹699 for an unbleached organic flax shirt with lifetime seam repairs?"
+                placeholder="e.g. Would you buy this at ₹699?"
                 value={feedbackQuestion}
                 onChange={e => setFeedbackQuestion(e.target.value)}
                 required
@@ -515,7 +515,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                   id="product-markets"
                   type="text"
                   className="form-input"
-                  placeholder="e.g. Koramangala, Indiranagar, Whitefield (comma-separated)"
+                  placeholder="e.g. Bengaluru, Mumbai, Delhi NCR"
                   value={marketInput}
                   onChange={e => setMarketInput(e.target.value)}
                 />
@@ -539,7 +539,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                   id="product-fulfillment"
                   type="text"
                   className="form-input"
-                  placeholder="e.g. Standard postal shipping with recycled kraft packaging"
+                  placeholder="e.g. Standard courier shipping"
                   value={fulfillmentMode}
                   onChange={e => setFulfillmentMode(e.target.value)}
                 />
@@ -563,7 +563,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                       id="product-clothing-material"
                       type="text"
                       className="form-input"
-                      placeholder="e.g. 100% Organic Flax Linen"
+                      placeholder="e.g. 100% Organic Linen"
                       value={clothingMaterial}
                       onChange={e => setClothingMaterial(e.target.value)}
                     />
@@ -574,7 +574,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                       id="product-clothing-fit"
                       type="text"
                       className="form-input"
-                      placeholder="e.g. Relaxed Regular Fit"
+                      placeholder="e.g. Relaxed fit"
                       value={clothingFit}
                       onChange={e => setClothingFit(e.target.value)}
                     />
@@ -603,7 +603,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                       id="product-food-portion"
                       type="text"
                       className="form-input"
-                      placeholder="e.g. 750g baked loaf"
+                      placeholder="e.g. 750g loaf"
                       value={foodPortion}
                       onChange={e => setFoodPortion(e.target.value)}
                     />
@@ -614,7 +614,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                       id="product-food-mode"
                       type="text"
                       className="form-input"
-                      placeholder="e.g. Morning home delivery within 5 km"
+                      placeholder="e.g. Morning delivery / pickup"
                       value={foodMode}
                       onChange={e => setFoodMode(e.target.value)}
                     />
@@ -626,7 +626,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                     id="product-food-ingredients"
                     type="text"
                     className="form-input"
-                    placeholder="e.g. Stoneground wheat flour, water, sea salt, wild starter. Contains gluten."
+                    placeholder="e.g. Wheat flour, sea salt, sourdough starter. Contains gluten."
                     value={foodIngredients}
                     onChange={e => setFoodIngredients(e.target.value)}
                   />
@@ -643,7 +643,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                       id="product-digital-platform"
                       type="text"
                       className="form-input"
-                      placeholder="e.g. Web Cloud SaaS"
+                      placeholder="e.g. Web SaaS / Mobile"
                       value={digitalPlatform}
                       onChange={e => setDigitalPlatform(e.target.value)}
                     />
@@ -654,7 +654,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                       id="product-digital-language"
                       type="text"
                       className="form-input"
-                      placeholder="e.g. TypeScript / React"
+                      placeholder="e.g. TypeScript / Python"
                       value={digitalLanguage}
                       onChange={e => setDigitalLanguage(e.target.value)}
                     />
@@ -665,7 +665,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                       id="product-digital-use-case"
                       type="text"
                       className="form-input"
-                      placeholder="e.g. Launch decision workbench"
+                      placeholder="e.g. Product validation workspace"
                       value={digitalUseCase}
                       onChange={e => setDigitalUseCase(e.target.value)}
                     />
@@ -690,7 +690,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                   id="product-other-specs"
                   className="form-textarea"
                   rows={2}
-                  placeholder="Enter specific dimensions, features, or materials"
+                  placeholder="Key dimensions, features, or materials..."
                   value={otherSpecs}
                   onChange={e => setOtherSpecs(e.target.value)}
                 />
@@ -705,7 +705,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
               id="visual-description"
               className="form-textarea"
               rows={2}
-              placeholder="Describe what someone would see or how the product works. This is founder-supplied, not image analysis."
+              placeholder="Visual appearance and key design details..."
               value={visualDescription}
               onChange={e => setVisualDescription(e.target.value)}
             />
@@ -749,7 +749,7 @@ export const PublishProductPage: React.FC<PublishProductPageProps> = ({
                         type="text"
                         className="form-input"
                         style={{ fontSize: '11px', padding: '4px 6px', marginBottom: '6px' }}
-                        placeholder="Confirmed visual description"
+                        placeholder="Image description..."
                         value={img.confirmed_visual_description || ''}
                         onChange={e => handleUpdateImageDescription(idx, e.target.value)}
                       />
