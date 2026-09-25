@@ -93,9 +93,10 @@
      - **Simulation Run Controller (`client/src/pages/SetupTestPage.tsx`)**: Run simulation action with live banner indicating state (`running`, `completed (100/100)`, `partial (X/100)`, `unconfigured`, `failed`), link to Results tab, and "Retry Incomplete" button.
      - **Results Workbench (`client/src/pages/ResultsPage.tsx`)**: Displays run metadata, model ID, response counts for Option A vs Option B, side-by-side 50-persona evaluation table with qualitative reasons, objections, factor tags, and "Retry Missing Evaluations" action.
      - **App Navigation (`client/src/App.tsx`)**: Manages shared `activeTestId` across tabs and navigates seamlessly to Results.
-  5. **Automated Test Suite (`server/test/groqEvaluator.test.ts`)**:
+  5. **Automated Test Suite & Live Smoke Test Verification (`server/test/groqEvaluator.test.ts`)**:
      - 18 automated tests passing across `@droptest/shared` and `@droptest/server`.
      - Verifies schema validation, unconfigured smoke test behavior, deterministic access gating with zero model calls, and partial run tracking with clean retry resumption to 100 records.
+     - Live Groq API key configured in server environment (`.env`) and verified working with `openai/gpt-oss-120b` via official `groq-sdk`.
 
 ---
 
