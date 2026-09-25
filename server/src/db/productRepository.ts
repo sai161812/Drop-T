@@ -275,9 +275,9 @@ export class ProductRepository {
   }
 
   /**
-   * List published products in newest-first order with optional category & search filter
+   * List published products newest-first, collapsing exact duplicate product submissions.
    */
-  static listPublished(category?: string, query?: string, viewerId?: string): ProductPublicSummary[] {
+  static listPublished(category?: string, query?: string, viewerId?: string, limit?: number): ProductPublicSummary[] {
     const db = getDatabase();
     let sql = `
       SELECT p.*, u.display_name as owner_name, u.startup_name,
@@ -290,6 +290,15 @@ export class ProductRepository {
       FROM products p
       JOIN users u ON p.owner_id = u.id
       WHERE p.status = 'published'
+        AND p.id = (
+          SELECT duplicate.id
+          FROM products duplicate
+          WHERE duplicate.status = 'published'
+            AND lower(trim(duplicate.name)) = lower(trim(p.name))
+            AND lower(trim(duplicate.summary)) = lower(trim(p.summary))
+          ORDER BY duplicate.created_at DESC, duplicate.id DESC
+          LIMIT 1
+        )
     `;
     const params: any[] = [viewerId || null, viewerId || null];
 
@@ -305,6 +314,10 @@ export class ProductRepository {
     }
 
     sql += ` ORDER BY p.created_at DESC`;
+    if (limit !== undefined) {
+      sql += ` LIMIT ?`;
+      params.push(limit);
+    }
 
     const rows = db.prepare(sql).all(...params) as any[];
 

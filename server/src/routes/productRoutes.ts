@@ -21,9 +21,14 @@ productRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
   try {
     const category = req.query.category ? String(req.query.category) : undefined;
     const query = req.query.q ? String(req.query.q) : undefined;
+    const requestedLimit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+
+    if (requestedLimit !== undefined && (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 50)) {
+      return res.status(400).json({ error: 'limit must be an integer between 1 and 50' });
+    }
 
     if (req.user) res.setHeader('Cache-Control', 'private, no-store');
-    const products = ProductRepository.listPublished(category, query, req.user?.id);
+    const products = ProductRepository.listPublished(category, query, req.user?.id, requestedLimit);
     res.json({ products });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to load product feed', message: err.message });

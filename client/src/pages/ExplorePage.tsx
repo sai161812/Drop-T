@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 
+const EXPLORE_PRODUCT_LIMIT = 16;
+
 interface ExplorePageProps {
   onOpenProduct: (productId: string) => void;
   onNavigateToPublish: () => void;
@@ -23,6 +25,22 @@ const CATEGORY_FALLBACK_IMAGES: Record<ProductCategory, string> = {
   local_food_beverages: '/images/products/category-food-beverage.png',
   digital_products_services: '/images/products/category-digital-services.png',
   other: '/images/products/category-other-products.png'
+};
+
+const PRODUCT_FALLBACK_IMAGES: Record<string, string> = {
+  'cloud ledger': '/images/products/cloud-ledger.jpg',
+  'terracotta self-watering planter': '/images/products/terracotta-self-watering-planter.jpg',
+  'handcrafted hemp tote bag': '/images/products/handcrafted-hemp-tote.jpg',
+  'organic flax linen t-shirt (updated edition)': '/images/products/organic-flax-linen-shirt.jpg',
+  'organic flax linen minimalist t-shirt': '/images/products/organic-flax-minimalist-tee.jpg',
+  'country style artisan sourdough loaf': '/images/products/artisan-sourdough.jpg',
+  'organic hemp everyday summer tee': '/images/products/sage-hemp-tee.jpg',
+  'demo organic himalayan hemp summer tee': '/images/products/sage-hemp-tee.jpg',
+  'smart water bottle': '/images/products/smart-water-bottle.jpg',
+  'founder a published product': '/images/products/apparel-indigo-overshirt.jpg',
+  'founder b published product': '/images/products/apparel-rust-tee.jpg',
+  'injected product': '/images/products/apparel-charcoal-tee.jpg',
+  'artisanal cold brew press & ceramic tumbler': '/images/products/cold-brew-press-tumbler.png'
 };
 
 const getLegacyDemoImage = (url?: string): string | undefined => {
@@ -54,6 +72,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
     setError(null);
     try {
       const params = new URLSearchParams();
+      params.append('limit', String(EXPLORE_PRODUCT_LIMIT));
       if (category !== 'all') params.append('category', category);
       if (searchQuery.trim()) params.append('q', searchQuery.trim());
 
@@ -267,8 +286,13 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
           {products.map(product => {
             const stageStyle = getStageBadgeColor(product.stage);
             const uploadedImage = product.images?.[0];
-            const fallbackImage = CATEGORY_FALLBACK_IMAGES[product.category];
-            const displayImage = getLegacyDemoImage(uploadedImage?.url) || uploadedImage?.url || fallbackImage;
+            const productFallback = PRODUCT_FALLBACK_IMAGES[product.name.trim().toLowerCase()];
+            const fallbackImage = productFallback || CATEGORY_FALLBACK_IMAGES[product.category];
+            const legacyDemoImage = getLegacyDemoImage(uploadedImage?.url);
+            const displayImage = legacyDemoImage
+              ? productFallback || legacyDemoImage
+              : uploadedImage?.url || fallbackImage;
+            const hasProductArtwork = Boolean(uploadedImage || productFallback);
             return (
               <article
                 key={product.id}
@@ -303,7 +327,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                 }}>
                   <img
                     src={displayImage}
-                    alt={uploadedImage?.confirmed_visual_description || `${product.category.replace(/_/g, ' ')} category artwork for ${product.name}`}
+                    alt={uploadedImage?.confirmed_visual_description || `${product.name} product image`}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     onError={event => {
                       if (!event.currentTarget.src.endsWith(fallbackImage)) {
@@ -312,7 +336,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                     }}
                   />
 
-                  {!uploadedImage && (
+                  {!hasProductArtwork && (
                     <div style={{
                       position: 'absolute',
                       bottom: '8px',

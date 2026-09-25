@@ -187,6 +187,7 @@ const MainApp: React.FC = () => {
             setActiveTab('explore');
           }}
           onSignIn={() => setIsAuthModalOpen(true)}
+          onOpenProduct={handleOpenProduct}
         />
         <AuthModal
           isOpen={isAuthModalOpen}
