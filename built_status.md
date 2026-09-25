@@ -123,6 +123,37 @@
      - **24 automated tests passing** across `@droptest/shared` and `@droptest/server`.
      - Verifies rate denominators, market eligibility transitions, transition matrix math, incomplete run protection, break-even scenario math, and server repository integration.
 
+### Phase 5: Finance Calculations, Break-Even Engine & Scenario Analysis
+- **Status:** `COMPLETED & VERIFIED`
+- **Key Deliverables:**
+  1. **Deterministic Finance Calculation Engine (`shared/src/finance.ts`)**:
+     - `calculateFinancials(inputs)`: Single consistent currency and accounting period per test.
+     - Computes contribution margin $\text{Contribution} = P - C$.
+     - When $\text{Contribution} > 0$, computes break-even units $\lceil F / (P - C) \rceil$.
+     - Zero fixed cost $F = 0$ strictly produces 0 break-even units.
+     - When $\text{Contribution} \le 0$, explicitly flags `"No break-even at this price and unit cost."`
+     - When stated capacity $M$ is entered and is below break-even, flags `"Cannot break even within entered capacity."`
+     - Missing costs or incomplete inputs return explicit missing field indicators and guidance, never fabricated numbers.
+     - Supports independent variable/production costs for Option A ($C_A$) and Option B ($C_B$).
+  2. **Scenario Arithmetic & Strict Validation (`processScenario`)**:
+     - Evaluates user-entered unit-sales scenarios ($Q$) with revenue $Q \times P$, variable cost $Q \times C$, and net profit/loss $Q \times (P - C) - F$.
+     - Strictly validates scenario volumes: rejects negative counts ($Q < 0$) and counts above capacity ($Q > M$) with explicit validation errors; **never clamps silently**.
+     - Firm boundary: Sales scenarios are conditional arithmetic based exclusively on user-entered volume assumptions; **never derived from the 50 simulated persona interest counts**.
+  3. **Shared Analysis Integration (`shared/src/analysis.ts`)**:
+     - `generateDecisionCard`: Includes financial reality check comparing Option A vs Option B break-even units and capacity constraints, or explicit missing-cost notices.
+     - Carries structured financial options and inputs directly into `ComparisonAnalysis`.
+  4. **Financial Scenario UI Component (`client/src/components/Results/FinancialScenarioPanel.tsx`)**:
+     - Rendered in `ResultsPage.tsx` alongside `DecisionCard`, `SingleLeverDiffBanner`, `BreakdownTable`, `TransitionMatrixView`, and `PersonaTransitionTable`.
+     - Side-by-side Option A vs Option B cost breakdown cards (Price, Unit Cost, Contribution Margin, Fixed Launch Cost, Required Break-Even Units).
+     - Capacity ceiling warning badges when break-even exceeds capacity.
+     - Interactive *"If you sell Q units"* scenario table with editable Lower, Central, and Higher volume inputs.
+     - Net profit/loss and variance ($B - A$) calculation per scenario.
+     - Missing-cost empty state with clear action prompts when financial data is omitted in setup.
+  5. **Automated Test Suite (`shared/test/finance.test.ts`)**:
+     - **32 automated tests passing** across `@droptest/shared` (18 tests) and `@droptest/server` (14 tests).
+     - Verifies exact PRD fixture ($F=\text{₹}6000, C=\text{₹}350, P_A=\text{₹}699 \implies 18 \text{ units}, P_B=\text{₹}899 \implies 11 \text{ units}$).
+     - Verifies zero fixed costs, negative/zero contribution margins, non-integer ceiling math, capacity overflow, invalid scenario rejection, independent A/B cost structures, and missing input guidance.
+
 ---
 
 ## 3. Directory Map & Component Structure
@@ -137,15 +168,16 @@ DROP-T/
 │
 ├── shared/                    # Shared TypeScript library
 │   ├── src/
-│   │   ├── types.ts           # Domain entities, enums, interfaces (inc. ComparisonAnalysis)
+│   │   ├── types.ts           # Domain entities, enums, interfaces (inc. ComparisonAnalysis & Financials)
 │   │   ├── validation.ts      # Zod runtime validation schemas
-│   │   ├── finance.ts         # Deterministic financial scenario engine
+│   │   ├── finance.ts         # Deterministic financial scenario & break-even engine
 │   │   ├── eligibility.ts     # Deterministic access status & panel stats engine
 │   │   ├── analysis.ts        # Phase 4 comparison metrics & decision card synthesis
 │   │   └── index.ts           # Exports
 │   └── test/
 │       ├── shared.test.ts     # Unit tests for contracts, splits, math, and eligibility
-│       └── analysis.test.ts   # Unit tests for comparison analysis, transitions & decision card
+│       ├── analysis.test.ts   # Unit tests for comparison analysis, transitions & decision card
+│       └── finance.test.ts    # Unit tests for break-even, scenarios, and capacity limits
 │
 ├── server/                    # Express + SQLite Backend
 │   ├── src/
@@ -192,6 +224,7 @@ DROP-T/
     │   │       ├── BreakdownTable.tsx       # Denominators, segment & market breakdowns
     │   │       ├── TransitionMatrixView.tsx # 4x4 transition matrix & net shifts
     │   │       ├── PersonaTransitionTable.tsx # 50-persona inspectable response rows
+    │   │       ├── FinancialScenarioPanel.tsx# Deterministic break-even & scenario comparison
     │   │       └── RealFeedbackSection.tsx  # Truthful placeholder for real responses
     │   ├── pages/
     │   │   ├── SetupTestPage.tsx            # Complete interactive workbench with Run simulation trigger
@@ -214,7 +247,7 @@ DROP-T/
 # 1. Install dependencies across all workspaces
 npm install
 
-# 2. Run all unit, database, and simulation tests (24 passing)
+# 2. Run all unit, database, and simulation tests (32 passing)
 npm test
 
 # 3. Build all packages (shared, server, client)
@@ -226,9 +259,9 @@ npm run dev
 
 ---
 
-## 5. Next Steps for Phase 5 / Phase 6 (Incoming Agent Handoff)
+## 5. Next Steps for Phase 6 (Incoming Agent Handoff)
 
-When starting Phase 5 & 6, implement the Public Shareable Feedback Page and Real Respondent Collection:
+When starting Phase 6, implement the Public Shareable Feedback Page and Real Respondent Collection:
 1. **Unguessable Shareable Feedback Link**:
    - `GET /feedback/:token` public route serving clean, unguided voting view between Option A and Option B.
    - Shows actual uploaded creative, pricing, primary message, and fulfillment details.

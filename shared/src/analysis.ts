@@ -602,6 +602,24 @@ export function computeComparisonAnalysis(
     run_status: run.status,
     primary_lever: fullTest.comparison_lever,
     model_id: run.model_id,
+    currency: fullTest.offering.currency || 'USD',
+    period: fullTest.offering.period || 'launch_batch',
+    options: {
+      A: {
+        name: fullTest.options.A.name,
+        price: fullTest.options.A.price,
+        variable_cost_per_sale: fullTest.options.A.variable_cost_per_sale,
+        fixed_launch_cost: fullTest.options.A.fixed_launch_cost,
+        capacity_units: fullTest.options.A.capacity_units
+      },
+      B: {
+        name: fullTest.options.B.name,
+        price: fullTest.options.B.price,
+        variable_cost_per_sale: fullTest.options.B.variable_cost_per_sale,
+        fixed_launch_cost: fullTest.options.B.fixed_launch_cost,
+        capacity_units: fullTest.options.B.capacity_units
+      }
+    },
     option_a_summary: summaryA,
     option_b_summary: summaryB,
     eligibility_changes: eligibilityChanges,

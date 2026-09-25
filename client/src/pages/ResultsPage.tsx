@@ -14,6 +14,7 @@ import { SingleLeverDiffBanner } from '../components/Results/SingleLeverDiffBann
 import { BreakdownTable } from '../components/Results/BreakdownTable.js';
 import { TransitionMatrixView } from '../components/Results/TransitionMatrixView.js';
 import { PersonaTransitionTable } from '../components/Results/PersonaTransitionTable.js';
+import { FinancialScenarioPanel } from '../components/Results/FinancialScenarioPanel.js';
 import { RealFeedbackSection } from '../components/Results/RealFeedbackSection.js';
 
 interface ResultsPageProps {
@@ -210,14 +211,32 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ testId, onNavigateToSe
         nameB={analysis.option_b_summary.option_name}
       />
 
-      {/* 5. 50-Persona Drill-down Response Table */}
+      {/* 5. Deterministic Financial Scenarios & Break-Even Analysis */}
+      <FinancialScenarioPanel
+        currency={analysis.currency}
+        period={analysis.period}
+        nameA={analysis.options.A.name}
+        nameB={analysis.options.B.name}
+        priceA={analysis.options.A.price}
+        priceB={analysis.options.B.price}
+        varCostA={analysis.options.A.variable_cost_per_sale}
+        varCostB={analysis.options.B.variable_cost_per_sale}
+        fixedCostA={analysis.options.A.fixed_launch_cost}
+        fixedCostB={analysis.options.B.fixed_launch_cost}
+        capacityA={analysis.options.A.capacity_units}
+        capacityB={analysis.options.B.capacity_units}
+        financeA={analysis.finance_analysis.option_a}
+        financeB={analysis.finance_analysis.option_b}
+      />
+
+      {/* 6. 50-Persona Drill-down Response Table */}
       <PersonaTransitionTable
         transitions={analysis.transitions}
         nameA={analysis.option_a_summary.option_name}
         nameB={analysis.option_b_summary.option_name}
       />
 
-      {/* 6. Real Person Feedback Section (Truthful Empty State until Phase 6) */}
+      {/* 7. Real Person Feedback Section (Truthful Empty State until Phase 6) */}
       <RealFeedbackSection
         testId={analysis.test_id}
       />

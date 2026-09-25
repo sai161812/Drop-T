@@ -299,6 +299,8 @@ export interface ScenarioCalculation {
   variable_cost: number;
   net_result: number;
   is_within_capacity: boolean;
+  is_valid: boolean;
+  validation_error?: string;
 }
 
 export interface FinancialCalculationResult {
@@ -513,6 +515,24 @@ export interface ComparisonAnalysis {
   run_status: RunStatus;
   primary_lever: PrimaryLever;
   model_id?: string;
+  currency: string;
+  period: string;
+  options: {
+    A: {
+      name: string;
+      price: number;
+      variable_cost_per_sale?: number;
+      fixed_launch_cost?: number;
+      capacity_units?: number;
+    };
+    B: {
+      name: string;
+      price: number;
+      variable_cost_per_sale?: number;
+      fixed_launch_cost?: number;
+      capacity_units?: number;
+    };
+  };
   option_a_summary: OptionResultSummary;
   option_b_summary: OptionResultSummary;
   eligibility_changes: EligibilityChangeSummary[];

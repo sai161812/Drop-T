@@ -55,10 +55,25 @@ export function calculateFinancials(inputs: FinancialInputs): FinancialCalculati
   } = {};
 
   const processScenario = (units?: number): ScenarioCalculation | undefined => {
-    if (units === undefined || isNaN(units) || units < 0) {
+    if (units === undefined || isNaN(units)) {
       return undefined;
     }
-    const isWithinCapacity = M === undefined || M <= 0 || units <= M;
+
+    if (units < 0) {
+      return {
+        units,
+        revenue: 0,
+        variable_cost: 0,
+        net_result: 0,
+        is_within_capacity: false,
+        is_valid: false,
+        validation_error: 'Sales scenario units cannot be negative.'
+      };
+    }
+
+    const hasCapacityCeiling = M !== undefined && M > 0;
+    const isExceedingCapacity = hasCapacityCeiling && units > M;
+
     const revenue = units * P;
     const variableCost = units * C;
     const netResult = units * contribution - F;
@@ -68,7 +83,11 @@ export function calculateFinancials(inputs: FinancialInputs): FinancialCalculati
       revenue,
       variable_cost: variableCost,
       net_result: netResult,
-      is_within_capacity: isWithinCapacity
+      is_within_capacity: !isExceedingCapacity,
+      is_valid: !isExceedingCapacity,
+      validation_error: isExceedingCapacity 
+        ? `Scenario (${units} units) exceeds entered capacity ceiling of ${M} units.` 
+        : undefined
     };
   };
 
