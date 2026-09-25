@@ -8,7 +8,8 @@ import {
   UtensilsCrossed, 
   Cpu, 
   Package,
-  PlusCircle
+  PlusCircle,
+  Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 
@@ -18,6 +19,7 @@ interface ExplorePageProps {
   onOpenProduct: (productId: string) => void;
   onNavigateToPublish: () => void;
   onPromptAuth: () => void;
+  onGoHome?: () => void;
 }
 
 const CATEGORY_FALLBACK_IMAGES: Record<ProductCategory, string> = {
@@ -56,7 +58,8 @@ const getLegacyDemoImage = (url?: string): string | undefined => {
 export const ExplorePage: React.FC<ExplorePageProps> = ({
   onOpenProduct,
   onNavigateToPublish,
-  onPromptAuth
+  onPromptAuth,
+  onGoHome
 }) => {
   const { user, token } = useAuth();
   const [products, setProducts] = useState<ProductPublicSummary[]>([]);
@@ -167,6 +170,17 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              {onGoHome && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={onGoHome}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', padding: '3px 9px', marginRight: '6px' }}
+                  title="Return to Landing Page"
+                >
+                  <Home size={12} /> Home
+                </button>
+              )}
               <span className="brand-badge" style={{ fontSize: '10px' }}>EARLY STAGE COMMUNITY</span>
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Real startups & structured feedback</span>
             </div>

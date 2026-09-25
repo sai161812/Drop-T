@@ -22,12 +22,22 @@ const MainApp: React.FC = () => {
   const [activeTestId, setActiveTestId] = useState<string | undefined>();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authDefaultRole, setAuthDefaultRole] = useState<UserRole>('startup');
+  const [isHomeLandingView, setIsHomeLandingView] = useState(false);
 
   const handleOpenAuthModal = (role?: UserRole) => {
     if (role) {
       setAuthDefaultRole(role);
     }
     setIsAuthModalOpen(true);
+  };
+
+  const handleGoHome = () => {
+    setShowLanding(true);
+    setIsHomeLandingView(true);
+    setSelectedProductId(null);
+    setEditingProductId(undefined);
+    setActiveTab('explore');
+    window.history.pushState({}, '', '/');
   };
   const [standaloneFeedbackToken, setStandaloneFeedbackToken] = useState<string | null>(null);
   const [labRequest, setLabRequest] = useState<{ productId?: string; review: 'resume' | 'new' }>(() => {
@@ -47,6 +57,9 @@ const MainApp: React.FC = () => {
       setLabRequest({ review: 'resume' });
       const path = window.location.pathname;
       if (path === '/lab' || path === '/results') window.history.replaceState({}, '', path);
+      if (user) {
+        setIsHomeLandingView(false);
+      }
     }
     priorAccountId.current = nextAccountId;
   }, [user?.id, isAuthLoading]);
@@ -56,6 +69,9 @@ const MainApp: React.FC = () => {
     const handleUrlNavigation = () => {
       const pathname = window.location.pathname;
       setShowLanding(pathname === '/');
+      if (pathname !== '/') {
+        setIsHomeLandingView(false);
+      }
 
       const params = new URLSearchParams(window.location.search);
       setStandaloneFeedbackToken(null);
@@ -85,6 +101,11 @@ const MainApp: React.FC = () => {
         setEditingProductId(undefined);
         setActiveTab('my-products');
       } else if (pathname === '/lab') {
+        if (user?.role === 'user') {
+          window.history.replaceState({}, '', '/explore');
+          setActiveTab('explore');
+          return;
+        }
         setLabRequest({
           productId: params.get('product') || params.get('product_id') || undefined,
           review: params.get('review') === 'new' ? 'new' : 'resume'
@@ -92,6 +113,11 @@ const MainApp: React.FC = () => {
         setActiveTestId(params.get('test') || params.get('run') || undefined);
         setActiveTab('setup');
       } else if (pathname === '/results') {
+        if (user?.role === 'user') {
+          window.history.replaceState({}, '', '/explore');
+          setActiveTab('explore');
+          return;
+        }
         setActiveTestId(params.get('test') || params.get('run') || undefined);
         setActiveTab('results');
       } else {
@@ -106,7 +132,7 @@ const MainApp: React.FC = () => {
     handleUrlNavigation();
     window.addEventListener('popstate', handleUrlNavigation);
     return () => window.removeEventListener('popstate', handleUrlNavigation);
-  }, []);
+  }, [user?.role]);
 
   const navigateToTab = (tab: PageTab) => {
     setActiveTab(tab);
@@ -133,6 +159,9 @@ const MainApp: React.FC = () => {
       }
       window.history.pushState({}, '', '/my-products');
     } else if (tab === 'setup') {
+      if (user?.role === 'user') {
+        return;
+      }
       setLabRequest({ review: 'resume' });
       const testQuery = activeTestId ? `?test=${encodeURIComponent(activeTestId)}` : '';
       window.history.pushState({}, '', `/lab${testQuery}`);
@@ -190,13 +219,14 @@ const MainApp: React.FC = () => {
     );
   }
 
-  if (!isAuthLoading && !user && activeTab === 'explore' && showLanding) {
+  if (!isAuthLoading && activeTab === 'explore' && ((!user && showLanding) || isHomeLandingView)) {
     return (
       <>
         <LandingPage
           onExplore={() => {
             window.history.pushState({}, '', '/explore');
             setShowLanding(false);
+            setIsHomeLandingView(false);
             setActiveTab('explore');
           }}
           onSignIn={handleOpenAuthModal}
@@ -217,6 +247,7 @@ const MainApp: React.FC = () => {
         activeTab={activeTab}
         onTabChange={navigateToTab}
         onOpenAuthModal={handleOpenAuthModal}
+        onGoHome={handleGoHome}
       />
 
       <main className="workbench-main" style={{ minHeight: 'calc(100vh - 60px)', paddingBottom: 'var(--space-8)' }}>
@@ -226,6 +257,7 @@ const MainApp: React.FC = () => {
             onOpenProduct={handleOpenProduct}
             onNavigateToPublish={() => navigateToTab('publish')}
             onPromptAuth={() => setIsAuthModalOpen(true)}
+            onGoHome={handleGoHome}
           />
         )}
 

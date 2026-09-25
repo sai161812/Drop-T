@@ -3,6 +3,7 @@ import type { UserRole } from '@droptest/shared';
 import { useAuth } from '../context/AuthContext.js';
 import { ElectricBrandMark } from './Common/ElectricBrandMark.js';
 import { 
+  Home,
   Compass, 
   Bookmark,
   PlusCircle, 
@@ -21,12 +22,14 @@ interface NavbarProps {
   activeTab: PageTab;
   onTabChange: (tab: PageTab) => void;
   onOpenAuthModal: (role?: UserRole) => void;
+  onGoHome?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onTabChange,
-  onOpenAuthModal
+  onOpenAuthModal,
+  onGoHome
 }) => {
   const { user, signOut } = useAuth();
 
@@ -60,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         className="navbar-brand" 
         aria-label="DROPTEST home"
         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 0, padding: 0, background: 'transparent', color: 'inherit' }}
-        onClick={() => onTabChange('explore')}
+        onClick={onGoHome || (() => onTabChange('explore'))}
       >
         <ElectricBrandMark />
         <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '-0.03em', color: 'var(--color-text-primary)' }}>
@@ -73,6 +76,19 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Main Nav Tabs */}
       <nav className="nav-tabs" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {onGoHome && (
+          <button
+            type="button"
+            className="nav-tab-btn"
+            onClick={onGoHome}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+            title="Return to Landing Page"
+          >
+            <Home size={15} />
+            <span>Home</span>
+          </button>
+        )}
+
         <button
           type="button"
           className={`nav-tab-btn ${activeTab === 'explore' || activeTab === 'product-detail' ? 'active' : ''}`}
@@ -123,17 +139,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           </>
         )}
 
-        <button
-          type="button"
-              className={`nav-tab-btn ${activeTab === 'setup' || activeTab === 'results' ? 'active' : ''}`}
-              aria-current={activeTab === 'setup' || activeTab === 'results' ? 'page' : undefined}
-          onClick={() => onTabChange('setup')}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
-          title="Synthetic Simulation Lab"
-        >
-          <FlaskConical size={15} />
-          <span>Synthetic Lab</span>
-        </button>
+        {user?.role !== 'user' && (
+          <button
+            type="button"
+            className={`nav-tab-btn ${activeTab === 'setup' || activeTab === 'results' ? 'active' : ''}`}
+            aria-current={activeTab === 'setup' || activeTab === 'results' ? 'page' : undefined}
+            onClick={() => onTabChange('setup')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+            title="Synthetic Simulation Lab"
+          >
+            <FlaskConical size={15} />
+            <span>Synthetic Lab</span>
+          </button>
+        )}
       </nav>
 
       {/* User Auth Section */}
