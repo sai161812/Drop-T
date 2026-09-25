@@ -51,7 +51,8 @@ Do not use these credentials outside a local demo.
 
 | View | Route |
 | --- | --- |
-| Explore | `/` |
+| Public landing page | `/` |
+| Explore | `/explore` |
 | Product detail | `/product/:id` |
 | Saved products | `/saved` |
 | Publish or edit | `/publish` or `/publish?edit=:id` |

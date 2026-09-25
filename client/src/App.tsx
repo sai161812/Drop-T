@@ -10,6 +10,7 @@ import { MyProductsPage } from './pages/MyProductsPage.js';
 import { SetupTestPage } from './pages/SetupTestPage.js';
 import { ResultsPage } from './pages/ResultsPage.js';
 import { PublicFeedbackPage } from './pages/PublicFeedbackPage.js';
+import { LandingPage } from './pages/LandingPage.js';
 
 const MainApp: React.FC = () => {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -59,7 +60,7 @@ const MainApp: React.FC = () => {
         if (token) {
           setStandaloneFeedbackToken(token);
         }
-      } else if (pathname === '/') {
+      } else if (pathname === '/' || pathname === '/explore') {
         setSelectedProductId(null);
         setEditingProductId(undefined);
         setActiveTab('explore');
@@ -98,7 +99,7 @@ const MainApp: React.FC = () => {
   const navigateToTab = (tab: PageTab) => {
     setActiveTab(tab);
     if (tab === 'explore') {
-      window.history.pushState({}, '', '/');
+      window.history.pushState({}, '', '/explore');
       setSelectedProductId(null);
     } else if (tab === 'saved') {
       if (!user) {
@@ -174,6 +175,24 @@ const MainApp: React.FC = () => {
           />
         </main>
       </div>
+    );
+  }
+
+  if (!isAuthLoading && !user && activeTab === 'explore' && window.location.pathname === '/') {
+    return (
+      <>
+        <LandingPage
+          onExplore={() => {
+            window.history.pushState({}, '', '/explore');
+            setActiveTab('explore');
+          }}
+          onSignIn={() => setIsAuthModalOpen(true)}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+      </>
     );
   }
 
