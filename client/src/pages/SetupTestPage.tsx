@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { DomainId, PrimaryLever, ImageMetadata, TestDraftPayloadSchema, TestDraftPayload } from '@droptest/shared';
+import { 
+  DomainId, 
+  PrimaryLever, 
+  ImageMetadata, 
+  TestDraftPayloadSchema, 
+  TestDraftPayload 
+} from '@droptest/shared';
 import { DomainSelector } from '../components/SetupTest/DomainSelector.js';
 import { AudienceLocationForm } from '../components/SetupTest/AudienceLocationForm.js';
 import { OfferingForm } from '../components/SetupTest/OfferingForm.js';
 import { AlternativeBForm, OptionAData, OptionBData } from '../components/SetupTest/AlternativeBForm.js';
 import { FinancialsForm } from '../components/SetupTest/FinancialsForm.js';
 import { AssumptionSummary } from '../components/SetupTest/AssumptionSummary.js';
+import { DOMAIN_PRESETS, BLANK_PRESET } from '../config/templates.js';
+import { RotateCcw, Sparkles } from 'lucide-react';
 
 interface SetupTestPageProps {
   onSaveSuccess?: (savedData: any) => void;
@@ -20,60 +28,59 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   onUpdateHeaderTitle,
   setSaveStatus
 }) => {
+  // Load initial preset (Clothing)
+  const initialPreset = DOMAIN_PRESETS.clothing_accessories.payload;
+
   // 1. Domain
-  const [domainId, setDomainId] = useState<DomainId>('clothing_accessories');
+  const [domainId, setDomainId] = useState<DomainId>(initialPreset.test.domain_id);
 
   // 2. Offering Core
-  const [title, setTitle] = useState('Organic Handloom Linen Shirt');
-  const [shortValueProp, setShortValueProp] = useState('Breathable organic linen shirt handcrafted for warm humid climates');
-  const [description, setDescription] = useState('Made from 100% natural organic flax linen with natural horn buttons and relaxed fit. Machine washable and pre-shrunk.');
-  const [currency, setCurrency] = useState('INR');
-  const [period, setPeriod] = useState('launch_batch');
-  const [domainSpecificData, setDomainSpecificData] = useState<any>({
-    item_type: 'Shirt',
-    material: '100% Organic Flax Linen',
-    sizes: ['S', 'M', 'L', 'XL']
-  });
+  const [title, setTitle] = useState(initialPreset.test.title);
+  const [shortValueProp, setShortValueProp] = useState(initialPreset.offering.short_value_prop);
+  const [description, setDescription] = useState(initialPreset.offering.description);
+  const [currency, setCurrency] = useState(initialPreset.offering.currency);
+  const [period, setPeriod] = useState(initialPreset.offering.period);
+  const [domainSpecificData, setDomainSpecificData] = useState<any>(initialPreset.offering.domain_specific_data);
 
   // 3. Option A (Baseline)
   const [optionA, setOptionA] = useState<OptionAData>({
-    name: 'Baseline ₹699',
-    price: 699,
-    primary_message: 'Sustainable everyday comfort at an accessible launch price',
-    served_markets: ['Bangalore Urban', 'Chennai Central'],
-    fulfillment_mode: 'Standard postal shipping',
-    images: [],
-    variable_cost_per_sale: 299,
-    fixed_launch_cost: 20000,
-    capacity_units: 100
+    name: initialPreset.option_a.name,
+    price: initialPreset.option_a.price,
+    primary_message: initialPreset.option_a.primary_message,
+    served_markets: initialPreset.option_a.served_markets,
+    fulfillment_mode: initialPreset.option_a.fulfillment_mode,
+    images: initialPreset.option_a.images || [],
+    variable_cost_per_sale: initialPreset.option_a.variable_cost_per_sale,
+    fixed_launch_cost: initialPreset.option_a.fixed_launch_cost,
+    capacity_units: initialPreset.option_a.capacity_units
   });
 
   // 4. Comparison Lever & Option B (Alternative)
-  const [comparisonLever, setComparisonLever] = useState<PrimaryLever>('price');
+  const [comparisonLever, setComparisonLever] = useState<PrimaryLever>(initialPreset.comparison_lever);
   const [optionB, setOptionB] = useState<OptionBData>({
-    name: 'Premium ₹899',
-    price: 899,
-    primary_message: 'Sustainable luxury crafted with gift packaging included',
-    served_markets: ['Bangalore Urban', 'Chennai Central'],
-    fulfillment_mode: 'Standard postal shipping',
-    images: [],
-    variable_cost_per_sale: 320,
-    fixed_launch_cost: 20000,
-    capacity_units: 100
+    name: initialPreset.option_b.name,
+    price: initialPreset.option_b.price,
+    primary_message: initialPreset.option_b.primary_message,
+    served_markets: initialPreset.option_b.served_markets,
+    fulfillment_mode: initialPreset.option_b.fulfillment_mode,
+    images: initialPreset.option_b.images || [],
+    variable_cost_per_sale: initialPreset.option_b.variable_cost_per_sale,
+    fixed_launch_cost: initialPreset.option_b.fixed_launch_cost,
+    capacity_units: initialPreset.option_b.capacity_units
   });
 
   // 5. Audience & Location Config
-  const [intendedBuyer, setIntendedBuyer] = useState('Young eco-conscious working professionals (25-35) looking for sustainable minimalist apparel');
-  const [adjacentBuyer, setAdjacentBuyer] = useState('College students or gift buyers looking for durable natural aesthetic fabrics');
-  const [expectedSpendMin, setExpectedSpendMin] = useState(500);
-  const [expectedSpendMax, setExpectedSpendMax] = useState(1200);
-  const [audienceMarkets, setAudienceMarkets] = useState<string[]>(['Bangalore Urban', 'Chennai Central', 'Hyderabad']);
+  const [intendedBuyer, setIntendedBuyer] = useState(initialPreset.audience_config.intended_buyer_description);
+  const [adjacentBuyer, setAdjacentBuyer] = useState(initialPreset.audience_config.adjacent_buyer_description);
+  const [expectedSpendMin, setExpectedSpendMin] = useState(initialPreset.audience_config.expected_spend_min);
+  const [expectedSpendMax, setExpectedSpendMax] = useState(initialPreset.audience_config.expected_spend_max);
+  const [audienceMarkets, setAudienceMarkets] = useState<string[]>(initialPreset.audience_config.audience_markets);
 
   // 6. Financial scenarios
-  const [fixedCost, setFixedCost] = useState<number | undefined>(20000);
-  const [varCostA, setVarCostA] = useState<number | undefined>(299);
-  const [varCostB, setVarCostB] = useState<number | undefined>(320);
-  const [capacityUnits, setCapacityUnits] = useState<number | undefined>(100);
+  const [fixedCost, setFixedCost] = useState<number | undefined>(initialPreset.option_a.fixed_launch_cost);
+  const [varCostA, setVarCostA] = useState<number | undefined>(initialPreset.option_a.variable_cost_per_sale);
+  const [varCostB, setVarCostB] = useState<number | undefined>(initialPreset.option_b.variable_cost_per_sale);
+  const [capacityUnits, setCapacityUnits] = useState<number | undefined>(initialPreset.option_a.capacity_units);
   const [lowerUnits, setLowerUnits] = useState<number | undefined>(30);
   const [centralUnits, setCentralUnits] = useState<number | undefined>(60);
   const [higherUnits, setHigherUnits] = useState<number | undefined>(90);
@@ -83,10 +90,57 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [phase0Notice, setPhase0Notice] = useState<string | null>(null);
 
+  // Function to apply a preset payload
+  const applyPreset = (payload: TestDraftPayload) => {
+    setDomainId(payload.test.domain_id);
+    setTitle(payload.test.title);
+    setShortValueProp(payload.offering.short_value_prop);
+    setDescription(payload.offering.description);
+    setCurrency(payload.offering.currency);
+    setPeriod(payload.offering.period);
+    setDomainSpecificData(payload.offering.domain_specific_data || {});
+
+    setOptionA({
+      name: payload.option_a.name,
+      price: payload.option_a.price,
+      primary_message: payload.option_a.primary_message,
+      served_markets: payload.option_a.served_markets,
+      fulfillment_mode: payload.option_a.fulfillment_mode,
+      images: payload.option_a.images || [],
+      variable_cost_per_sale: payload.option_a.variable_cost_per_sale,
+      fixed_launch_cost: payload.option_a.fixed_launch_cost,
+      capacity_units: payload.option_a.capacity_units
+    });
+
+    setComparisonLever(payload.comparison_lever);
+    setOptionB({
+      name: payload.option_b.name,
+      price: payload.option_b.price,
+      primary_message: payload.option_b.primary_message,
+      served_markets: payload.option_b.served_markets,
+      fulfillment_mode: payload.option_b.fulfillment_mode,
+      images: payload.option_b.images || [],
+      variable_cost_per_sale: payload.option_b.variable_cost_per_sale,
+      fixed_launch_cost: payload.option_b.fixed_launch_cost,
+      capacity_units: payload.option_b.capacity_units
+    });
+
+    setIntendedBuyer(payload.audience_config.intended_buyer_description);
+    setAdjacentBuyer(payload.audience_config.adjacent_buyer_description);
+    setExpectedSpendMin(payload.audience_config.expected_spend_min);
+    setExpectedSpendMax(payload.audience_config.expected_spend_max);
+    setAudienceMarkets(payload.audience_config.audience_markets);
+
+    setFixedCost(payload.option_a.fixed_launch_cost);
+    setVarCostA(payload.option_a.variable_cost_per_sale);
+    setVarCostB(payload.option_b.variable_cost_per_sale);
+    setCapacityUnits(payload.option_a.capacity_units);
+  };
+
   // Synchronize header title
   useEffect(() => {
     if (onUpdateHeaderTitle) {
-      onUpdateHeaderTitle(title);
+      onUpdateHeaderTitle(title || 'New Test Draft');
     }
   }, [title, onUpdateHeaderTitle]);
 
@@ -220,10 +274,62 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     }
   };
 
+  const handleDomainSelect = (newDomainId: DomainId) => {
+    if (newDomainId === domainId) return;
+    setDomainId(newDomainId);
+    // Automatically load matching domain template
+    const preset = DOMAIN_PRESETS[newDomainId];
+    if (preset) {
+      applyPreset(preset.payload);
+    }
+  };
+
   return (
     <div className="workbench-grid">
       {/* 65% Main Setup Column */}
       <div className="setup-column">
+        {/* Editable Quick-Action Preset Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            <Sparkles size={14} />
+            <span>Editable Presets:</span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: '11px', padding: '3px 8px' }}
+              onClick={() => applyPreset(DOMAIN_PRESETS.clothing_accessories.payload)}
+            >
+              Apparel Preset
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: '11px', padding: '3px 8px' }}
+              onClick={() => applyPreset(DOMAIN_PRESETS.local_food_beverages.payload)}
+            >
+              Food Preset
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: '11px', padding: '3px 8px' }}
+              onClick={() => applyPreset(DOMAIN_PRESETS.digital_products_services.payload)}
+            >
+              Digital SaaS Preset
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: '11px', padding: '3px 8px', color: 'var(--color-danger)' }}
+              onClick={() => applyPreset(BLANK_PRESET)}
+            >
+              <RotateCcw size={11} /> Clear Form
+            </button>
+          </div>
+        </div>
+
         {phase0Notice && (
           <div style={{ background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', color: '#166534', fontSize: 'var(--font-size-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{phase0Notice}</span>
@@ -241,7 +347,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         {/* Step 1: Domain */}
         <DomainSelector
           selectedDomain={domainId}
-          onSelectDomain={setDomainId}
+          onSelectDomain={handleDomainSelect}
         />
 
         {/* Step 2: Audience & Location */}
