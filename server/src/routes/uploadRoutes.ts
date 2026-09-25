@@ -60,3 +60,18 @@ uploadRouter.post('/', upload.single('image'), (req: Request, res: Response) => 
     res.status(500).json({ error: 'Image upload failed', message: error.message });
   }
 });
+
+uploadRouter.delete('/:filename', (req: Request, res: Response) => {
+  try {
+    const filename = path.basename(String(req.params.filename));
+    const filePath = path.join(config.uploadDir, filename);
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    res.json({ success: true, filename });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to delete image', message: error.message });
+  }
+});
+

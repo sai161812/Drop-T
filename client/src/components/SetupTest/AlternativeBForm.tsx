@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders, Sparkles, Check, Upload, Image as ImageIcon } from 'lucide-react';
+import { Sliders, Sparkles, Check, Upload, Image as ImageIcon, X, AlertCircle, ArrowRight, Info } from 'lucide-react';
 import { PrimaryLever, PRIMARY_LEVERS, PRIMARY_LEVER_LABELS, ImageMetadata } from '@droptest/shared';
 
 export interface OptionBData {
@@ -60,6 +60,10 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
+    if ((optionB.images || []).length >= 3) {
+      alert('Maximum 3 images allowed per option.');
+      return;
+    }
     const file = e.target.files[0];
     const uploaded = await onUploadImage(file);
     if (uploaded) {
@@ -67,6 +71,11 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
       onChangeOptionB({ ...optionB, images: [...currentImages, uploaded] });
     }
     e.target.value = '';
+  };
+
+  const handleRemoveImage = (imgId: string) => {
+    const currentImages = optionB.images || [];
+    onChangeOptionB({ ...optionB, images: currentImages.filter(img => img.id !== imgId) });
   };
 
   const handleUpdateImageDescription = (imgId: string, desc: string) => {
@@ -77,8 +86,19 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
     onChangeOptionB({ ...optionB, images: updated });
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // Diff Calculations
   const isPriceDiff = optionA.price !== optionB.price;
   const isMessageDiff = optionA.primary_message !== optionB.primary_message;
+  const isMarketsDiff = JSON.stringify(optionA.served_markets.slice().sort()) !== JSON.stringify(optionB.served_markets.slice().sort());
+  const isCostDiff = optionA.variable_cost_per_sale !== undefined && 
+                     optionB.variable_cost_per_sale !== undefined && 
+                     optionA.variable_cost_per_sale !== optionB.variable_cost_per_sale;
 
   return (
     <div className="workbench-card">
@@ -118,6 +138,45 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
         </span>
       </div>
 
+      {/* Exact A -> B Diff Summary Box */}
+      <div style={{ background: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>
+          <ArrowRight size={14} />
+          <span>Exact A &rarr; B Comparison Diff Summary:</span>
+        </div>
+        
+        <ul style={{ listStyle: 'none', paddingLeft: '4px', fontSize: 'var(--font-size-xs)', lineHeight: '1.6' }}>
+          {comparisonLever === 'price' && (
+            <li className="tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
+              <strong>Price:</strong> Baseline {currency} {optionA.price} &rarr; Alternative {currency} {optionB.price} {isPriceDiff && `(${(optionB.price - optionA.price) >= 0 ? `+${optionB.price - optionA.price}` : optionB.price - optionA.price})`}
+            </li>
+          )}
+          {comparisonLever === 'message' && (
+            <li>
+              <strong>Primary Message:</strong> "{optionA.primary_message}" &rarr; "{optionB.primary_message}"
+            </li>
+          )}
+          {comparisonLever === 'served_markets' && (
+            <li>
+              <strong>Served Markets:</strong> [{optionA.served_markets.join(', ')}] &rarr; [{optionB.served_markets.join(', ')}] {isMarketsDiff ? '(Modified coverage)' : '(Unchanged coverage)'}
+            </li>
+          )}
+          {comparisonLever === 'creative' && (
+            <li>
+              <strong>Creative:</strong> Option A ({(optionA.images || []).length} images) vs Option B ({(optionB.images || []).length} images) with confirmed visual descriptions.
+            </li>
+          )}
+
+          {/* Linked Cost Disclosure */}
+          {isCostDiff && (
+            <li style={{ marginTop: '4px', color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <AlertCircle size={12} />
+              <span>Linked Variable Cost Change: {currency} {optionA.variable_cost_per_sale} &rarr; {currency} {optionB.variable_cost_per_sale} per sale</span>
+            </li>
+          )}
+        </ul>
+      </div>
+
       {/* Option B Card */}
       <div className={`option-panel ${comparisonLever ? 'diff-target' : ''}`}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
@@ -150,7 +209,7 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
             <label className="form-label" htmlFor="option-b-price" style={{ color: comparisonLever === 'price' ? 'var(--color-accent)' : 'inherit' }}>
               <span>Price ({currency})</span>
               <span className="required">*</span>
-              {comparisonLever === 'price' && <span style={{ fontSize: '10px', background: '#FEF08A', padding: '1px 4px', borderRadius: '2px' }}>Diff</span>}
+              {comparisonLever === 'price' && <span style={{ fontSize: '10px', background: '#FEF08A', padding: '1px 4px', borderRadius: '2px', marginLeft: '4px' }}>Active Diff</span>}
             </label>
             <input
               id="option-b-price"
@@ -174,7 +233,7 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
           <label className="form-label" htmlFor="option-b-msg" style={{ color: comparisonLever === 'message' ? 'var(--color-accent)' : 'inherit' }}>
             <span>Primary Message / Positioning</span>
             <span className="required">*</span>
-            {comparisonLever === 'message' && <span style={{ fontSize: '10px', background: '#FEF08A', padding: '1px 4px', borderRadius: '2px' }}>Diff</span>}
+            {comparisonLever === 'message' && <span style={{ fontSize: '10px', background: '#FEF08A', padding: '1px 4px', borderRadius: '2px', marginLeft: '4px' }}>Active Diff</span>}
           </label>
           <input
             id="option-b-msg"
@@ -190,7 +249,7 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
           <label className="form-label" style={{ color: comparisonLever === 'served_markets' ? 'var(--color-accent)' : 'inherit' }}>
             <span>Served Markets (Availability in Option B)</span>
             <span className="required">*</span>
-            {comparisonLever === 'served_markets' && <span style={{ fontSize: '10px', background: '#FEF08A', padding: '1px 4px', borderRadius: '2px' }}>Diff</span>}
+            {comparisonLever === 'served_markets' && <span style={{ fontSize: '10px', background: '#FEF08A', padding: '1px 4px', borderRadius: '2px', marginLeft: '4px' }}>Active Diff</span>}
           </label>
           <span className="form-help" style={{ marginBottom: '6px' }}>
             {comparisonLever === 'served_markets' 
@@ -256,34 +315,52 @@ export const AlternativeBForm: React.FC<AlternativeBFormProps> = ({
           <div className="form-group" style={{ marginTop: 'var(--space-3)' }}>
             <label className="form-label">
               <ImageIcon size={14} />
-              <span>Alternative Creative / Packaging Images</span>
+              <span>Alternative Creative / Packaging Images (0 to 3 images)</span>
               <span className="required">*</span>
             </label>
-            <span className="form-help">
-              Upload alternative visuals. Confirmed visual descriptions are required when testing the creative lever.
-            </span>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--color-text-muted)', background: 'var(--color-surface)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', marginBottom: '8px' }}>
+              <Info size={13} style={{ flexShrink: 0 }} />
+              <span>Testing creative lever: Confirmed visual descriptions are mandatory for Option B images.</span>
+            </div>
 
-            <label className="image-upload-dropzone" style={{ marginTop: '8px', display: 'block' }}>
-              <input
-                type="file"
-                accept="image/png, image/jpeg, image/webp"
-                style={{ display: 'none' }}
-                onChange={handleFileUpload}
-              />
-              <Upload size={18} style={{ margin: '0 auto 4px auto', display: 'block', color: 'var(--color-text-muted)' }} />
-              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                Click to attach Option B image (PNG, JPEG, WEBP up to 5MB)
-              </span>
-            </label>
+            {(optionB.images || []).length < 3 && (
+              <label className="image-upload-dropzone" style={{ marginTop: '4px', display: 'block' }}>
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleFileUpload}
+                />
+                <Upload size={18} style={{ margin: '0 auto 4px auto', display: 'block', color: 'var(--color-text-muted)' }} />
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+                  Click to attach Option B image (PNG, JPEG, WEBP up to 5MB, {(optionB.images || []).length}/3 attached)
+                </span>
+              </label>
+            )}
 
             {optionB.images && optionB.images.length > 0 && (
               <div className="image-preview-grid">
                 {optionB.images.map((img) => (
                   <div key={img.id} className="image-preview-card">
-                    <img src={img.url} alt={img.filename} className="image-preview-img" />
+                    <div style={{ position: 'relative' }}>
+                      <img src={img.url} alt={img.filename} className="image-preview-img" />
+                      <button
+                        type="button"
+                        className="image-remove-btn"
+                        onClick={() => handleRemoveImage(img.id)}
+                        aria-label={`Remove Option B image ${img.filename}`}
+                        title="Remove image"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
                     <div className="image-preview-meta">
                       <div style={{ fontWeight: 600, fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {img.filename}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                        {formatFileSize(img.size_bytes)}
                       </div>
                       <textarea
                         placeholder="Confirmed visual description (Required for creative lever)..."

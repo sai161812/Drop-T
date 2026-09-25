@@ -65,14 +65,20 @@ export const AudienceLocationForm: React.FC<AudienceLocationFormProps> = ({
 
       {/* Audience Descriptions */}
       <div className="form-group">
-        <label className="form-label" htmlFor="intended-buyer">
-          <Users size={14} color="var(--color-intended)" />
-          <span>Intended Buyer Description (20 Profiles)</span>
-          <span className="required">*</span>
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label className="form-label" htmlFor="intended-buyer">
+            <Users size={14} color="var(--color-intended)" />
+            <span>Intended Buyer Description (20 Profiles)</span>
+            <span className="required">*</span>
+          </label>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+            {intendedBuyer.length}/500
+          </span>
+        </div>
         <textarea
           id="intended-buyer"
           className="form-textarea"
+          maxLength={500}
           placeholder="e.g. Eco-conscious young professionals (25-35) looking for high-quality sustainable linen clothing"
           value={intendedBuyer}
           onChange={e => onChangeIntendedBuyer(e.target.value)}
@@ -86,14 +92,20 @@ export const AudienceLocationForm: React.FC<AudienceLocationFormProps> = ({
       </div>
 
       <div className="form-group">
-        <label className="form-label" htmlFor="adjacent-buyer">
-          <Users size={14} color="var(--color-adjacent)" />
-          <span>Adjacent Buyer Description (20 Profiles)</span>
-          <span className="required">*</span>
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label className="form-label" htmlFor="adjacent-buyer">
+            <Users size={14} color="var(--color-adjacent)" />
+            <span>Adjacent Buyer Description (20 Profiles)</span>
+            <span className="required">*</span>
+          </label>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+            {adjacentBuyer.length}/500
+          </span>
+        </div>
         <textarea
           id="adjacent-buyer"
           className="form-textarea"
+          maxLength={500}
           placeholder="e.g. University students or gift buyers looking for aesthetic durable natural fabrics"
           value={adjacentBuyer}
           onChange={e => onChangeAdjacentBuyer(e.target.value)}
@@ -150,11 +162,16 @@ export const AudienceLocationForm: React.FC<AudienceLocationFormProps> = ({
 
       {/* Audience Markets */}
       <div className="form-group">
-        <label className="form-label">
-          <MapPin size={14} />
-          <span>Audience Markets (1 to 4 Target Regions)</span>
-          <span className="required">*</span>
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label className="form-label">
+            <MapPin size={14} />
+            <span>Audience Markets (1 to 4 Target Regions)</span>
+            <span className="required">*</span>
+          </label>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+            {audienceMarkets.length}/{PANEL_CONSTANTS.MAX_AUDIENCE_MARKETS} configured
+          </span>
+        </div>
         <span className="form-help" style={{ marginBottom: '8px' }}>
           Specific cities, neighborhoods, or country zones where your simulated personas reside.
         </span>
@@ -183,10 +200,12 @@ export const AudienceLocationForm: React.FC<AudienceLocationFormProps> = ({
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: 0,
+                  padding: '2px',
                   display: 'flex',
+                  alignItems: 'center',
                   color: 'var(--color-text-muted)'
                 }}
+                aria-label={`Remove market ${market}`}
                 title="Remove market"
               >
                 <X size={12} />

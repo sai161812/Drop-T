@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   DomainId, 
   PrimaryLever, 
   ImageMetadata, 
   TestDraftPayloadSchema, 
-  TestDraftPayload 
+  TestDraftPayload,
+  Test
 } from '@droptest/shared';
 import { DomainSelector } from '../components/SetupTest/DomainSelector.js';
 import { AudienceLocationForm } from '../components/SetupTest/AudienceLocationForm.js';
@@ -13,7 +14,7 @@ import { AlternativeBForm, OptionAData, OptionBData } from '../components/SetupT
 import { FinancialsForm } from '../components/SetupTest/FinancialsForm.js';
 import { AssumptionSummary } from '../components/SetupTest/AssumptionSummary.js';
 import { DOMAIN_PRESETS, BLANK_PRESET } from '../config/templates.js';
-import { RotateCcw, Sparkles } from 'lucide-react';
+import { RotateCcw, Sparkles, FolderOpen } from 'lucide-react';
 
 interface SetupTestPageProps {
   onSaveSuccess?: (savedData: any) => void;
@@ -28,6 +29,11 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   onUpdateHeaderTitle,
   setSaveStatus
 }) => {
+  // Active test ID if saved
+  const [testId, setTestId] = useState<string | undefined>(undefined);
+  const [savedDraftsList, setSavedDraftsList] = useState<Test[]>([]);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+
   // Load initial preset (Clothing)
   const initialPreset = DOMAIN_PRESETS.clothing_accessories.payload;
 
@@ -90,8 +96,28 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [phase0Notice, setPhase0Notice] = useState<string | null>(null);
 
+  // Fetch saved drafts list from SQLite
+  const fetchDraftsList = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tests');
+      if (res.ok) {
+        const data = await res.json();
+        setSavedDraftsList(data.tests || []);
+      }
+    } catch (e) {
+      console.error('Error fetching drafts:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDraftsList();
+  }, [fetchDraftsList]);
+
   // Function to apply a preset payload
-  const applyPreset = (payload: TestDraftPayload) => {
+  const applyPreset = (payload: TestDraftPayload, keepId = false) => {
+    if (!keepId) {
+      setTestId(undefined);
+    }
     setDomainId(payload.test.domain_id);
     setTitle(payload.test.title);
     setShortValueProp(payload.offering.short_value_prop);
@@ -137,6 +163,32 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     setCapacityUnits(payload.option_a.capacity_units);
   };
 
+  // Load a saved draft by ID from SQLite
+  const loadDraftById = async (id: string) => {
+    setIsLoadingDraft(true);
+    try {
+      const res = await fetch(`/api/tests/${id}`);
+      if (res.ok) {
+        const full = await res.json();
+        setTestId(full.test.id);
+        const payload: TestDraftPayload = {
+          test: { id: full.test.id, title: full.test.title, domain_id: full.test.domain_id },
+          offering: full.offering,
+          option_a: full.options.A,
+          option_b: full.options.B,
+          audience_config: full.audience_config,
+          comparison_lever: full.comparison_lever
+        };
+        applyPreset(payload, true);
+        if (setSaveStatus) setSaveStatus('saved');
+      }
+    } catch (e) {
+      console.error('Failed to load draft:', e);
+    } finally {
+      setIsLoadingDraft(false);
+    }
+  };
+
   // Synchronize header title
   useEffect(() => {
     if (onUpdateHeaderTitle) {
@@ -147,6 +199,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   // Construct current payload
   const currentPayload: TestDraftPayload = {
     test: {
+      id: testId,
       title,
       domain_id: domainId
     },
@@ -206,7 +259,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     setValidationErrors(errors);
     setMissingInputs(missing);
   }, [
-    title, domainId, shortValueProp, description, currency, period, domainSpecificData,
+    testId, title, domainId, shortValueProp, description, currency, period, domainSpecificData,
     optionA, optionB, comparisonLever, intendedBuyer, adjacentBuyer,
     expectedSpendMin, expectedSpendMax, audienceMarkets, fixedCost, varCostA, varCostB, capacityUnits
   ]);
@@ -228,8 +281,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
       }
 
       const saved = await res.json();
+      setTestId(saved.test.id);
       if (setSaveStatus) setSaveStatus('saved');
       if (onSaveSuccess) onSaveSuccess(saved);
+      fetchDraftsList();
       return true;
     } catch (e) {
       console.error('Save network error:', e);
@@ -245,7 +300,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
     if (saved) {
       setPhase0Notice(
-        'Test configuration saved successfully to SQLite database with locked schema and 50-profile contracts. (Phase 0 scope complete; simulation engine runs in Phase 1).'
+        'Test configuration saved successfully to SQLite database with locked schema and 50-profile contracts. (Phase 1 intake complete; simulation runner executes in Phase 2).'
       );
     }
   };
@@ -280,7 +335,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     // Automatically load matching domain template
     const preset = DOMAIN_PRESETS[newDomainId];
     if (preset) {
-      applyPreset(preset.payload);
+      applyPreset(preset.payload, false);
     }
   };
 
@@ -288,45 +343,84 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
     <div className="workbench-grid">
       {/* 65% Main Setup Column */}
       <div className="setup-column">
-        {/* Editable Quick-Action Preset Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-            <Sparkles size={14} />
-            <span>Editable Presets:</span>
+        {/* First Fold Guidance Card */}
+        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+            <div>
+              <h2 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>
+                Set up your comparative launch test
+              </h2>
+              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+                Enter your offering details, choose <strong>Option A (Baseline)</strong> and <strong>Option B (Alternative)</strong>, configure your audience markets, and preview the <strong>50 distinct simulated personas</strong> before running the evaluation.
+              </p>
+            </div>
+            
+            {/* Saved Drafts Switcher */}
+            {savedDraftsList.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <FolderOpen size={14} color="var(--color-text-muted)" />
+                <select
+                  className="form-select"
+                  style={{ fontSize: '11px', padding: '3px 8px', maxWidth: '180px' }}
+                  value={testId || ''}
+                  onChange={e => {
+                    if (e.target.value) {
+                      loadDraftById(e.target.value);
+                    }
+                  }}
+                  disabled={isLoadingDraft}
+                >
+                  <option value="" disabled>Load saved draft...</option>
+                  {savedDraftsList.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.title.length > 20 ? `${d.title.substring(0, 20)}...` : d.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: '11px', padding: '3px 8px' }}
-              onClick={() => applyPreset(DOMAIN_PRESETS.clothing_accessories.payload)}
-            >
-              Apparel Preset
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: '11px', padding: '3px 8px' }}
-              onClick={() => applyPreset(DOMAIN_PRESETS.local_food_beverages.payload)}
-            >
-              Food Preset
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: '11px', padding: '3px 8px' }}
-              onClick={() => applyPreset(DOMAIN_PRESETS.digital_products_services.payload)}
-            >
-              Digital SaaS Preset
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: '11px', padding: '3px 8px', color: 'var(--color-danger)' }}
-              onClick={() => applyPreset(BLANK_PRESET)}
-            >
-              <RotateCcw size={11} /> Clear Form
-            </button>
+
+          {/* Quick Presets Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--color-border-subtle)', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              <Sparkles size={13} />
+              <span>Quick Starter Presets:</span>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => applyPreset(DOMAIN_PRESETS.clothing_accessories.payload)}
+              >
+                Apparel Preset
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => applyPreset(DOMAIN_PRESETS.local_food_beverages.payload)}
+              >
+                Food Preset
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => applyPreset(DOMAIN_PRESETS.digital_products_services.payload)}
+              >
+                Digital SaaS Preset
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '11px', padding: '3px 8px', color: 'var(--color-danger)' }}
+                onClick={() => applyPreset(BLANK_PRESET)}
+              >
+                <RotateCcw size={11} /> Clear Form
+              </button>
+            </div>
           </div>
         </div>
 

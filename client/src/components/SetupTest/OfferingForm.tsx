@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Upload, Image as ImageIcon, Check } from 'lucide-react';
+import { Package, Upload, Image as ImageIcon, Check, X, Info } from 'lucide-react';
 import { DomainId, ImageMetadata } from '@droptest/shared';
 import { OptionAData } from './AlternativeBForm.js';
 
@@ -55,6 +55,10 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
+    if ((optionA.images || []).length >= 3) {
+      alert('Maximum 3 images allowed per option.');
+      return;
+    }
     const file = e.target.files[0];
     const uploaded = await onUploadImage(file);
     if (uploaded) {
@@ -64,12 +68,23 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
     e.target.value = '';
   };
 
+  const handleRemoveImage = (imgId: string) => {
+    const currentImages = optionA.images || [];
+    onChangeOptionA({ ...optionA, images: currentImages.filter(img => img.id !== imgId) });
+  };
+
   const handleUpdateImageDescription = (imgId: string, desc: string) => {
     const currentImages = optionA.images || [];
     const updated = currentImages.map(img => 
       img.id === imgId ? { ...img, confirmed_visual_description: desc } : img
     );
     onChangeOptionA({ ...optionA, images: updated });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   return (
@@ -183,7 +198,7 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
         </div>
       </div>
 
-      {/* Tailored Domain Fields */}
+      {/* Tailored Domain Fields (Strictly matching active domain) */}
       <div style={{ background: 'var(--color-surface-subtle)', padding: 'var(--space-3) var(--space-4)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-4)', border: '1px solid var(--color-border-subtle)' }}>
         <h3 style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
           {domainId === 'clothing_accessories' && 'Apparel Specifications'}
@@ -192,16 +207,28 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
         </h3>
 
         {domainId === 'clothing_accessories' && (
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Material Composition</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. 100% French Organic Flax Linen"
-                value={domainSpecificData?.material || ''}
-                onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, material: e.target.value })}
-              />
+          <>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Item Type</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Linen Shirt, Tote Bag, Jacket"
+                  value={domainSpecificData?.item_type || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, item_type: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Material Composition</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 100% French Organic Flax Linen"
+                  value={domainSpecificData?.material || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, material: e.target.value })}
+                />
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">Available Sizes</label>
@@ -215,59 +242,108 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
                   sizes: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean)
                 })}
               />
+              <span className="form-help">Comma-separated list of sizes.</span>
             </div>
-          </div>
+          </>
         )}
 
         {domainId === 'local_food_beverages' && (
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Portion / Package Size</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. 500ml glass bottle, 4-pack"
-                value={domainSpecificData?.portion || ''}
-                onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, portion: e.target.value })}
-              />
+          <>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Item Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Cold Brew Bottle, Sourdough Loaf"
+                  value={domainSpecificData?.item_name || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, item_name: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Portion / Package Size</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 500ml glass bottle, 4-pack"
+                  value={domainSpecificData?.portion || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, portion: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Ingredients / Dietary Notes</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. Vegan, 100% Arabica, Contains nuts"
-                value={domainSpecificData?.ingredients_allergens || ''}
-                onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, ingredients_allergens: e.target.value })}
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Ingredients / Allergens</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 100% Arabica, Gluten-free, Contains tree nuts"
+                  value={domainSpecificData?.ingredients_allergens || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, ingredients_allergens: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Availability Window</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Saturday & Sunday mornings (8 AM - 12 PM)"
+                  value={domainSpecificData?.availability_window || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, availability_window: e.target.value })}
+                />
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {domainId === 'digital_products_services' && (
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Supported Platform / Languages</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. Web / iOS / Android / English"
-                value={domainSpecificData?.platform_language || ''}
-                onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, platform_language: e.target.value })}
-              />
+          <>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Core Use Case</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Automated PDF receipt extraction into spreadsheets"
+                  value={domainSpecificData?.core_use_case || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, core_use_case: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Supported Platform / Languages</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Web App / Chrome Extension / English"
+                  value={domainSpecificData?.platform_language || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, platform_language: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Pricing Model</label>
-              <select
-                className="form-select"
-                value={domainSpecificData?.pricing_type || 'one_time'}
-                onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, pricing_type: e.target.value })}
-              >
-                <option value="one_time">One-time purchase (Perpetual)</option>
-                <option value="subscription">Recurring Subscription (First-period calculation)</option>
-              </select>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Pricing Model</label>
+                <select
+                  className="form-select"
+                  value={domainSpecificData?.pricing_type || 'one_time'}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, pricing_type: e.target.value })}
+                >
+                  <option value="one_time">One-time purchase (Perpetual)</option>
+                  <option value="subscription">Recurring Subscription (First-period calculation)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Service / Support Availability</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 24-hour turnaround email support"
+                  value={domainSpecificData?.service_support_availability || ''}
+                  onChange={e => onChangeDomainSpecificData({ ...domainSpecificData, service_support_availability: e.target.value })}
+                />
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
 
@@ -393,31 +469,49 @@ export const OfferingForm: React.FC<OfferingFormProps> = ({
             <ImageIcon size={14} />
             <span>Product Imagery & Visual Descriptions (0 to 3 images)</span>
           </label>
-          <span className="form-help">
-            Upload images shown to real evaluators. A confirmed visual description ensures simulated personas understand the visual details accurately.
-          </span>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--color-text-muted)', background: 'var(--color-surface)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', marginBottom: '8px' }}>
+            <Info size={13} style={{ flexShrink: 0 }} />
+            <span>Image attached; describe what it shows for the simulation. Do not assume model vision analysis without confirmed notes.</span>
+          </div>
 
-          <label className="image-upload-dropzone" style={{ marginTop: '8px', display: 'block' }}>
-            <input
-              type="file"
-              accept="image/png, image/jpeg, image/webp"
-              style={{ display: 'none' }}
-              onChange={handleFileUpload}
-            />
-            <Upload size={18} style={{ margin: '0 auto 4px auto', display: 'block', color: 'var(--color-text-muted)' }} />
-            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-              Click to attach image (PNG, JPEG, WEBP up to 5MB)
-            </span>
-          </label>
+          {(optionA.images || []).length < 3 && (
+            <label className="image-upload-dropzone" style={{ marginTop: '4px', display: 'block' }}>
+              <input
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                style={{ display: 'none' }}
+                onChange={handleFileUpload}
+              />
+              <Upload size={18} style={{ margin: '0 auto 4px auto', display: 'block', color: 'var(--color-text-muted)' }} />
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+                Click to attach Option A image (PNG, JPEG, WEBP up to 5MB, {(optionA.images || []).length}/3 attached)
+              </span>
+            </label>
+          )}
 
           {optionA.images && optionA.images.length > 0 && (
             <div className="image-preview-grid">
               {optionA.images.map((img) => (
                 <div key={img.id} className="image-preview-card">
-                  <img src={img.url} alt={img.filename} className="image-preview-img" />
+                  <div style={{ position: 'relative' }}>
+                    <img src={img.url} alt={img.filename} className="image-preview-img" />
+                    <button
+                      type="button"
+                      className="image-remove-btn"
+                      onClick={() => handleRemoveImage(img.id)}
+                      aria-label={`Remove image ${img.filename}`}
+                      title="Remove image"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                   <div className="image-preview-meta">
                     <div style={{ fontWeight: 600, fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {img.filename}
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                      {formatFileSize(img.size_bytes)}
                     </div>
                     <textarea
                       placeholder="Confirmed visual description (what this image shows)..."

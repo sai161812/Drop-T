@@ -45,3 +45,18 @@ testRouter.post('/', (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to save test draft', message: error.message });
   }
 });
+
+// DELETE /api/tests/:id - Delete test by ID
+testRouter.delete('/:id', (req: Request, res: Response) => {
+  try {
+    const testId = String(req.params.id);
+    const success = TestRepository.deleteById(testId);
+    if (!success) {
+      return res.status(404).json({ error: 'Test not found or already deleted' });
+    }
+    res.json({ success: true, id: testId });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to delete test', message: error.message });
+  }
+});
+

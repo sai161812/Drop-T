@@ -5,7 +5,8 @@ import {
   Sliders, 
   Play, 
   AlertTriangle, 
-  CheckCircle2 
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
 import { 
   PrimaryLever, 
@@ -56,7 +57,7 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
             <Users size={16} />
             <span>Simulated Panel (50 Profiles)</span>
           </h2>
-          <span className="badge badge-intended tabular-nums">50 Profiles</span>
+          <span className="badge badge-intended tabular-nums">50 Total Personas</span>
         </div>
 
         <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
@@ -125,7 +126,7 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
         ) : (
           <div>
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-              Reachable coverage across options:
+              Deterministic reachability across options:
             </div>
             {audienceMarkets.map((market, idx) => {
               const inA = servedMarketsA.includes(market);
@@ -171,14 +172,14 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
       {/* Checklist & Run Action Card */}
       <div className="workbench-card" style={{ background: isValid ? 'var(--color-surface)' : 'var(--color-surface-subtle)' }}>
         <h3 style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-          Run Verification
+          Simulation Readiness
         </h3>
 
         {missingInputs.length > 0 ? (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--color-warning)', fontWeight: 500, marginBottom: '6px' }}>
               <AlertTriangle size={14} />
-              <span>Missing required inputs ({missingInputs.length}):</span>
+              <span>Missing or invalid requirements ({missingInputs.length}):</span>
             </div>
             <ul className="missing-checklist">
               {missingInputs.map((item, idx) => (
@@ -202,8 +203,9 @@ export const AssumptionSummary: React.FC<AssumptionSummaryProps> = ({
           style={{ marginTop: 'var(--space-4)' }}
           disabled={!isValid || isSubmitting}
           onClick={onRunSimulation}
+          title={!isValid ? 'Fill all mandatory inputs above to enable simulation' : 'Run 50 simulated profiles'}
         >
-          <Play size={16} />
+          {!isValid ? <Lock size={15} /> : <Play size={16} />}
           <span>Run 50 simulated profiles</span>
         </button>
 

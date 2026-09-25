@@ -21,35 +21,53 @@
 
 ### Phase 0: Foundation, Persistence, Contracts & Research Workbench Shell
 - **Status:** `COMPLETED & VERIFIED` (Local commit: `272d662`)
+- **Deliverables:**
+  - Initial scaffolding, locked domain contracts, SQLite migrations, Zod validation schemas, deterministic finance engine, base test suites.
+
+### Phase 1: "Set up test" Screen & Durable Draft Persistence
+- **Status:** `COMPLETED & VERIFIED`
 - **Key Deliverables:**
-  1. **Locked Domain Contracts & Enums (`shared/src/types.ts` & `shared/src/validation.ts`)**:
-     - 3 Working Domains: `'clothing_accessories'`, `'local_food_beverages'`, `'digital_products_services'`
-     - Option IDs: `'A'` (Baseline), `'B'` (Alternative)
-     - Primary Levers: `'price'`, `'message'`, `'served_markets'`, `'creative'`
-     - Response Categories: `'interested'`, `'unsure'`, `'not_interested'`, `'unavailable'`
-     - Fixed 50-Profile Split: 20 intended (40%), 20 adjacent (40%), 10 contrasting (20%) = 50 total profiles (100 evaluations across A & B)
-     - Single currency and period per test
-     - Deterministic location access gating: unserved markets marked `unavailable`
-     - Runtime validation with Zod enforcing text lengths, numerical limits, image metadata (max 5MB, PNG/JPEG/WEBP), and 1–4 audience markets
-  2. **Deterministic Financial Scenario Engine (`shared/src/finance.ts`)**:
-     - Calculates contribution per sale ($P - C$), break-even units ($\lceil F / (P - C) \rceil$), capacity constraints ($M$), and user-entered scenario profits ($Q \times (P - C) - F$)
-  3. **SQLite Database & Repository (`server/src/db/`)**:
-     - Tables: `tests`, `offerings`, `options`, `audience_configs`, `profiles`, `runs`, `evaluations`, `human_responses`
-     - Foreign key integrity, WAL mode, cascading deletes
-  4. **Backend REST APIs (`server/src/routes/`)**:
-     - `GET /api/health` — Health check & configured Groq models
-     - `GET /api/tests` — List test drafts
-     - `GET /api/tests/:id` — Retrieve test draft with options and audience configuration
-     - `POST /api/tests` — Save / update test draft with Zod validation
-     - `POST /api/upload` — Multipart image upload with MIME & size validation
-     - `GET /api/feedback/:testId` — Public view of Option A & Option B (no simulated data)
-     - `POST /api/feedback/:testId` — Submit real human feedback
-     - `GET /api/feedback/:testId/stats` — Retrieve human feedback stats
-  5. **Desktop Research Workbench UI (`client/src/`)**:
-     - 2-Column layout: 65% intake column (Domain Template &rarr; Audience & Location &rarr; Core Offering Baseline A &rarr; Alternative B Diff &rarr; Financial Scenarios) and 35% sticky assumption panel (20/20/10 split preview, market coverage counts, diff overview, missing inputs checklist, Run action).
-     - Actionable empty states on `Results` and `Public feedback` pages.
-     - Centralized editable presets (`client/src/config/templates.ts`) with quick-action buttons for Apparel, Food & Beverage, Digital SaaS, and Clear Form.
-     - Custom design tokens in `client/src/styles/tokens.css` with tabular figures and restrained styling.
+  1. **First Fold Guidance & Research Hierarchy**:
+     - Concise guidance banner explaining the 5 intake steps and the 50-persona simulated panel.
+     - Saved Drafts Switcher dropdown with durable rehydration from SQLite.
+     - Quick Starter Presets bar: one-click loading for Apparel, Food & Beverage, Digital SaaS, and Clear Form.
+  2. **Domain-Tailored Intake Forms**:
+     - `clothing_accessories`: Item type, material composition, sizes, unit production cost, shipping details.
+     - `local_food_beverages`: Item name, portion size, ingredients/allergens, pickup/delivery mode, availability window, unit preparation cost.
+     - `digital_products_services`: Core use case, platform & language compatibility, pricing model (one-time vs recurring subscription for first-period calculation), support availability.
+     - Displays strictly relevant tailored fields per selected domain.
+  3. **0–3 Image / Screenshot Management**:
+     - Local multipart uploads via `/api/upload` (and deletion via `/api/upload/:filename`).
+     - Image cards with formatted file sizes (KB/MB), thumbnail preview, accessible removal button (`aria-label="Remove image"`).
+     - Confirmed visual description textarea for each image with honest disclaimer: *"Image attached; describe what it shows for the simulation."*
+     - Enforced mandatory confirmed description when the creative lever is selected.
+  4. **Audience & Location Configuration**:
+     - Character count trackers on Intended (20 personas) and Adjacent (20 personas) buyer descriptions.
+     - Expected spend range min and max with validation ($min \le max$).
+     - 1–4 user-named audience markets with inline add/remove controls.
+  5. **Option B Alternative & Single-Lever Diff Engine**:
+     - Lever selector: `price`, `message`, `served_markets`, `creative`.
+     - Exact A &rarr; B diff summary banner displaying all changed fields.
+     - Linked cost change detector (discloses any per-sale unit cost variance as an explicit finance change).
+     - Option B image uploads and confirmed visual descriptions when testing creative.
+  6. **Deterministic Financial Scenarios (PRD Section 8)**:
+     - Fixed launch cost, variable cost per sale, capacity ceiling, accounting period.
+     - 3 user-entered unit scenarios (lower, central, higher).
+     - Real-time break-even units $\lceil F / (P - C) \rceil$ and net scenario calculation.
+     - Explicit missing-field disclosures when cost inputs are omitted.
+  7. **Assumption Summary & Simulation Readiness Gate**:
+     - 20/20/10 visual segment bar with exact counts (20 intended / 20 adjacent / 10 contrasting).
+     - Reachable market coverage breakdown (Option A vs Option B).
+     - Missing requirements checklist; Run button disabled with explicit reason until all mandatory fields are valid.
+  8. **Responsive 1440px & 390px Styling**:
+     - Desktop (1440px): 2-column research workbench with sticky assumption sidebar.
+     - Mobile (390px): Single-column task order, $\ge 44\text{px}$ touch targets, zero horizontal overflow.
+  9. **Backend Draft CRUD APIs**:
+     - `POST /api/tests` — Save / update draft test.
+     - `GET /api/tests/:id` — Retrieve test draft by ID.
+     - `GET /api/tests` — List all saved drafts.
+     - `DELETE /api/tests/:id` — Delete saved test draft.
+     - `POST /api/upload` & `DELETE /api/upload/:filename` — Manage local images.
 
 ---
 
@@ -80,8 +98,8 @@ DROP-T/
 │   │   │   ├── migrations.ts  # DDL schema definitions & migrations
 │   │   │   └── testRepository.ts # SQL queries for test drafts & feedback
 │   │   ├── routes/
-│   │   │   ├── testRoutes.ts  # Test CRUD endpoints
-│   │   │   ├── uploadRoutes.ts# Multer file upload endpoint
+│   │   │   ├── testRoutes.ts  # Test CRUD endpoints (GET, POST, DELETE)
+│   │   │   ├── uploadRoutes.ts# Multer file upload & delete endpoints
 │   │   │   └── feedbackRoutes.ts # Public feedback submission & stats
 │   │   ├── app.ts             # Express application setup & middleware
 │   │   └── index.ts           # Server entrypoint (Port 3001)
@@ -124,7 +142,7 @@ DROP-T/
 # 1. Install dependencies across all workspaces
 npm install
 
-# 2. Run all unit and database tests
+# 2. Run all unit and database tests (8 passing)
 npm test
 
 # 3. Build all packages (shared, server, client)
@@ -136,21 +154,20 @@ npm run dev
 
 ---
 
-## 5. Next Steps for Phase 1 (Incoming Agent Handoff)
+## 5. Next Steps for Phase 2 (Incoming Agent Handoff)
 
-When starting Phase 1, build upon the locked models and persistence:
-1. **Profile Generation (`server/src/simulation/profileGenerator.ts`)**:
-   - Deterministic 50-persona matrix generation (20 intended, 20 adjacent, 10 contrasting) spread across the configured 1–4 audience markets.
-   - Assign stable profile IDs (`prof_01` .. `prof_50`).
+When starting Phase 2, implement the Simulation Engine and Results Dashboard:
+1. **Profile Generation Engine (`server/src/simulation/profileGenerator.ts`)**:
+   - Deterministic 50-persona matrix generation (20 intended, 20 adjacent, 10 contrasting) spread across configured audience markets.
+   - Assign stable IDs (`prof_01` .. `prof_50`).
+   - Store profile snapshot with the run.
 2. **Groq Evaluation Engine (`server/src/simulation/groqEvaluator.ts`)**:
-   - Evaluate Option A and Option B across the same 50 profiles in batches (5–10 per call).
-   - Deterministic access gate: unserved profiles are immediately marked `unavailable` without calling the model.
-   - Structured JSON response parsing into `evaluations` table.
-   - Bounded retries for rate limits (`429`).
+   - Evaluate Option A and Option B across the same 50 profiles in batches (5–10 per request).
+   - Deterministic access gate: unserved profiles are immediately recorded as `unavailable` with reason, without calling the LLM.
+   - Parse structured output (`interested`, `unsure`, `not_interested`) with qualitative reason and primary objection.
+   - Bounded retries on rate limits (`429`) and partial run resumption.
 3. **Results UI (`client/src/pages/ResultsPage.tsx`)**:
-   - Decision card at top (best next test, key observation with denominator, main objection, missing evidence).
+   - Top decision card (best next test, key simulated observation, main objection, missing evidence).
    - Paired A &rarr; B transition matrix.
-   - Audience segment & market breakdowns.
-   - Persona inspection drawer.
-4. **Public Feedback Sharing (`client/src/pages/PublicFeedbackPage.tsx`)**:
-   - Render public A vs B comparison page with voting controls (A, B, neither, unsure + optional reason).
+   - Segment & market breakdowns with visible denominators.
+   - Inspectable individual persona response drawer.

@@ -92,4 +92,15 @@ describe('DROPTEST Server & Database Repository Tests', () => {
     assert.strictEqual(feedback.counts.neither, 0);
     assert.strictEqual(feedback.counts.unsure, 0);
   });
+
+  it('deletes a draft test cleanly', () => {
+    const tests = TestRepository.listAll();
+    const testId = tests[0].id;
+    const deleted = TestRepository.deleteById(testId);
+    assert.strictEqual(deleted, true);
+
+    const check = TestRepository.getById(testId);
+    assert.strictEqual(check, null);
+  });
 });
+

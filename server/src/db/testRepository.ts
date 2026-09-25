@@ -292,6 +292,15 @@ export class TestRepository {
   }
 
   /**
+   * Delete test by ID
+   */
+  static deleteById(id: string): boolean {
+    const db = getDatabase();
+    const result = db.prepare('DELETE FROM tests WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  /**
    * Submit human response
    */
   static recordHumanResponse(testId: string, choice: HumanChoice, reason?: string, tokenHash?: string): HumanResponse {
