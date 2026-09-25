@@ -704,6 +704,7 @@ export interface ProductPublicDetail extends Product {
     currency: string;
     message: string;
     created_at: string;
+    updated_at?: string;
   };
 }
 

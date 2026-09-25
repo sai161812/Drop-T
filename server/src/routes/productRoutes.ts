@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import { 
   ProductDraftPayloadSchema, 
   ProductPublishPayloadSchema,
-  CommunityFeedbackSubmissionSchema 
+  CommunityFeedbackSubmissionSchema,
+  SupportProposalSubmissionSchema
 } from '@droptest/shared';
 import { ProductRepository } from '../db/productRepository.js';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../middleware/authMiddleware.js';
@@ -39,6 +40,16 @@ productRouter.get('/saved/all', requireAuth, (req: AuthenticatedRequest, res: Re
     res.json({ products });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to load saved products', message: err.message });
+  }
+});
+
+// GET /api/products/proposals/incoming - Support proposals received for founder's products (Owner only)
+productRouter.get('/proposals/incoming', requireAuth, requireRole(['startup']), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const proposals = ProductRepository.getReceivedProposals(req.user!.id);
+    res.json({ proposals });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to load incoming support proposals', message: err.message });
   }
 });
 
@@ -175,6 +186,31 @@ productRouter.get('/:id/feedback/breakdown', requireAuth, requireRole(['startup'
   } catch (err: any) {
     res.status(err.status || 500).json({
       error: err.message || 'Failed to load feedback breakdown'
+    });
+  }
+});
+
+// POST /api/products/:id/support - Submit or edit a support proposal (Sponsor / Startup only)
+productRouter.post('/:id/support', requireAuth, requireRole(['sponsor', 'startup']), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const productId = String(req.params.id);
+    const parseResult = SupportProposalSubmissionSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Invalid support proposal',
+        issues: parseResult.error.issues
+      });
+    }
+
+    const proposal = ProductRepository.upsertSupportProposal(req.user!.id, productId, parseResult.data);
+    res.json({
+      success: true,
+      proposal
+    });
+  } catch (err: any) {
+    res.status(err.status || 500).json({
+      error: err.message || 'Failed to submit support proposal'
     });
   }
 });

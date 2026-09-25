@@ -29,7 +29,10 @@ import {
   User,
   Briefcase,
   Rocket,
-  Lock
+  Lock,
+  HandCoins,
+  X,
+  Info
 } from 'lucide-react';
 
 interface ProductDetailPageProps {
@@ -75,6 +78,15 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState<string | null>(null);
   const [feedbackErrorMsg, setFeedbackErrorMsg] = useState<string | null>(null);
 
+  // Support Proposal Modal state
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState<boolean>(false);
+  const [supportAmount, setSupportAmount] = useState<number | ''>(500);
+  const [supportCurrency, setSupportCurrency] = useState<string>('INR');
+  const [supportMessage, setSupportMessage] = useState<string>('');
+  const [isSubmittingSupport, setIsSubmittingSupport] = useState<boolean>(false);
+  const [supportError, setSupportError] = useState<string | null>(null);
+  const [supportSuccessBanner, setSupportSuccessBanner] = useState<string | null>(null);
+
   // Founder-only feedback breakdown state
   const [founderBreakdown, setFounderBreakdown] = useState<FounderFeedbackBreakdown | null>(null);
   const [isLoadingBreakdown, setIsLoadingBreakdown] = useState<boolean>(false);
@@ -101,6 +113,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         setFeedbackChoice('');
         setFeedbackFactor('');
         setFeedbackReason('');
+      }
+
+      // Pre-fill support proposal if exists
+      if (data.user_proposal) {
+        setSupportAmount(data.user_proposal.amount);
+        setSupportCurrency(data.user_proposal.currency || 'INR');
+        setSupportMessage(data.user_proposal.message || '');
       }
 
       // If owner, fetch detailed breakdown
@@ -232,6 +251,90 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
   };
 
+  const handleOpenSupportModal = () => {
+    if (!token) {
+      onPromptAuth?.();
+      return;
+    }
+    if (product?.user_proposal) {
+      setSupportAmount(product.user_proposal.amount);
+      setSupportCurrency(product.user_proposal.currency || 'INR');
+      setSupportMessage(product.user_proposal.message || '');
+    } else {
+      setSupportAmount(500);
+      setSupportCurrency('INR');
+      setSupportMessage('');
+    }
+    setSupportError(null);
+    setIsSupportModalOpen(true);
+  };
+
+  const handleSubmitSupport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) {
+      onPromptAuth?.();
+      return;
+    }
+
+    const numAmount = Number(supportAmount);
+    if (!numAmount || numAmount <= 0) {
+      setSupportError('Proposed amount must be a positive number.');
+      return;
+    }
+
+    if (!supportMessage.trim() || supportMessage.trim().length < 3) {
+      setSupportError('Please include a message of at least 3 characters explaining your support intent.');
+      return;
+    }
+
+    setIsSubmittingSupport(true);
+    setSupportError(null);
+
+    try {
+      const res = await fetch(`/api/products/${productId}/support`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: numAmount,
+          currency: supportCurrency,
+          message: supportMessage.trim()
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to submit support proposal');
+      }
+
+      const resData = await res.json();
+      if (product) {
+        setProduct({
+          ...product,
+          user_proposal: {
+            id: resData.proposal.id,
+            amount: resData.proposal.amount,
+            currency: resData.proposal.currency,
+            message: resData.proposal.message,
+            created_at: resData.proposal.created_at,
+            updated_at: resData.proposal.updated_at
+          }
+        });
+      }
+
+      setIsSupportModalOpen(false);
+      const currSymbol = supportCurrency === 'INR' ? '₹' : supportCurrency + ' ';
+      setSupportSuccessBanner(`Proposal sent: Proposed ${currSymbol}${numAmount.toLocaleString()}`);
+      setTimeout(() => setSupportSuccessBanner(null), 5000);
+    } catch (err: any) {
+      setSupportError(err.message || 'Error submitting support proposal');
+    } finally {
+      setIsSubmittingSupport(false);
+    }
+  };
+
   const handleCopyLink = () => {
     const url = `${window.location.origin}/product/${productId}`;
     navigator.clipboard.writeText(url);
@@ -240,6 +343,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
 
   const isOwner = user && product && user.id === product.owner_id;
+  const canOfferSupport = user && !isOwner && (user.role === 'sponsor' || user.role === 'startup');
 
   const getCategoryIcon = (cat: ProductCategory) => {
     switch (cat) {
@@ -308,6 +412,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const maybePct = totalFeedback > 0 ? Math.round((counts.maybe / totalFeedback) * 100) : 0;
   const noPct = totalFeedback > 0 ? Math.round((counts.no / totalFeedback) * 100) : 0;
   const hasUserResponded = Boolean(product.feedback_summary.user_feedback);
+  const hasSentProposal = Boolean(product.user_proposal);
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: 'var(--space-6) var(--space-4)' }}>
@@ -333,6 +438,19 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <span>{copiedLink ? 'Link Copied!' : 'Share URL'}</span>
           </button>
 
+          {/* Offer Support Button (Sponsors and other Startups) */}
+          {canOfferSupport && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+              onClick={handleOpenSupportModal}
+            >
+              <HandCoins size={14} />
+              <span>{hasSentProposal ? 'Update Support' : 'Offer Support'}</span>
+            </button>
+          )}
+
           {/* Owner Actions */}
           {isOwner && (
             <>
@@ -357,6 +475,14 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           )}
         </div>
       </div>
+
+      {/* Support Success Notification Banner */}
+      {supportSuccessBanner && (
+        <div className="status-banner status-banner-success" style={{ marginBottom: 'var(--space-4)' }}>
+          <Check size={16} />
+          <span>{supportSuccessBanner}</span>
+        </div>
+      )}
 
       {/* Main Product Card */}
       <div style={{
@@ -443,8 +569,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               {product.name}
             </h1>
 
-            {/* Price Tag */}
-            <div style={{ marginBottom: '16px' }}>
+            {/* Price Tag & Sent Proposal Tag */}
+            <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               {product.price !== null ? (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
                   <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
@@ -455,6 +581,25 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               ) : (
                 <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', fontSize: '13px' }}>
                   Launch price not decided yet
+                </span>
+              )}
+
+              {/* Proposal Sent Status Pill */}
+              {hasSentProposal && product.user_proposal && (
+                <span style={{
+                  background: '#DCFCE7',
+                  color: '#15803D',
+                  border: '1px solid #86EFAC',
+                  padding: '4px 10px',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <Check size={13} />
+                  <span>Proposal sent: Proposed {product.user_proposal.currency === 'INR' ? '₹' : product.user_proposal.currency + ' '}{product.user_proposal.amount.toLocaleString()}</span>
                 </span>
               )}
             </div>
@@ -499,7 +644,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </span>
             </div>
 
-            {/* Save / Unsave Action Button */}
+            {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
@@ -511,6 +656,18 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 {isSaved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
                 <span>{isSaved ? 'Saved' : 'Save'}</span>
               </button>
+
+              {canOfferSupport && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '13px', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={handleOpenSupportModal}
+                >
+                  <HandCoins size={16} />
+                  <span>{hasSentProposal ? 'Edit Proposal' : 'Offer Support'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -986,6 +1143,145 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               No individual feedback submissions recorded yet. When shoppers or backers respond, their answers will appear here.
             </div>
           )}
+        </div>
+      )}
+
+      {/* Offer Support Proposal Modal */}
+      {isSupportModalOpen && (
+        <div className="modal-backdrop" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div className="workbench-card" style={{
+            maxWidth: '520px',
+            width: '100%',
+            background: 'var(--color-surface)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            padding: '24px',
+            position: 'relative'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <HandCoins size={20} color="var(--color-primary)" />
+                  <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                    {hasSentProposal ? 'Update Support Proposal' : 'Offer Support'}
+                  </h3>
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0 }}>
+                  Propose early backing to help <strong>{product.owner.startup_name || product.owner.display_name}</strong> launch.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsSupportModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Non-binding notice */}
+            <div style={{
+              background: '#F0FDF4',
+              border: '1px solid #BBF7D0',
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              fontSize: '12px',
+              color: '#166534'
+            }}>
+              <Info size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span>
+                This is a recorded proposal of backing to the founder. No payment or financial transaction occurs on DROPTEST.
+              </span>
+            </div>
+
+            {supportError && (
+              <div className="status-banner status-banner-error" style={{ marginBottom: '14px', fontSize: '13px' }}>
+                <span>{supportError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitSupport}>
+              {/* Proposed Amount Input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
+                  Proposed Amount (₹ INR) <span style={{ color: 'var(--color-danger)' }}>*</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    className="form-input"
+                    placeholder="500"
+                    value={supportAmount}
+                    onChange={e => setSupportAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    style={{ paddingLeft: '32px', fontSize: '14px', fontWeight: 600 }}
+                    required
+                  />
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
+                  Enter any positive amount you would like to propose for backing this batch.
+                </span>
+              </div>
+
+              {/* Message Input */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
+                  Proposal Message / Backing Terms <span style={{ color: 'var(--color-danger)' }}>*</span>
+                </label>
+                <textarea
+                  className="form-input"
+                  rows={4}
+                  placeholder="e.g. Interested in early batch pre-orders for 20 units or testing in our workspace..."
+                  maxLength={1000}
+                  value={supportMessage}
+                  onChange={e => setSupportMessage(e.target.value)}
+                  style={{ fontSize: '13px', resize: 'vertical' }}
+                  required
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsSupportModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSubmittingSupport || !supportAmount || Number(supportAmount) <= 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <HandCoins size={14} />
+                  <span>{isSubmittingSupport ? 'Sending...' : hasSentProposal ? 'Update Proposal' : 'Submit Proposal'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

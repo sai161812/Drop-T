@@ -13,6 +13,7 @@ import {
   ProductFeedback,
   FounderFeedbackBreakdown,
   FounderFeedbackItem,
+  SupportProposal,
   PublicUser
 } from '@droptest/shared';
 import { AuthRepository } from './authRepository.js';
@@ -203,16 +204,17 @@ export class ProductRepository {
     }
 
     // Get current user's proposal if any
-    let userProposal: { id: string; amount: number; currency: string; message: string; created_at: string } | undefined;
+    let userProposal: { id: string; amount: number; currency: string; message: string; created_at: string; updated_at?: string } | undefined;
     if (currentUserId) {
-      const propRow = db.prepare('SELECT id, amount, currency, message, created_at FROM support_proposals WHERE product_id = ? AND sender_id = ?').get(productId, currentUserId) as any;
+      const propRow = db.prepare('SELECT id, amount, currency, message, created_at, updated_at FROM support_proposals WHERE product_id = ? AND sender_id = ?').get(productId, currentUserId) as any;
       if (propRow) {
         userProposal = {
           id: propRow.id,
           amount: propRow.amount,
           currency: propRow.currency,
           message: propRow.message,
-          created_at: propRow.created_at
+          created_at: propRow.created_at,
+          updated_at: propRow.updated_at
         };
       }
     }
@@ -543,5 +545,122 @@ export class ProductRepository {
       factor_counts: factorCounts,
       responses
     };
+  }
+
+  /**
+   * Submit or update a support proposal on another startup's product.
+   * Allowed roles: sponsor, startup.
+   * One proposal per (sender_id, product_id): updates existing record if submitted again.
+   */
+  static upsertSupportProposal(
+    senderId: string,
+    productId: string,
+    payload: { amount: number; currency: string; message: string }
+  ): SupportProposal {
+    const db = getDatabase();
+    const product = this.getRawById(productId);
+    if (!product) {
+      throw Object.assign(new Error('Product not found'), { status: 404 });
+    }
+
+    const sender = AuthRepository.getUserById(senderId);
+    if (!sender) {
+      throw Object.assign(new Error('User not found'), { status: 401 });
+    }
+
+    if (sender.role !== 'sponsor' && sender.role !== 'startup') {
+      throw Object.assign(new Error('Only sponsors and startup founders can offer support proposals'), { status: 403 });
+    }
+
+    if (product.owner_id === senderId) {
+      throw Object.assign(new Error('Founders cannot submit support proposals to their own products'), { status: 400 });
+    }
+
+    if (payload.amount <= 0) {
+      throw Object.assign(new Error('Proposed amount must be a positive number'), { status: 400 });
+    }
+
+    const now = new Date().toISOString();
+    const existing = db.prepare('SELECT id, created_at FROM support_proposals WHERE sender_id = ? AND product_id = ?').get(senderId, productId) as any;
+
+    let proposalId: string;
+    let createdAt: string;
+
+    if (existing) {
+      proposalId = existing.id;
+      createdAt = existing.created_at;
+      db.prepare(`
+        UPDATE support_proposals
+        SET amount = ?, currency = ?, message = ?, updated_at = ?
+        WHERE sender_id = ? AND product_id = ?
+      `).run(payload.amount, payload.currency || 'INR', payload.message.trim(), now, senderId, productId);
+    } else {
+      proposalId = uuidv4();
+      createdAt = now;
+      db.prepare(`
+        INSERT INTO support_proposals (
+          id, sender_id, product_id, recipient_id, amount, currency, message, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        proposalId,
+        senderId,
+        productId,
+        product.owner_id,
+        payload.amount,
+        payload.currency || 'INR',
+        payload.message.trim(),
+        createdAt,
+        now
+      );
+    }
+
+    return {
+      id: proposalId,
+      sender_id: senderId,
+      sender_name: sender.display_name,
+      sender_role: sender.role,
+      sender_startup_name: sender.startup_name || undefined,
+      product_id: productId,
+      product_name: product.name,
+      recipient_id: product.owner_id,
+      amount: payload.amount,
+      currency: payload.currency || 'INR',
+      message: payload.message.trim(),
+      created_at: createdAt,
+      updated_at: now
+    };
+  }
+
+  /**
+   * Get all incoming support proposals received for the startup founder's products.
+   */
+  static getReceivedProposals(recipientId: string): SupportProposal[] {
+    const db = getDatabase();
+    const rows = db.prepare(`
+      SELECT sp.*, u.display_name as sender_name, u.role as sender_role, u.startup_name as sender_startup_name,
+             p.name as product_name
+      FROM support_proposals sp
+      JOIN users u ON sp.sender_id = u.id
+      JOIN products p ON sp.product_id = p.id
+      WHERE sp.recipient_id = ?
+      ORDER BY sp.updated_at DESC
+    `).all(recipientId) as any[];
+
+    return rows.map(r => ({
+      id: r.id,
+      sender_id: r.sender_id,
+      sender_name: r.sender_name,
+      sender_role: r.sender_role,
+      sender_startup_name: r.sender_startup_name || undefined,
+      product_id: r.product_id,
+      product_name: r.product_name,
+      recipient_id: r.recipient_id,
+      amount: r.amount,
+      currency: r.currency,
+      message: r.message,
+      created_at: r.created_at,
+      updated_at: r.updated_at
+    }));
   }
 }
