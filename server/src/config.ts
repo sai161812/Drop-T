@@ -39,12 +39,14 @@ const parsedGroqKeys = parseGroqApiKeys();
 export const config: ServerConfig = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  dataDir: process.env.DATA_DIR
+  // Vercel's deployment filesystem is read-only, even when local .env paths
+  // have been copied into the project's environment variables.
+  dataDir: process.env.VERCEL ? '/tmp/data' : process.env.DATA_DIR
     ? path.resolve(process.cwd(), process.env.DATA_DIR)
-    : (process.env.VERCEL ? '/tmp/data' : path.resolve(process.cwd(), './data')),
-  uploadDir: process.env.UPLOAD_DIR
+    : path.resolve(process.cwd(), './data'),
+  uploadDir: process.env.VERCEL ? '/tmp/uploads' : process.env.UPLOAD_DIR
     ? path.resolve(process.cwd(), process.env.UPLOAD_DIR)
-    : (process.env.VERCEL ? '/tmp/uploads' : path.resolve(process.cwd(), './uploads')),
+    : path.resolve(process.cwd(), './uploads'),
   groqApiKey: parsedGroqKeys[0] || process.env.GROQ_API_KEY || '',
   groqApiKeys: parsedGroqKeys,
   groqModel: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
