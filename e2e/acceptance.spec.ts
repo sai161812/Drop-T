@@ -177,9 +177,9 @@ test.describe('DROPTEST browser acceptance', () => {
 
     await page.getByRole('button', { name: 'Private Synthetic Lab' }).click();
     await expect(page).toHaveURL(/\/lab\?product=/);
-    await expect(page.getByText(`${productName} — AI Persona Evaluation`)).toBeVisible();
+    await expect(page.getByRole('heading', { name: `${productName} — Synthetic Review`, exact: true })).toBeVisible();
     await page.reload();
-    await expect(page.getByText(`${productName} — AI Persona Evaluation`)).toBeVisible();
+    await expect(page.getByRole('heading', { name: `${productName} — Synthetic Review`, exact: true })).toBeVisible();
 
     await page.goto(productUrl);
     await expect(page.getByRole('heading', { name: productName })).toBeVisible();

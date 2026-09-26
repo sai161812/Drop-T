@@ -18,11 +18,6 @@ import { DOMAIN_PRESETS } from '../config/templates.js';
 import { 
   FolderOpen, 
   FlaskConical, 
-  Rocket, 
-  Package, 
-  Users, 
-  TrendingUp, 
-  Cpu, 
   CheckCircle2, 
   AlertTriangle, 
   Lock, 
@@ -30,9 +25,7 @@ import {
   ArrowRight, 
   ArrowLeft, 
   Save,
-  Sparkles,
   RefreshCw,
-  Sliders
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 import './SetupTestPage.css';
@@ -62,8 +55,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 }) => {
   const { token } = useAuth();
   
-  // Page navigation state (Default: 'overview')
-  const [activePage, setActivePage] = useState<LabPageId>('overview');
+  const [activePage, setActivePage] = useState<LabPageId>('offering');
 
   // Active test ID if saved
   const [testId, setTestId] = useState<string | undefined>(activeTestId);
@@ -628,38 +620,33 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
     return [
       {
-        id: 'overview' as LabPageId,
-        title: 'Overview & Evidence',
-        subtitle: 'Review mode & market research',
-        icon: Rocket,
-        isComplete: isOverviewComplete
-      },
-      {
         id: 'offering' as LabPageId,
-        title: 'Product & Offering',
-        subtitle: mode === 'comparison' ? 'Baseline A & Variant B' : 'Specifications & baseline',
-        icon: Package,
+        title: 'Your Idea',
+        subtitle: mode === 'comparison' ? 'Idea and comparison' : 'What you want to validate',
         isComplete: isOfferingComplete
       },
       {
         id: 'audience' as LabPageId,
-        title: 'Target Audience',
-        subtitle: 'Buyer personas & locations',
-        icon: Users,
+        title: 'Audience',
+        subtitle: 'Who should care',
         isComplete: isAudienceComplete
       },
       {
+        id: 'overview' as LabPageId,
+        title: 'Market Check',
+        subtitle: 'Sources and comparables',
+        isComplete: isOverviewComplete
+      },
+      {
         id: 'financials' as LabPageId,
-        title: 'Unit Economics',
-        subtitle: 'Costs & volume scenarios',
-        icon: TrendingUp,
+        title: 'Launch Numbers',
+        subtitle: 'Optional costs and scenarios',
         isComplete: isFinancialsComplete
       },
       {
         id: 'simulation' as LabPageId,
-        title: 'Simulation Panel',
-        subtitle: '50 Personas & launchpad',
-        icon: Cpu,
+        title: 'Review & Run',
+        subtitle: '50 personas and idea profile',
         isComplete: isFormValid
       }
     ];
@@ -719,8 +706,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         {/* Step Pages Navigation List */}
         <nav aria-label="Synthetic Lab Sections">
           <ul className="lab-nav-list">
-            {labPages.map((page) => {
-              const Icon = page.icon;
+            {labPages.map((page, pageIndex) => {
               const isActive = activePage === page.id;
               return (
                 <li key={page.id} className="lab-nav-item">
@@ -732,7 +718,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                   >
                     <div className="lab-nav-btn-content">
                       <div className="lab-nav-icon-wrap">
-                        <Icon size={14} />
+                        <span>{String(pageIndex + 1).padStart(2, '0')}</span>
                       </div>
                       <div className="lab-nav-text">
                         <span className="lab-nav-label">{page.title}</span>
@@ -758,7 +744,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
         <div className="lab-sidebar-footer">
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-              <span>Configuration Status</span>
+              <span>Setup progress</span>
               <span className="tabular-nums" style={{ fontWeight: 600 }}>{completedCount}/{labPages.length}</span>
             </div>
             <div className="lab-progress-bar-wrap">
@@ -775,7 +761,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
             disabled={isLocked || isSubmitting || isSavingLocal || runState.status === 'running'}
           >
             {isSavingLocal ? <RefreshCw size={12} className="spin" /> : <Save size={12} />}
-            <span>{isSavingLocal ? 'Saving...' : 'Save Lab Draft'}</span>
+            <span>{isSavingLocal ? 'Saving...' : 'Save draft'}</span>
           </button>
 
           {/* Saved Drafts Dropdown (Only when not in a linked product and there are drafts) */}
@@ -812,7 +798,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
             title={!isFormValid ? 'Complete all required inputs to run simulation' : 'Launch 50-profile synthetic simulation'}
           >
             {!isFormValid ? <Lock size={13} /> : <Play size={13} />}
-            <span>{mode === 'single' ? 'Run Review (50)' : 'Run A/B Review (100)'}</span>
+            <span>{mode === 'single' ? 'Run 50-persona review' : 'Run A/B review'}</span>
           </button>
         </div>
       </aside>
@@ -938,14 +924,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           <div className="lab-page-body">
             <div className="lab-page-header">
               <div className="lab-page-title-group">
-                <div className="lab-page-breadcrumb">
-                  <span>Synthetic Lab</span>
-                  <span>/</span>
-                  <span>Overview & Evidence</span>
-                </div>
-                <h1 className="lab-page-title">Launch Overview & Market Evidence</h1>
+                <div className="lab-page-breadcrumb"><span>Step 03</span><span>of 05</span></div>
+                <h1 className="lab-page-title">Check the market around your idea</h1>
                 <p className="lab-page-desc">
-                  Set evaluation mode, verify launch pricing, and extract live competitor search references.
+                  Find comparable products and select sources to ground the review.
                 </p>
               </div>
             </div>
@@ -953,32 +935,26 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
             {/* Quick Context Highlights */}
             <div className="lab-overview-grid">
               <div className="lab-overview-card">
-                <div className="lab-overview-card-title">
-                  <Cpu size={14} color="var(--color-text-secondary)" />
-                  <span>AI Consumer Panel Engine</span>
-                </div>
+                <span className="lab-overview-index">01</span>
+                <div className="lab-overview-card-title">Market evidence</div>
                 <div className="lab-overview-card-value">
-                  Powered by Llama 3.3 70B via Groq. Evaluates willingness-to-pay and objections across 50 consumer profiles.
+                  Compare your idea with existing products, prices, and selected source claims.
                 </div>
               </div>
 
               <div className="lab-overview-card">
-                <div className="lab-overview-card-title">
-                  <Sparkles size={14} color="var(--color-text-secondary)" />
-                  <span>Market Intelligence</span>
-                </div>
+                <span className="lab-overview-index">02</span>
+                <div className="lab-overview-card-title">50 buyer perspectives</div>
                 <div className="lab-overview-card-value">
-                  Retrieves live comparable market prices and competitor claims to ground persona reasoning in real market data.
+                  Intended, adjacent, and contrasting personas assess the same idea and evidence.
                 </div>
               </div>
 
               <div className="lab-overview-card">
-                <div className="lab-overview-card-title">
-                  <Sliders size={14} color="var(--color-text-secondary)" />
-                  <span>Decision Isolation</span>
-                </div>
+                <span className="lab-overview-index">03</span>
+                <div className="lab-overview-card-title">Idea profile</div>
                 <div className="lab-overview-card-value">
-                  Single-product review validates concept viability. A/B mode isolates price, messaging, or creative levers.
+                  Results bring together strengths, objections, sources, and suggested next moves.
                 </div>
               </div>
             </div>
@@ -1004,14 +980,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           <div className="lab-page-body">
             <div className="lab-page-header">
               <div className="lab-page-title-group">
-                <div className="lab-page-breadcrumb">
-                  <span>Synthetic Lab</span>
-                  <span>/</span>
-                  <span>Product & Offering</span>
-                </div>
-                <h1 className="lab-page-title">Product Offering & Baseline Variant</h1>
+                <div className="lab-page-breadcrumb"><span>Step 01</span><span>of 05</span></div>
+                <h1 className="lab-page-title">Describe the idea</h1>
                 <p className="lab-page-desc">
-                  Select your product domain category and detail your core value proposition, specs, and visual creative.
+                  Add the product, its promise, key details, price, and an image. A rough concept is enough.
                 </p>
               </div>
             </div>
@@ -1065,14 +1037,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           <div className="lab-page-body">
             <div className="lab-page-header">
               <div className="lab-page-title-group">
-                <div className="lab-page-breadcrumb">
-                  <span>Synthetic Lab</span>
-                  <span>/</span>
-                  <span>Target Audience</span>
-                </div>
-                <h1 className="lab-page-title">Target Audience & Served Markets</h1>
+                <div className="lab-page-breadcrumb"><span>Step 02</span><span>of 05</span></div>
+                <h1 className="lab-page-title">Define who it is for</h1>
                 <p className="lab-page-desc">
-                  Specify your ideal intended customer, adjacent market profiles, expected spend boundaries, and delivery cities.
+                  Describe the primary buyer, a nearby audience, expected spend, and where you can reach them.
                 </p>
               </div>
             </div>
@@ -1101,14 +1069,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           <div className="lab-page-body">
             <div className="lab-page-header">
               <div className="lab-page-title-group">
-                <div className="lab-page-breadcrumb">
-                  <span>Synthetic Lab</span>
-                  <span>/</span>
-                  <span>Unit Economics</span>
-                </div>
-                <h1 className="lab-page-title">Unit Economics & Sales Scenarios</h1>
+                <div className="lab-page-breadcrumb"><span>Step 04</span><span>of 05 · Optional</span></div>
+                <h1 className="lab-page-title">Add launch numbers</h1>
                 <p className="lab-page-desc">
-                  Model fixed setup costs, variable margins per unit, and projected volume scenarios (conservative, target, optimistic).
+                  Add costs and sales estimates to include break-even guidance in your idea profile.
                 </p>
               </div>
             </div>
@@ -1144,14 +1108,10 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
           <div className="lab-page-body">
             <div className="lab-page-header">
               <div className="lab-page-title-group">
-                <div className="lab-page-breadcrumb">
-                  <span>Synthetic Lab</span>
-                  <span>/</span>
-                  <span>Simulation Panel</span>
-                </div>
-                <h1 className="lab-page-title">Simulation Panel & Launchpad</h1>
+                <div className="lab-page-breadcrumb"><span>Step 05</span><span>of 05</span></div>
+                <h1 className="lab-page-title">Review the brief and run the lab</h1>
                 <p className="lab-page-desc">
-                  Inspect the deterministic 50-consumer persona distribution and launch your AI evaluation run.
+                  Confirm what the lab will evaluate. The result becomes a clear idea profile.
                 </p>
               </div>
             </div>
@@ -1161,17 +1121,17 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {isFormValid ? <CheckCircle2 size={16} color="var(--color-text-primary)" /> : <AlertTriangle size={16} color="var(--color-text-secondary)" />}
-                  <span>Simulation Readiness Checklist</span>
+                  <span>{isFormValid ? 'Ready for review' : 'Complete the brief'}</span>
                 </h2>
                 <span className="badge" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }}>
-                  {isFormValid ? 'All Requirements Met' : `${missingInputs.length} Requirement(s) Needed`}
+                  {isFormValid ? 'Ready' : `${missingInputs.length} remaining`}
                 </span>
               </div>
 
               {missingInputs.length > 0 ? (
                 <div style={{ marginBottom: '16px' }}>
                   <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-                    Complete the following required fields to enable the 50-profile evaluation:
+                    Add these details before running the review:
                   </p>
                   <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {missingInputs.map((item, idx) => (
@@ -1181,7 +1141,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 </div>
               ) : (
                 <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
-                  Your product proposal, market evidence, audience parameters, and economic assumptions are fully verified and ready.
+                  The idea and audience are complete. You can run the 50-persona review.
                 </p>
               )}
 
@@ -1198,8 +1158,8 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                     {isSubmitting || runState.status === 'running' 
                       ? 'Running 50-Profile Evaluation...' 
                       : mode === 'single' 
-                        ? 'Launch Product Review (50 Personas)' 
-                        : 'Launch Comparative Review (100 Evaluations)'}
+                        ? 'Run 50-persona review' 
+                        : 'Run A/B persona review'}
                   </span>
                 </button>
 
@@ -1210,28 +1170,52 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                     style={{ padding: '10px 16px', fontSize: '14px' }}
                     onClick={onNavigateToResults}
                   >
-                    View Completed Results &rarr;
+                    Open idea profile &rarr;
                   </button>
                 )}
               </div>
             </div>
 
-            {/* 50-Profile Panel Review */}
-            <ProfileReviewPanel
-              seed={panelSeed}
-              onSeedChange={setPanelSeed}
-              locked={isLocked || runState.status === 'running'}
-              testId={testId}
-              domainId={domainId}
-              intendedBuyer={intendedBuyer}
-              adjacentBuyer={adjacentBuyer}
-              expectedSpendMin={expectedSpendMin}
-              expectedSpendMax={expectedSpendMax}
-              audienceMarkets={audienceMarkets}
-              currency={currency}
-              optionA={{ name: optionA.name, served_markets: optionA.served_markets }}
-              optionB={mode === 'comparison' ? { name: optionB.name, served_markets: optionB.served_markets } : undefined}
-            />
+            <section className="idea-profile-preview" aria-labelledby="idea-profile-preview-title">
+              <div className="idea-profile-visual">
+                {optionA.images?.[0]?.url ? <img src={optionA.images[0].url} alt="" /> : <span>Idea image</span>}
+              </div>
+              <div className="idea-profile-content">
+                <div className="idea-profile-kicker">Idea profile preview</div>
+                <h2 id="idea-profile-preview-title">{title || optionA.name || 'Untitled idea'}</h2>
+                <p>{shortValueProp || 'Add a clear promise in the Idea step.'}</p>
+                <dl className="idea-profile-facts">
+                  <div><dt>Audience</dt><dd>{intendedBuyer || 'Not defined'}</dd></div>
+                  <div><dt>Category</dt><dd>{domainId.replaceAll('_', ' ')}</dd></div>
+                  <div><dt>Review</dt><dd>{mode === 'single' ? '50 personas' : '100 paired evaluations'}</dd></div>
+                  <div><dt>Output</dt><dd>Strengths, objections, evidence, next moves</dd></div>
+                </dl>
+              </div>
+            </section>
+
+            <details className="lab-persona-details">
+              <summary>
+                <span><strong>Inspect the 50-persona panel</strong><small>20 intended · 20 adjacent · 10 contrasting</small></span>
+                <span aria-hidden="true">+</span>
+              </summary>
+              <div className="lab-persona-details-body">
+                <ProfileReviewPanel
+                  seed={panelSeed}
+                  onSeedChange={setPanelSeed}
+                  locked={isLocked || runState.status === 'running'}
+                  testId={testId}
+                  domainId={domainId}
+                  intendedBuyer={intendedBuyer}
+                  adjacentBuyer={adjacentBuyer}
+                  expectedSpendMin={expectedSpendMin}
+                  expectedSpendMax={expectedSpendMax}
+                  audienceMarkets={audienceMarkets}
+                  currency={currency}
+                  optionA={{ name: optionA.name, served_markets: optionA.served_markets }}
+                  optionB={mode === 'comparison' ? { name: optionB.name, served_markets: optionB.served_markets } : undefined}
+                />
+              </div>
+            </details>
           </div>
         )}
 
@@ -1249,7 +1233,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
               </button>
             ) : (
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                Overview
+                Start
               </span>
             )}
           </div>
@@ -1272,7 +1256,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
                 onClick={() => void handleRunSimulation()}
               >
                 <Play size={14} />
-                <span>Launch 50-Profile Simulation</span>
+                <span>Run 50-persona review</span>
               </button>
             )}
           </div>

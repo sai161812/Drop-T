@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 
-const EXPLORE_PRODUCT_LIMIT = 16;
+const EXPLORE_PRODUCT_LIMIT = 50;
 
 interface ExplorePageProps {
   onOpenProduct: (productId: string) => void;

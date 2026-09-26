@@ -32,7 +32,8 @@ import {
   Lock,
   HandCoins,
   X,
-  Info
+  Info,
+  Trash2
 } from 'lucide-react';
 
 interface ProductDetailPageProps {
@@ -494,6 +495,33 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 onClick={() => onOpenSyntheticLab(product.id)}
               >
                 <FlaskConical size={14} /> Private Synthetic Lab
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-danger)' }}
+                onClick={async () => {
+                  if (!window.confirm(`Are you sure you want to delete "${product.name}"? This will permanently remove this product and all its test simulations.`)) {
+                    return;
+                  }
+                  try {
+                    const res = await fetch(`/api/products/${product.id}`, {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (!res.ok) {
+                      const body = await res.json().catch(() => ({}));
+                      throw new Error(body.error || 'Failed to delete product');
+                    }
+                    onNavigateBack();
+                  } catch (err: any) {
+                    alert(err.message || 'Error deleting product');
+                  }
+                }}
+                title="Delete Product"
+              >
+                <Trash2 size={14} /> Delete Product
               </button>
             </>
           )}

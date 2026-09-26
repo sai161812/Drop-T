@@ -264,7 +264,7 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
               }}
             >
               <FlaskConical size={12} />
-              Synthetic Lab Preflight
+              Review setup
             </span>
             {product && (
               <span className="badge" style={{ background: '#F1F5F9', color: '#475569', fontSize: '11px' }}>
@@ -281,18 +281,18 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
               }}
             >
               {selectedCount > 0 && !skipResearch 
-                ? `Market Research Attached (${selectedCount} references)` 
+                ? `${selectedCount} source${selectedCount === 1 ? '' : 's'} selected` 
                 : skipResearch 
-                  ? 'Simulation Without Research'
-                  : 'Direct Simulation (No Research)'}
+                  ? 'Review without sources'
+                  : 'Sources not added'}
             </span>
           </div>
 
           <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            {product ? `${product.name} — AI Persona Evaluation` : 'Synthetic Lab Workbench'}
+            {product ? `${product.name} — validation brief` : 'Choose how to validate the idea'}
           </h3>
           <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-            Evaluate your product against 50 distinct buyer personas (20 intended / 20 adjacent / 10 contrasting). All costs, private inputs, and market references remain strictly private.
+            Use one 50-persona review, or compare two versions of the same idea. Your private inputs stay private.
           </p>
         </div>
 
@@ -304,7 +304,7 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
             style={{ fontSize: '11px', padding: '4px 10px', height: '28px' }}
             onClick={() => onModeChange('single')}
           >
-            Single Product (50 Evals)
+            One idea · 50 personas
           </button>
           <button
             type="button"
@@ -312,7 +312,7 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
             style={{ fontSize: '11px', padding: '4px 10px', height: '28px' }}
             onClick={() => onModeChange('comparison')}
           >
-            A/B Comparison (100 Evals)
+            Compare A/B · 100 reviews
           </button>
         </div>
       </div>
@@ -369,14 +369,14 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Search size={15} color="var(--color-primary)" />
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                Market Research & Comparable Products
+                Existing products and sources
               </span>
               <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginLeft: '4px' }}>
                 ({selectedCount}/5 selected for simulation)
               </span>
             </div>
             <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-              Automatic search finds comparable alternatives across served markets. Verified snippet facts are provided to each persona during evaluation.
+              Find relevant alternatives, then choose up to five sources to ground the validation.
             </p>
           </div>
 
@@ -398,7 +398,7 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
               disabled={isSearching}
             >
               <Search size={13} className={isSearching ? 'animate-spin' : ''} />
-              {isSearching ? 'Searching Web...' : 'Find Comparable Products'}
+              {isSearching ? 'Searching...' : 'Search existing products'}
             </button>
           </div>
         </div>
@@ -566,25 +566,14 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '14px', color: 'var(--color-text-muted)', fontSize: '11px', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
-            No market references retrieved yet. Click <strong>Find Comparable Products</strong> to automatically search the web or add links manually.
+            No sources yet. Search existing products or add a reference you already trust.
           </div>
         )}
       </div>
 
-      {/* Provider Status & Smoke Test Strip */}
-      <div 
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          flexWrap: 'wrap', 
-          gap: '10px',
-          paddingTop: 'var(--space-2)',
-          borderTop: '1px solid var(--color-border-subtle)',
-          fontSize: '11px',
-          color: 'var(--color-text-secondary)'
-        }}
-      >
+      <details className="lab-technical-details">
+        <summary>Technical status</summary>
+        <div className="lab-technical-details-body">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <span>
             Mode: <strong>{mode === 'single' ? 'Single Product (50 Persona Evaluations)' : 'A/B Comparison (100 Paired Evaluations)'}</strong>
@@ -621,7 +610,8 @@ export const PreflightLabCard: React.FC<PreflightLabCardProps> = ({
           <RefreshCw size={11} className={isTestingProvider ? 'animate-spin' : ''} />
           {isTestingProvider ? 'Testing Model...' : 'Smoke Test Engine'}
         </button>
-      </div>
+        </div>
+      </details>
     </div>
   );
 };

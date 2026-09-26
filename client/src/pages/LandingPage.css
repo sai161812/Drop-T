@@ -285,7 +285,7 @@
 
 .dropdown-item-num {
   display: inline-block;
-  color: rgba(255, 255, 255, 0.44);
+  color: #b8b8bc;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11.5px;
   font-weight: 700;

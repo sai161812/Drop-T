@@ -13,7 +13,9 @@ import {
   Briefcase,
   Rocket,
   ArrowRight,
-  Info
+  Info,
+  Trash2,
+  Check
 } from 'lucide-react';
 
 interface MyProductsPageProps {
@@ -34,6 +36,8 @@ export const MyProductsPage: React.FC<MyProductsPageProps> = ({
   const [products, setProducts] = useState<(Product & { save_count: number; feedback_count: number })[]>([]);
   const [proposals, setProposals] = useState<SupportProposal[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -61,6 +65,34 @@ export const MyProductsPage: React.FC<MyProductsPageProps> = ({
       setError(err.message || 'Error fetching founder dashboard data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${productName}"? This will permanently remove the product and all associated simulations.`
+    );
+    if (!confirmDelete) return;
+
+    setDeletingId(productId);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const res = await fetch(`/api/products/${productId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to delete product');
+      }
+      setProducts(prev => prev.filter(p => p.id !== productId));
+      setSuccessMessage(`Product "${productName}" was deleted.`);
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err: any) {
+      setError(err.message || 'Error deleting product');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -139,6 +171,13 @@ export const MyProductsPage: React.FC<MyProductsPageProps> = ({
       {error && (
         <div role="alert" style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-4)' }}>
           {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div role="status" style={{ background: '#DCFCE7', border: '1px solid #86EFAC', color: '#15803D', padding: '10px 14px', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+          <Check size={16} />
+          <span>{successMessage}</span>
         </div>
       )}
 
@@ -225,7 +264,7 @@ export const MyProductsPage: React.FC<MyProductsPageProps> = ({
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="btn btn-secondary"
@@ -256,7 +295,25 @@ export const MyProductsPage: React.FC<MyProductsPageProps> = ({
                     style={{ fontSize: '12px', padding: '6px 10px' }}
                     onClick={() => onOpenSyntheticLab(p.id, 'new')}
                   >
-                    New review from current product
+                    New review
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{
+                      fontSize: '12px',
+                      padding: '6px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      color: 'var(--color-danger)'
+                    }}
+                    onClick={() => handleDeleteProduct(p.id, p.name)}
+                    disabled={deletingId === p.id}
+                    title={`Delete ${p.name}`}
+                  >
+                    <Trash2 size={13} />
+                    <span>{deletingId === p.id ? 'Deleting...' : 'Delete'}</span>
                   </button>
                 </div>
               </div>

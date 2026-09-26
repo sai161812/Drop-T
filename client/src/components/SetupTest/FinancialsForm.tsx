@@ -80,10 +80,10 @@ export const FinancialsForm: React.FC<FinancialsFormProps> = ({
       <div className="card-header">
         <div>
           <h2 className="card-title">
-            <span>Deterministic Financial Scenarios (Optional)</span>
+            <span>Optional launch assumptions</span>
           </h2>
           <p className="card-description">
-            Calculate exact break-even units and conditional net profit. Scenarios use user-entered unit volumes, not simulated panel counts.
+            Add costs and sales estimates to include break-even guidance in the final idea profile.
           </p>
         </div>
       </div>
@@ -164,7 +164,7 @@ export const FinancialsForm: React.FC<FinancialsFormProps> = ({
       {/* User-Entered Sales Scenarios */}
       <div style={{ marginTop: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
         <label className="form-label" style={{ marginBottom: '8px' }}>
-          <span>User-Entered Sales Scenarios (Units sold in {period.replace('_', ' ')})</span>
+          <span>Sales scenarios (units sold in {period.replace('_', ' ')})</span>
         </label>
         <div className="form-row">
           <div className="form-group">
@@ -212,7 +212,7 @@ export const FinancialsForm: React.FC<FinancialsFormProps> = ({
       <div style={{ background: 'var(--color-surface-subtle)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-3)' }}>
           <Calculator size={16} />
-          <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>Deterministic Financial Summary</h3>
+          <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>Live break-even summary</h3>
         </div>
 
         {priceUnknown ? (
