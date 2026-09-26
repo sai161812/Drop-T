@@ -53,7 +53,14 @@ product feed before any Groq request is made.
 The five optional `GROQ_API_KEY*` variables form a provider key pool used only
 for synthetic simulations. They do not load products, create sessions, or
 authenticate users. Start the Render service with one key. Add fallback keys
-later only if the Groq account's rate limits require them.
+later for credential management; keys in the same organization share quota.
+
+The Blueprint selects `qwen/qwen3.8-27b`. Reviews send five personas per request
+with compact output, then wait for short quota resets when required. All 50
+personas still receive individual evaluations. Free-tier reviews can take
+several minutes. Long daily-limit waits preserve partial results for a later
+retry. A retry uses the original run's recorded model; select a different model
+only for a new review, so one review never silently mixes different models.
 
 ## Existing local products
 

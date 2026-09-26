@@ -49,7 +49,7 @@ export const config: ServerConfig = {
     : path.resolve(process.cwd(), './uploads'),
   groqApiKey: parsedGroqKeys[0] || process.env.GROQ_API_KEY || '',
   groqApiKeys: parsedGroqKeys,
-  groqModel: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
+  groqModel: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
   groqTemperature: parseFloat(process.env.GROQ_TEMPERATURE || '0.2'),
   groqMaxRetries: parseInt(process.env.GROQ_MAX_RETRIES || '15', 10),
   braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY || '',

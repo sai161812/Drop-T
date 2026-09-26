@@ -1,5 +1,8 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
+import https from 'node:https';
+import { EventEmitter } from 'node:events';
+import { config } from '../src/config.js';
 import { 
   GroqBatchEvaluationResponseSchema, 
   GroqEvaluationItemSchema,
@@ -9,7 +12,7 @@ import {
 } from '@droptest/shared';
 import { initDatabase, closeDatabase } from '../src/db/database.js';
 import { TestRepository } from '../src/db/testRepository.js';
-import { buildGroqResponseSchema, GroqEvaluator } from '../src/simulation/groqEvaluator.js';
+import { buildGroqResponseSchema, GroqEvaluator, GroqKeyPoolManager } from '../src/simulation/groqEvaluator.js';
 import { generatePanelProfiles } from '../src/simulation/profileGenerator.js';
 
 describe('Phase 3: Groq Evaluator, Gating & Incomplete Run Recovery Tests', () => {
@@ -19,6 +22,63 @@ describe('Phase 3: Groq Evaluator, Gating & Incomplete Run Recovery Tests', () =
 
   after(() => {
     closeDatabase();
+  });
+
+  it('shares rate-limit cooldown across keys for one model without blocking another model', (t) => {
+    const originalKeys = config.groqApiKeys;
+    config.groqApiKeys = ['quota-test-a', 'quota-test-b'];
+    let now = 1_000;
+    const clock = t.mock.method(Date, 'now', () => now);
+    try {
+      GroqKeyPoolManager.markCooldown('quota-test-a', 998_000, 'test-throttled-model');
+      const limited = GroqKeyPoolManager.acquire('test-throttled-model');
+      assert.equal(limited.isCooldown, true);
+      assert.ok(limited.waitMs >= 998_000, 'long waits must not be incorrectly reported as ten seconds');
+      assert.equal(GroqKeyPoolManager.acquire('test-other-model').isCooldown, false);
+      now += 999_000;
+      assert.equal(GroqKeyPoolManager.acquire('test-throttled-model').isCooldown, false);
+    } finally {
+      config.groqApiKeys = originalKeys;
+      clock.mock.restore();
+    }
+  });
+
+  it('uses the configured model without silently downgrading and limits reasoning overhead', async (t) => {
+    const originalModel = config.groqModel;
+    config.groqModel = 'openai/gpt-oss-120b';
+    let body: any;
+    const requestMock = t.mock.method(https, 'request', ((_options: any, callback: any) => {
+      const request = new EventEmitter() as any;
+      request.write = (data: string) => { body = JSON.parse(data); };
+      request.end = () => queueMicrotask(() => {
+        const response = new EventEmitter() as any;
+        response.statusCode = 200;
+        response.headers = {};
+        callback(response);
+        const requested = JSON.parse(body.messages[1].content).profiles_to_evaluate;
+        const evaluations = requested.map((profile: any) => ({ profile_id: profile.profile_id, response: 'unsure', reason: 'Fits the use case, but durability is unverified.', primary_objection: 'Durability', factor_tags: ['fit'], referenced_fields: ['use_case'], source_ids: [] }));
+        response.emit('data', JSON.stringify({ choices: [{ message: { content: JSON.stringify({ evaluations }) } }] }));
+        response.emit('end');
+      });
+      return request;
+    }) as any);
+    try {
+      const option = { name: 'Example', price: 20, primary_message: 'Everyday product', fulfillment_mode: 'delivery' };
+      await GroqEvaluator.evaluateBatchWithGroq([], option, 'other', '{}', 1, 1000, 'USD', '', [], 'test-key');
+      assert.equal(body.model, 'openai/gpt-oss-120b');
+      assert.equal(body.reasoning_effort, 'low');
+      await GroqEvaluator.evaluateBatchWithGroq([], option, 'other', '{}', 1, 1000, 'USD', '', [], 'test-key', 'openai/gpt-oss-20b');
+      assert.equal(body.model, 'openai/gpt-oss-20b', 'a frozen run model takes precedence over current configuration');
+      const profile = { id: 'original-persona-id', segment: 'intended', market: 'India', budget_min: 10, budget_max: 50, use_case: 'Daily use', constraints: [], priorities: ['quality'], access_mode: 'delivery' } as any;
+      const results = await GroqEvaluator.evaluateBatchWithGroq([profile], option, 'other', '{}', 1, 1000, 'USD', '', [], 'test-key', 'qwen/qwen3.8-27b');
+      assert.equal(JSON.parse(body.messages[1].content).profiles_to_evaluate[0].profile_id, 'p1');
+      assert.equal(results[0].profile_id, profile.id, 'compact provider IDs must be restored before persistence');
+      assert.equal(body.max_completion_tokens, 900);
+      assert.equal(body.reasoning_effort, 'none');
+    } finally {
+      config.groqModel = originalModel;
+      requestMock.mock.restore();
+    }
   });
 
   it('validates Groq structured batch response schema and rejects invalid response enum', () => {
