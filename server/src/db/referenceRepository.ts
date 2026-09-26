@@ -235,7 +235,7 @@ export class ReferenceRepository {
       .filter(Boolean).join(' ').toLowerCase();
     const lines = references.map((ref, index) => {
       const facts = (ref.supported_facts.length ? ref.supported_facts : [ref.snippet_or_fact]).filter(Boolean);
-      const overlap = facts.find(fact => fact.toLowerCase().split(/\W+/).some(token => token.length > 4 && productFacts.includes(token)));
+      const overlap = facts.find((fact: string) => fact.toLowerCase().split(/\W+/).some((token: string) => token.length > 4 && productFacts.includes(token)));
       return `REF-${index + 1}: overlap=${overlap || 'unknown'}; verified_difference=${facts[0] || 'unknown'}; missing_facts=pricing/specifications not present in the retrieved evidence are unknown.`;
     });
     return `Selected-source comparison (evidence only):\n${lines.join('\n')}`;

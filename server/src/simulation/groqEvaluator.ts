@@ -492,7 +492,7 @@ export class GroqEvaluator {
             for (const item of rawEvaluations) {
               const matchedProfile = profilesToQuery.find(p => p.id === item.profile_id);
               const allowedFields = new Set([...REFERENCE_FIELDS, ...Object.keys(fullTest.offering.domain_specific_data)]);
-              if (matchedProfile && !returnedProfileIds.has(item.profile_id) && item.referenced_fields.every(field => allowedFields.has(field))) {
+              if (matchedProfile && !returnedProfileIds.has(item.profile_id) && item.referenced_fields.every((field: string) => allowedFields.has(field))) {
                 // Resolve only exact frozen aliases (REF-n) or exact full IDs.
                 const validSourceIds: string[] = [];
                 let invalidCitation = false;

@@ -101,13 +101,13 @@ authRouter.get('/me', (req: AuthenticatedRequest, res: Response) => {
 // GET /api/auth/demo-accounts - List available demo accounts for quick testing
 authRouter.get('/demo-accounts', (_req: Request, res: Response) => {
   res.json({
-    accounts: DEMO_ACCOUNTS.map(({ email, password, role, display_name, startup_name, description }) => ({
-      email,
-      password,
-      role,
-      display_name,
-      startup_name,
-      description: description || (role === 'startup' ? startup_name : role === 'sponsor' ? 'Sponsor account' : 'Community member')
+    accounts: DEMO_ACCOUNTS.map((acc: any) => ({
+      email: acc.email,
+      password: acc.password,
+      role: acc.role,
+      display_name: acc.display_name,
+      startup_name: acc.startup_name,
+      description: acc.description || (acc.role === 'startup' ? acc.startup_name : acc.role === 'sponsor' ? 'Sponsor account' : 'Community member')
     }))
   });
 });

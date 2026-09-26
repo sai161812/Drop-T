@@ -62,9 +62,9 @@ export class SearchService {
     };
     const data = product.category_data || {};
     const enteredFeatures = [data.material, data.item_type, data.core_use_case, data.main_function]
-      .filter(value => typeof value === 'string' && value.trim()).map(value => String(value).trim());
+      .filter((value: any) => typeof value === 'string' && value.trim()).map((value: any) => String(value).trim());
     const markets = Array.isArray(product.availability_markets)
-      ? product.availability_markets.filter(value => value && value !== 'not_decided').slice(0, 2)
+      ? product.availability_markets.filter((value: any) => value && value !== 'not_decided').slice(0, 2)
       : [];
     const price = typeof product.price === 'number' && product.price > 0
       ? `${product.currency || ''} ${product.price}`.trim()
