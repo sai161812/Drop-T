@@ -12,7 +12,7 @@ import {
 } from '@droptest/shared';
 import { initDatabase, closeDatabase } from '../src/db/database.js';
 import { TestRepository } from '../src/db/testRepository.js';
-import { buildGroqResponseSchema, GroqEvaluator, GroqKeyPoolManager } from '../src/simulation/groqEvaluator.js';
+import { buildGroqResponseSchema, GroqEvaluator, GroqKeyPoolManager, requiresMarketCitation } from '../src/simulation/groqEvaluator.js';
 import { generatePanelProfiles } from '../src/simulation/profileGenerator.js';
 
 describe('Phase 3: Groq Evaluator, Gating & Incomplete Run Recovery Tests', () => {
@@ -22,6 +22,14 @@ describe('Phase 3: Groq Evaluator, Gating & Incomplete Run Recovery Tests', () =
 
   after(() => {
     closeDatabase();
+  });
+
+  it('accepts declared existing-alternative constraints while still requiring citations for competitor claims', () => {
+    const profile = { constraints: ['Has an existing alternative'] };
+    assert.equal(requiresMarketCitation('My existing alternative makes me hesitate.', profile), false);
+    assert.equal(requiresMarketCitation('My existing alternative is cheaper compared to this product.', profile), true);
+    assert.equal(requiresMarketCitation('A competitor offers a lower price.', profile), true);
+    assert.equal(requiresMarketCitation('My existing alternative makes me hesitate.', { constraints: [] }), true);
   });
 
   it('shares rate-limit cooldown across keys for one model without blocking another model', (t) => {

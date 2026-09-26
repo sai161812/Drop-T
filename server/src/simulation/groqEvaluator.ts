@@ -122,6 +122,15 @@ export function buildGroqResponseSchema(profileIds: string[], fields: string[]) 
   };
 }
 
+export function requiresMarketCitation(text: string, profile: Pick<Profile, 'constraints'>): boolean {
+  // Owning an existing alternative is a declared persona constraint, not an
+  // external claim about a competitor's price, features, or performance.
+  const groundedText = profile.constraints.some(constraint => /\bexisting alternative\b/i.test(constraint))
+    ? text.replace(/\bexisting alternative\b/gi, 'existing item')
+    : text;
+  return /\b(compared?\s+(?:to|with)|competitor|alternative|other\s+(?:brand|product|service)|market\s+(?:option|reference))\b/i.test(groundedText);
+}
+
 export class GroqKeyPoolManager {
   private static cooldowns = new Map<string, number>();
   private static currentIndex = 0;
@@ -521,8 +530,7 @@ export class GroqEvaluator {
                     if (!validSourceIds.includes(resolved)) validSourceIds.push(resolved);
                   }
                 }
-                const makesExternalComparison = /\b(compared?\s+(?:to|with)|competitor|alternative|other\s+(?:brand|product|service)|market\s+(?:option|reference))\b/i
-                  .test(`${item.reason || ''} ${item.primary_objection || ''}`);
+                const makesExternalComparison = requiresMarketCitation(`${item.reason || ''} ${item.primary_objection || ''}`, matchedProfile);
                 if (invalidCitation || (makesExternalComparison && validSourceIds.length === 0)) continue;
                 returnedProfileIds.add(item.profile_id);
 
