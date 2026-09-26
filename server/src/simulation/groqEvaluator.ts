@@ -207,7 +207,9 @@ export class GroqEvaluator {
     existingRunId?: string,
     options: EvaluatorOptions = {}
   ): Promise<{ run: Run; evaluations: Evaluation[] }> {
-    const opts = { ...DEFAULT_OPTIONS, maxRetries: config.groqMaxRetries, ...options };
+    const keyCount = GroqKeyPoolManager.keyCount;
+    const dynamicConcurrency = options.maxConcurrency ?? (keyCount >= 3 ? 3 : keyCount >= 2 ? 2 : 1);
+    const opts = { ...DEFAULT_OPTIONS, maxConcurrency: dynamicConcurrency, maxRetries: config.groqMaxRetries || 5, ...options };
     let fullTest = TestRepository.getById(testId);
     if (!fullTest) {
       throw new Error(`Test with ID "${testId}" not found`);
