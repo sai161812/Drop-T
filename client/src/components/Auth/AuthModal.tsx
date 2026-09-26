@@ -34,6 +34,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // OAuth states
+  const [activeOAuthProvider, setActiveOAuthProvider] = useState<'Google' | 'GitHub' | 'Apple' | null>(null);
+  const [oauthCustomEmail, setOauthCustomEmail] = useState('');
+  const [oauthCustomName, setOauthCustomName] = useState('');
+  const [oauthSelectedRole, setOauthSelectedRole] = useState<UserRole>(defaultRole);
+
   useEffect(() => {
     if (defaultRole) {
       setRole(defaultRole);
@@ -41,7 +47,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }, [defaultRole]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setActiveOAuthProvider(null);
+      return;
+    }
     setTab(initialTab);
     setError(null);
   }, [isOpen, initialTab]);
@@ -89,8 +98,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       previousFocus?.focus();
     };
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,11 +149,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const [activeOAuthProvider, setActiveOAuthProvider] = useState<'Google' | 'GitHub' | 'Apple' | null>(null);
-  const [oauthCustomEmail, setOauthCustomEmail] = useState('');
-  const [oauthCustomName, setOauthCustomName] = useState('');
-  const [oauthSelectedRole, setOauthSelectedRole] = useState<UserRole>(defaultRole);
-
   const handleOpenOAuthModal = (provider: 'Google' | 'GitHub' | 'Apple') => {
     setActiveOAuthProvider(provider);
     setOauthSelectedRole(role);
@@ -193,6 +195,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return 'Startup Login';
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="auth-glass-backdrop" onClick={(e) => {

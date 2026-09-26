@@ -122,7 +122,7 @@ export const SavedPage: React.FC<SavedPageProps> = ({
           Bookmark early stage startup products across the directory to keep track of their launch progress.
         </p>
         <button type="button" className="btn btn-primary" onClick={onPromptAuth}>
-          Sign In / Sign Up
+          Sign In
         </button>
       </div>
     );

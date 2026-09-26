@@ -87,7 +87,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onExplore, onSignIn, o
                 onClick={() => onSignIn()}
                 aria-haspopup="menu"
               >
-                Sign In / Sign Up
+                Sign In
               </button>
               <div className="signup-dropdown-menu" role="menu">
                 <button

@@ -4,7 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 const SEEDED_PRODUCT = 'Organic Hemp Everyday Summer Tee';
 
 async function loginDemo(page: Page, accountButton: string) {
-  await page.getByRole('button', { name: 'Sign In / Sign Up' }).click();
+  await page.getByRole('button', { name: /Sign In/ }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Sign In to DROPTEST' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: accountButton }).click();
@@ -53,7 +53,7 @@ test.describe('DROPTEST browser acceptance', () => {
     await page.getByRole('button', { name: 'Explore products', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Explore Startup Product Launches' })).toBeVisible();
 
-    const trigger = page.getByRole('button', { name: 'Sign In / Sign Up' });
+    const trigger = page.getByRole('button', { name: /Sign In/ }).first();
     await trigger.focus();
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: 'Sign In to DROPTEST' });

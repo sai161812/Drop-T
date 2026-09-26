@@ -207,7 +207,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onOpenAuthModal()}
               aria-haspopup="menu"
             >
-              <LogIn size={14} /> Sign In / Sign Up
+              <LogIn size={14} /> Sign In
             </button>
             <div className="signup-dropdown-menu" role="menu">
               <button
