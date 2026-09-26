@@ -58,6 +58,56 @@ export function buildGroqResponseSchema(profileIds: string[], fields: string[]) 
   };
 }
 
+export class GroqKeyPoolManager {
+  private static cooldowns = new Map<string, number>();
+  private static currentIndex = 0;
+
+  static getKeys(): string[] {
+    if (config.groqApiKeys && config.groqApiKeys.length > 0) {
+      return config.groqApiKeys;
+    }
+    return config.groqApiKey ? [config.groqApiKey] : [];
+  }
+
+  static get keyCount(): number {
+    return this.getKeys().length;
+  }
+
+  static acquire(): { key: string; index: number; isCooldown: boolean; waitMs: number } {
+    const keys = this.getKeys();
+    if (keys.length === 0) {
+      throw new Error('No Groq API keys configured. Set GROQ_API_KEY or GROQ_API_KEYS in .env');
+    }
+    const now = Date.now();
+    for (let i = 0; i < keys.length; i++) {
+      const targetIdx = (this.currentIndex + i) % keys.length;
+      const k = keys[targetIdx];
+      const cd = this.cooldowns.get(k) || 0;
+      if (now >= cd) {
+        this.currentIndex = (targetIdx + 1) % keys.length;
+        return { key: k, index: targetIdx, isCooldown: false, waitMs: 0 };
+      }
+    }
+    // All keys in cooldown; find the key that will become available earliest
+    let minWait = 10000;
+    let bestIdx = 0;
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const cd = this.cooldowns.get(k) || 0;
+      const wait = cd - now;
+      if (wait < minWait) {
+        minWait = wait;
+        bestIdx = i;
+      }
+    }
+    return { key: keys[bestIdx], index: bestIdx, isCooldown: true, waitMs: Math.max(500, minWait) };
+  }
+
+  static markCooldown(key: string, durationMs: number): void {
+    this.cooldowns.set(key, Date.now() + durationMs);
+  }
+}
+
 export class GroqEvaluator {
   private static activeRuns = new Set<string>();
   static isActive(runId: string): boolean { return this.activeRuns.has(runId); }
@@ -66,7 +116,7 @@ export class GroqEvaluator {
    * Check if Groq API key is present
    */
   static isConfigured(): boolean {
-    return Boolean(config.groqApiKey && config.groqApiKey.trim().length > 0);
+    return GroqKeyPoolManager.keyCount > 0;
   }
 
   /**
@@ -77,6 +127,7 @@ export class GroqEvaluator {
     model: string;
     sampleEvaluation?: GroqEvaluationItem;
     error?: string;
+    keysConfigured?: number;
   }> {
     if (!this.isConfigured()) {
       return {
@@ -109,6 +160,7 @@ export class GroqEvaluator {
     };
 
     try {
+      const keyInfo = GroqKeyPoolManager.acquire();
       const results = await this.evaluateBatchWithGroq(
         [sampleProfile],
         sampleOption,
@@ -116,27 +168,33 @@ export class GroqEvaluator {
         'Smoke test context',
         1,
         15000,
-        'USD'
+        'USD',
+        '',
+        [],
+        keyInfo.key
       );
 
       if (results.length > 0) {
         return {
           success: true,
           model: config.groqModel,
-          sampleEvaluation: results[0]
+          sampleEvaluation: results[0],
+          keysConfigured: GroqKeyPoolManager.keyCount
         };
       } else {
         return {
           success: false,
           model: config.groqModel,
-          error: 'Groq returned empty evaluations array'
+          error: 'Groq returned empty evaluations array',
+          keysConfigured: GroqKeyPoolManager.keyCount
         };
       }
     } catch (err: any) {
       return {
         success: false,
         model: config.groqModel,
-        error: err.cause?.code ? `${err.message} (${err.cause.code})` : err.message || 'Groq smoke test failed'
+        error: err.cause?.code ? `${err.message} (${err.cause.code})` : err.message || 'Groq smoke test failed',
+        keysConfigured: GroqKeyPoolManager.keyCount
       };
     }
   }
@@ -344,6 +402,16 @@ export class GroqEvaluator {
 
         while (attempts < opts.maxRetries && !batchSuccess && profilesToQuery.length > 0) {
           attempts++;
+          const keyInfo = GroqKeyPoolManager.acquire();
+
+          if (keyInfo.isCooldown && keyInfo.waitMs > 0) {
+            const waitSeconds = Math.ceil(keyInfo.waitMs / 1000);
+            TestRepository.updateRun(runId, {
+              error_message: `Rate limit guard: API key pool is cooling down. Resuming in ${waitSeconds}s...`
+            });
+            await new Promise(r => setTimeout(r, keyInfo.waitMs));
+          }
+
           try {
             const rawEvaluations = await this.evaluateBatchWithGroq(
               profilesToQuery,
@@ -354,7 +422,8 @@ export class GroqEvaluator {
               opts.timeoutMs,
               fullTest.offering.currency,
               referenceSummary,
-              selectedRefs
+              selectedRefs,
+              keyInfo.key
             );
 
             // Match and convert to Evaluation entities
@@ -402,7 +471,7 @@ export class GroqEvaluator {
             if (newEvaluations.length > 0) {
               TestRepository.saveEvaluations(newEvaluations);
               const currentTotal = TestRepository.getEvaluationsByRunId(runId).length;
-              TestRepository.updateRun(runId, { total_evaluations_completed: currentTotal });
+              TestRepository.updateRun(runId, { total_evaluations_completed: currentTotal, error_message: null });
             }
 
             // Check if any profiles in this batch were missed
@@ -415,21 +484,43 @@ export class GroqEvaluator {
             }
           } catch (batchErr: any) {
             console.warn(`Groq batch evaluation attempt ${attempts} failed:`, batchErr.message);
+            
+            // Rate limit (429) backoff calculation
+            const isRateLimit = batchErr.status === 429 || String(batchErr.message).includes('Rate limit') || String(batchErr.message).includes('rate_limit_exceeded');
+            let cooldownMs = 8500;
+            const retryHeader = batchErr.headers?.get?.('retry-after') || batchErr.response?.headers?.get?.('retry-after');
+            if (retryHeader) {
+              cooldownMs = Number.isFinite(Number(retryHeader)) ? Number(retryHeader) * 1000 : Math.max(1000, Date.parse(retryHeader) - Date.now());
+            } else {
+              const match = String(batchErr.message || '').match(/try again in ([\d\.]+)s/i);
+              if (match && match[1]) {
+                cooldownMs = Math.ceil(parseFloat(match[1]) * 1000) + 750;
+              }
+            }
+
+            if (isRateLimit) {
+              GroqKeyPoolManager.markCooldown(keyInfo.key, cooldownMs);
+              const nextKey = GroqKeyPoolManager.acquire();
+              if (!nextKey.isCooldown && GroqKeyPoolManager.keyCount > 1) {
+                // Instantly failover to the next available API key in the pool with 0ms delay!
+                TestRepository.updateRun(runId, {
+                  error_message: `Rate limit on Key #${keyInfo.index + 1}. Switching to Key #${nextKey.index + 1}...`
+                });
+                continue;
+              }
+            }
+
             if (attempts >= opts.maxRetries) {
               // Bounded retry exhausted: do not invent responses; continue with partial state
               break;
             }
-            // Exponential backoff with rate limit message and header parsing
-            const retryHeader = batchErr.headers?.get?.('retry-after') || batchErr.response?.headers?.get?.('retry-after');
-            let retryAfter = retryHeader ? (Number.isFinite(Number(retryHeader)) ? Number(retryHeader) * 1000 : Date.parse(retryHeader) - Date.now()) : 0;
-            if (!retryAfter || retryAfter <= 0) {
-              const match = String(batchErr.message || '').match(/try again in ([\d\.]+)s/i);
-              if (match && match[1]) {
-                retryAfter = Math.ceil(parseFloat(match[1])) * 1000 + 750;
-              }
-            }
-            const delay = Math.max(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 0, Math.min(35000, 1500 * Math.pow(2, attempts)));
-            TestRepository.updateRun(runId, { error_message: batchErr.status === 429 || String(batchErr.message).includes('Rate limit') ? 'Provider rate limit reached. Waiting before retrying.' : 'A model batch needs retrying; completed evaluations are saved.' });
+
+            const delay = isRateLimit ? cooldownMs : Math.min(30000, 1500 * Math.pow(2, attempts));
+            TestRepository.updateRun(runId, {
+              error_message: isRateLimit
+                ? `Rate limit reached. Auto-resuming in ${Math.ceil(delay / 1000)}s...`
+                : 'A model batch needs retrying; completed evaluations are saved.'
+            });
             await new Promise(r => setTimeout(r, delay));
           }
         }
@@ -451,7 +542,8 @@ export class GroqEvaluator {
     timeoutMs?: number,
     currency?: string,
     referenceSummary?: string,
-    selectedRefs?: CompetitorReference[]
+    selectedRefs?: CompetitorReference[],
+    apiKeyOverride?: string
   ) => Promise<GroqEvaluationItem[]> = async (
     profiles,
     option,
@@ -461,9 +553,10 @@ export class GroqEvaluator {
     timeoutMs = 30000,
     currency = 'USD',
     referenceSummary = '',
-    _selectedRefs = []
+    _selectedRefs = [],
+    apiKeyOverride
   ): Promise<GroqEvaluationItem[]> => {
-    const apiKey = config.groqApiKey;
+    const apiKey = apiKeyOverride || config.groqApiKey;
     if (!apiKey) {
       throw new Error('GROQ_API_KEY is not set');
     }
@@ -535,7 +628,7 @@ You MUST return an evaluation for every profile_id in the input list.`;
         response_format: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(config.groqModel)
           ? { type: 'json_schema', json_schema: { name: 'profile_evaluations', strict: true, schema: responseSchema } }
           : { type: 'json_object' },
-        max_completion_tokens: 6000,
+        max_completion_tokens: 1500,
         temperature: config.groqTemperature
       });
 
