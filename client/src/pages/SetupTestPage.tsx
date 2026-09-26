@@ -14,7 +14,7 @@ import { AlternativeBForm, OptionAData, OptionBData } from '../components/SetupT
 import { FinancialsForm } from '../components/SetupTest/FinancialsForm.js';
 import { ProfileReviewPanel } from '../components/SetupTest/ProfileReviewPanel.js';
 import { PreflightLabCard } from '../components/SetupTest/PreflightLabCard.js';
-import { DOMAIN_PRESETS } from '../config/templates.js';
+import { DOMAIN_PRESETS, SHOWCASE_DEMOS, BLANK_PRESET } from '../config/templates.js';
 import { 
   FolderOpen, 
   FlaskConical, 
@@ -26,6 +26,7 @@ import {
   ArrowLeft, 
   Save,
   RefreshCw,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 import './SetupTestPage.css';
@@ -75,7 +76,7 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
   const [researchRefreshKey, setResearchRefreshKey] = useState(0);
 
   // Load initial preset (Clothing)
-  const initialPreset = DOMAIN_PRESETS.clothing_accessories.payload;
+  const initialPreset = (DOMAIN_PRESETS.smart_water_bottle || DOMAIN_PRESETS.clothing_accessories).payload;
 
   // 1. Domain
   const [domainId, setDomainId] = useState<DomainId>(initialPreset.test.domain_id);
@@ -805,6 +806,57 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
 
       {/* 2. Main Page Content Area */}
       <main className="lab-main-content">
+        {/* Showcase Interactive Demo Quick-Selector */}
+        {!linkedProduct && (
+          <div className="lab-showcase-bar">
+            <div className="lab-showcase-info">
+              <div className="lab-showcase-badge">
+                <Sparkles size={12} />
+                <span>Showcase Validation Datasets</span>
+              </div>
+              <p className="lab-showcase-desc">
+                1-click switch between high-competition and high-differentiation pre-launch ideas to test live AI market novelty & persona reviews:
+              </p>
+            </div>
+
+            <div className="lab-showcase-grid">
+              {SHOWCASE_DEMOS.map(demo => {
+                const isSelected = (title.toLowerCase().includes('bottle') && demo.key === 'smart_water_bottle') ||
+                                   (title.toLowerCase().includes('cold brew') && demo.key === 'artisanal_cold_brew');
+                return (
+                  <button
+                    key={demo.key}
+                    type="button"
+                    className={`lab-showcase-card ${isSelected ? 'active' : ''}`}
+                    onClick={() => {
+                      const preset = (DOMAIN_PRESETS as any)[demo.presetKey];
+                      if (preset) applyPreset(preset.payload, false);
+                    }}
+                  >
+                    <div className="lab-showcase-card-top">
+                      <span className="lab-showcase-card-title">{demo.name}</span>
+                      <span className={`lab-showcase-verdict-pill ${demo.noveltyVerdict.toLowerCase()}`}>
+                        {demo.noveltyVerdict === 'WEAK' ? '⚠️ High Overlap (Weak)' : '✓ Defensible (Strong)'}
+                      </span>
+                    </div>
+                    <p className="lab-showcase-card-desc">{demo.desc}</p>
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                className="lab-showcase-card blank-card"
+                onClick={() => applyPreset(BLANK_PRESET, false)}
+              >
+                <div className="lab-showcase-card-top">
+                  <span className="lab-showcase-card-title">+ Start Blank Idea</span>
+                </div>
+                <p className="lab-showcase-card-desc">Clear all fields and validate your own custom concept.</p>
+              </button>
+            </div>
+          </div>
+        )}
         {saveError && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '13px', background: 'var(--color-danger-bg)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-danger-border)' }}>{saveError}</p>}
         {labLoadError && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '13px', background: 'var(--color-danger-bg)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-danger-border)' }}>{labLoadError}</p>}
         
@@ -962,6 +1014,9 @@ export const SetupTestPage: React.FC<SetupTestPageProps> = ({
             {/* Preflight Lab Card */}
             <PreflightLabCard
               product={linkedProduct}
+              ideaTitle={title}
+              shortValueProp={shortValueProp}
+              domainId={domainId}
               mode={mode}
               onModeChange={setMode}
               trialPrice={trialPrice}

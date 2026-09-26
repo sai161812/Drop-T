@@ -11,45 +11,62 @@ export const DomainSelector: React.FC<DomainSelectorProps> = ({
   selectedDomain,
   onSelectDomain
 }) => {
-  const domains: { id: DomainId; label: string; desc: string; icon: React.FC<{ size?: number }> }[] = [
+  const domains: { id: DomainId; label: string; tag: string; icon: React.FC<{ size?: number }> }[] = [
     {
       id: 'clothing_accessories',
-      label: DOMAIN_LABELS.clothing_accessories,
-      desc: 'Physical apparel, material, sizes, unit production cost & shipping',
+      label: 'Apparel & Goods',
+      tag: 'Sizes, materials, shipping',
       icon: Shirt
     },
     {
       id: 'local_food_beverages',
-      label: DOMAIN_LABELS.local_food_beverages,
-      desc: 'Portions, allergens, preparation, delivery zones & pickup windows',
+      label: 'Food & Beverage',
+      tag: 'Batches, fresh pickup/delivery',
       icon: UtensilsCrossed
     },
     {
       id: 'digital_products_services',
-      label: DOMAIN_LABELS.digital_products_services,
-      desc: 'Software, downloads, platform compatibility & first-period billing',
+      label: 'Digital / Software',
+      tag: 'Cloud, subscription, access',
       icon: Monitor
     },
     {
       id: 'other',
-      label: DOMAIN_LABELS.other,
-      desc: 'Founder-described specifications without apparel, food, or software assumptions',
+      label: 'Hardware & Other',
+      tag: 'Consumer IoT, specs, custom',
       icon: Package
     }
   ];
 
   return (
-    <div className="workbench-card">
-      <div className="card-header">
+    <div className="workbench-card" style={{ padding: '16px 18px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <div>
-          <h2 className="card-title">
-            <span>Domain Category</span>
-          </h2>
-          <p className="card-description">Select the category of offering to tailor input fields and evaluation rules.</p>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            Category Framework
+          </span>
+          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0 0' }}>
+            Tailors specification fields and buyer evaluation heuristics.
+          </p>
         </div>
+        <span 
+          style={{ 
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontSize: '10px', 
+            fontWeight: 700, 
+            padding: '2px 8px', 
+            borderRadius: 'var(--radius-sm)',
+            background: 'var(--color-surface-subtle)',
+            border: '1px solid var(--color-border-subtle)',
+            color: 'var(--color-text-secondary)',
+            textTransform: 'uppercase'
+          }}
+        >
+          {DOMAIN_LABELS[selectedDomain] || selectedDomain}
+        </span>
       </div>
 
-      <div className="domain-grid">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
         {domains.map(d => {
           const Icon = d.icon;
           const isActive = selectedDomain === d.id;
@@ -57,14 +74,44 @@ export const DomainSelector: React.FC<DomainSelectorProps> = ({
             <button
               key={d.id}
               type="button"
-              className={`domain-card ${isActive ? 'active' : ''}`}
               onClick={() => onSelectDomain(d.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-md)',
+                background: isActive ? 'var(--color-surface)' : 'var(--color-surface-subtle)',
+                border: isActive ? '1.5px solid var(--color-text-primary)' : '1px solid var(--color-border)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s ease',
+                boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+              }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <div 
+                style={{ 
+                  marginTop: '1px',
+                  color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)'
+                }}
+              >
                 <Icon size={16} />
-                <span className="domain-card-title">{d.label}</span>
               </div>
-              <p className="domain-card-desc">{d.desc}</p>
+              <div style={{ minWidth: 0 }}>
+                <div 
+                  style={{ 
+                    fontSize: '12px', 
+                    fontWeight: isActive ? 700 : 600, 
+                    color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                    lineHeight: 1.2
+                  }}
+                >
+                  {d.label}
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px', lineHeight: 1.2 }}>
+                  {d.tag}
+                </div>
+              </div>
             </button>
           );
         })}
