@@ -58,7 +58,8 @@ export function createApp(): Express {
     res.status(404).json({ error: 'API route not found' });
   });
 
-  const clientDir = path.resolve(import.meta.dirname, '../../client/dist');
+  const baseDir = typeof import.meta.dirname === 'string' ? import.meta.dirname : process.cwd();
+  const clientDir = path.resolve(baseDir, '../../client/dist');
   if (fs.existsSync(path.join(clientDir, 'index.html'))) {
     app.use(express.static(clientDir));
     app.get('*', (_req, res) => res.sendFile(path.join(clientDir, 'index.html')));

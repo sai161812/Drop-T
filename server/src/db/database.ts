@@ -23,7 +23,15 @@ export function initDatabase(dbPath?: string): DatabaseSync {
 
   const db = new DatabaseSync(targetPath);
   if (targetPath !== ':memory:') {
-    db.exec('PRAGMA journal_mode = WAL;');
+    try {
+      if (process.env.VERCEL) {
+        db.exec('PRAGMA journal_mode = DELETE;');
+      } else {
+        db.exec('PRAGMA journal_mode = WAL;');
+      }
+    } catch {
+      db.exec('PRAGMA journal_mode = DELETE;');
+    }
     db.exec('PRAGMA busy_timeout = 5000;');
   }
   runMigrations(db);
