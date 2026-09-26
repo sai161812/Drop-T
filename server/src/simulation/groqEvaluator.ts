@@ -1,5 +1,5 @@
+import https from 'node:https';
 import { v4 as uuidv4 } from 'uuid';
-import Groq from 'groq-sdk';
 import { 
   FullTestResponse, 
   Profile, 
@@ -40,6 +40,57 @@ const DEFAULT_OPTIONS: Required<EvaluatorOptions> = {
   timeoutMs: 45000,
   maxRetries: 15
 };
+
+const httpsAgent = new https.Agent({
+  keepAlive: false,
+  timeout: 30000
+});
+
+export function groqHttpsPost(
+  apiKey: string,
+  body: any,
+  timeoutMs = 30000
+): Promise<{ status: number; data: any; headers: Record<string, string | string[] | undefined> }> {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify(body);
+    const req = https.request({
+      hostname: 'api.groq.com',
+      port: 443,
+      path: '/openai/v1/chat/completions',
+      method: 'POST',
+      agent: httpsAgent,
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'Connection': 'close'
+      },
+      timeout: timeoutMs
+    }, (res) => {
+      let rawData = '';
+      res.on('data', chunk => { rawData += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(rawData);
+          resolve({ status: res.statusCode || 200, data: parsed, headers: res.headers });
+        } catch {
+          resolve({ status: res.statusCode || 200, data: rawData, headers: res.headers });
+        }
+      });
+    });
+
+    req.on('timeout', () => {
+      req.destroy(new Error(`Groq request timed out after ${timeoutMs}ms`));
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
 
 export function buildGroqResponseSchema(profileIds: string[], fields: string[]) {
   return {
@@ -208,11 +259,9 @@ export class GroqEvaluator {
     existingRunId?: string,
     options: EvaluatorOptions = {}
   ): Promise<{ run: Run; evaluations: Evaluation[] }> {
-    const keyCount = GroqKeyPoolManager.keyCount;
-    const dynamicConcurrency = options.maxConcurrency ?? (keyCount >= 3 ? 3 : keyCount >= 2 ? 2 : 1);
     const isTestEnv = process.env.NODE_ENV === 'test' || config.nodeEnv === 'test' || config.groqApiKey.includes('test');
     const defaultRetries = config.groqMaxRetries || (isTestEnv ? 3 : 15);
-    const opts = { ...DEFAULT_OPTIONS, maxConcurrency: dynamicConcurrency, maxRetries: options.maxRetries ?? defaultRetries, ...options };
+    const opts = { ...DEFAULT_OPTIONS, maxConcurrency: 1, maxRetries: options.maxRetries ?? defaultRetries, ...options };
     let fullTest = TestRepository.getById(testId);
     if (!fullTest) {
       throw new Error(`Test with ID "${testId}" not found`);
@@ -272,8 +321,7 @@ export class GroqEvaluator {
       };
     }
 
-    // References are immutable run evidence. An empty frozen array is valid and
-    // must never be replaced by references added after the run was created.
+    // References are immutable run evidence.
     const snapshot = TestRepository.getRunSnapshot(run.id);
     if (!snapshot || !Array.isArray(snapshot.references)) {
       throw new Error('This legacy run has no valid frozen research snapshot. Create a new review.');
@@ -284,11 +332,11 @@ export class GroqEvaluator {
     this.activeRuns.add(run.id);
     try {
       // 1. Process Option A (50 evaluations)
-      await this.processOptionEvaluations(run.id, fullTest, 'A', fullTest.options.A, profiles, opts, selectedRefs, referenceSummary);
+      await this.processOptionEvaluations(run.id, fullTest, 'A', fullTest.options.A, profiles, opts, selectedRefs, referenceSummary, expectedCount);
 
       // 2. Process Option B only if comparison mode (additional 50 evaluations)
       if (isComparison && fullTest.options.B) {
-        await this.processOptionEvaluations(run.id, fullTest, 'B', fullTest.options.B, profiles, opts, selectedRefs, referenceSummary);
+        await this.processOptionEvaluations(run.id, fullTest, 'B', fullTest.options.B, profiles, opts, selectedRefs, referenceSummary, expectedCount);
       }
 
       // 3. Finalize run status
@@ -334,7 +382,8 @@ export class GroqEvaluator {
     profiles: Profile[],
     opts: Required<EvaluatorOptions>,
     selectedRefs: CompetitorReference[] = [],
-    referenceSummary: string = ''
+    referenceSummary: string = '',
+    expectedTotalCount: number = 50
   ): Promise<void> {
     const existingEvaluations = TestRepository.getEvaluationsByRunId(runId);
     const completedProfileIds = new Set(
@@ -386,13 +435,12 @@ export class GroqEvaluator {
       return;
     }
 
-    // Chunk served profiles into batches (5-10 per request)
+    // Chunk served profiles into batches (10 per request)
     const batches: Profile[][] = [];
     for (let i = 0; i < servedProfilesToEvaluate.length; i += opts.batchSize) {
       batches.push(servedProfilesToEvaluate.slice(i, i + opts.batchSize));
     }
 
-    // Process batches with bounded concurrency (default 2)
     const domainLabel = fullTest.test.domain_id.replace(/_/g, ' ');
     const { _product_snapshot, ...labDomainData } = fullTest.offering.domain_specific_data as Record<string, any>;
     const offeringContext = JSON.stringify({ short_value_prop: fullTest.offering.short_value_prop, description: fullTest.offering.description, currency: fullTest.offering.currency, period: fullTest.offering.period, domain_specific_data: labDomainData });
@@ -411,14 +459,15 @@ export class GroqEvaluator {
 
           if (keyInfo.isCooldown && keyInfo.waitMs > 0) {
             const waitSeconds = Math.ceil(keyInfo.waitMs / 1000);
+            const currentTotal = TestRepository.getEvaluationsByRunId(runId).length;
             TestRepository.updateRun(runId, {
-              error_message: `Rate limit guard: API key pool is cooling down. Resuming in ${waitSeconds}s...`
+              error_message: `Rate limit guard: Cool down active. Resuming in ${waitSeconds}s... (${currentTotal}/${expectedTotalCount} completed)`
             });
             await new Promise(r => setTimeout(r, keyInfo.waitMs));
           }
 
           try {
-            const targetModel = (attempts > 1 && config.groqModel === 'openai/gpt-oss-120b')
+            const targetModel = (config.groqModel === 'openai/gpt-oss-120b')
               ? 'openai/gpt-oss-20b'
               : config.groqModel;
 
@@ -498,31 +547,30 @@ export class GroqEvaluator {
             // Rate limit (429) backoff calculation
             const isRateLimit = batchErr.status === 429 || String(batchErr.message).includes('Rate limit') || String(batchErr.message).includes('rate_limit_exceeded');
             let cooldownMs = 8500;
-            const retryHeader = batchErr.headers?.get?.('retry-after') || batchErr.response?.headers?.get?.('retry-after');
+            const retryHeader = batchErr.headers?.['retry-after'] || batchErr.headers?.get?.('retry-after');
             if (retryHeader) {
-              cooldownMs = Number.isFinite(Number(retryHeader)) ? Number(retryHeader) * 1000 : Math.max(1000, Date.parse(retryHeader) - Date.now());
+              cooldownMs = Number.isFinite(Number(retryHeader)) ? Number(retryHeader) * 1000 : Math.max(1000, Date.parse(String(retryHeader)) - Date.now());
             } else {
               const match = String(batchErr.message || '').match(/try again in ([\d\.]+)s/i);
               if (match && match[1]) {
-                cooldownMs = Math.ceil(parseFloat(match[1]) * 1000) + 750;
+                cooldownMs = Math.ceil(parseFloat(match[1]) * 1000) + 1200;
               }
             }
 
             if (isRateLimit) {
-              // Mark this key in cooldown
               GroqKeyPoolManager.markCooldown(keyInfo.key, cooldownMs);
             }
 
             if (attempts >= opts.maxRetries) {
-              // Bounded retry exhausted: do not invent responses; continue with partial state
               break;
             }
 
             const isTest = process.env.NODE_ENV === 'test' || config.nodeEnv === 'test' || config.groqApiKey.includes('test');
             const delay = isTest ? 10 : (isRateLimit ? cooldownMs : Math.min(30000, 1500 * Math.pow(2, attempts)));
+            const currentTotal = TestRepository.getEvaluationsByRunId(runId).length;
             TestRepository.updateRun(runId, {
               error_message: isRateLimit
-                ? `Rate limit reached. Auto-resuming in ${Math.ceil(delay / 1000)}s...`
+                ? `Rate limit reached. Auto-resuming in ${Math.ceil(delay / 1000)}s... (${currentTotal}/${expectedTotalCount} completed)`
                 : 'A model batch needs retrying; completed evaluations are saved.'
             });
             await new Promise(r => setTimeout(r, delay));
@@ -566,7 +614,7 @@ export class GroqEvaluator {
     if (!apiKey) {
       throw new Error('GROQ_API_KEY is not set');
     }
-    const modelToUse = modelOverride || config.groqModel;
+    const modelToUse = modelOverride || (config.groqModel === 'openai/gpt-oss-120b' ? 'openai/gpt-oss-20b' : config.groqModel);
     let contextFields: string[] = [];
     let priceUnknown = false;
     try {
@@ -577,7 +625,7 @@ export class GroqEvaluator {
     const fields = [...REFERENCE_FIELDS, ...contextFields];
     const responseSchema = buildGroqResponseSchema(profiles.map(profile => profile.id), fields);
 
-    // Ultra-compact system prompt (saves ~60% tokens)
+    // Ultra-compact system prompt
     const systemPrompt = `You are an impartial simulated consumer perspective evaluator for product launch research.
 Rules:
 1. "response": "interested" | "unsure" | "not_interested".
@@ -590,7 +638,7 @@ Rules:
 ${priceUnknown ? 'PRICE IS UNKNOWN: placeholder zero. Do not use price.' : ''}
 Use only fields: ${fields.join(', ')}. Return an evaluation for every profile_id.`;
 
-    // Ultra-compact user prompt (saves ~65% tokens)
+    // Compact user prompt
     const userPrompt = JSON.stringify({
       domain: domainLabel,
       offering: offeringContext,
@@ -616,47 +664,57 @@ Use only fields: ${fields.join(', ')}. Return an evaluation for every profile_id
       }))
     });
 
-    const groq = new Groq({ apiKey, maxRetries: 0, timeout: timeoutMs });
+    const requestBody: any = {
+      model: modelToUse,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: config.groqTemperature
+    };
 
-    try {
-      const chatCompletion = await groq.chat.completions.create({
-        model: modelToUse,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(modelToUse)
-          ? { type: 'json_schema', json_schema: { name: 'profile_evaluations', strict: true, schema: responseSchema } }
-          : { type: 'json_object' },
-        max_completion_tokens: 1500,
-        temperature: config.groqTemperature
-      });
+    if (['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(modelToUse)) {
+      requestBody.response_format = { type: 'json_schema', json_schema: { name: 'profile_evaluations', strict: true, schema: responseSchema } };
+      requestBody.max_completion_tokens = 2500;
+    } else {
+      requestBody.response_format = { type: 'json_object' };
+      requestBody.max_completion_tokens = 2500;
+    }
 
-      const content = chatCompletion.choices?.[0]?.message?.content;
-      if (!content) {
-        throw new Error('Groq returned empty response content');
-      }
+    const response = await groqHttpsPost(apiKey, requestBody, timeoutMs);
 
-      let parsedJson: any;
-      try {
-        parsedJson = JSON.parse(content);
-      } catch (jsonErr: any) {
-        throw new Error(`Failed to parse JSON from Groq response: ${jsonErr.message}`);
-      }
-
-      const parseResult = GroqBatchEvaluationResponseSchema.safeParse(parsedJson);
-      if (!parseResult.success) {
-        // Attempt to repair if evaluations array is wrapped or top-level array
-        if (Array.isArray(parsedJson)) {
-          const arrResult = GroqBatchEvaluationResponseSchema.safeParse({ evaluations: parsedJson });
-          if (arrResult.success) return arrResult.data.evaluations;
-        }
-        throw new Error(`Groq response failed schema validation: ${parseResult.error.message}`);
-      }
-
-      return parseResult.data.evaluations;
-    } catch (err: any) {
+    if (response.status !== 200) {
+      const errMessage = response.data?.error?.message || (typeof response.data === 'string' ? response.data : JSON.stringify(response.data));
+      const err: any = new Error(errMessage);
+      err.status = response.status;
+      err.headers = response.headers;
+      err.data = response.data;
       throw err;
     }
+
+    const content = response.data?.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('Groq returned empty response content');
+    }
+
+    let parsedJson: any;
+    try {
+      parsedJson = JSON.parse(content);
+    } catch (jsonErr: any) {
+      throw new Error(`Failed to parse JSON from Groq response: ${jsonErr.message}`);
+    }
+
+    const parseResult = GroqBatchEvaluationResponseSchema.safeParse(parsedJson);
+    if (!parseResult.success) {
+      // Attempt to repair if evaluations array is wrapped or top-level array
+      if (Array.isArray(parsedJson)) {
+        const arrResult = GroqBatchEvaluationResponseSchema.safeParse({ evaluations: parsedJson });
+        if (arrResult.success) return arrResult.data.evaluations;
+      }
+      throw new Error(`Groq response failed schema validation: ${parseResult.error.message}`);
+    }
+
+    return parseResult.data.evaluations;
   };
 }
+
