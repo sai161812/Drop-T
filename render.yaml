@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: droptest
+    runtime: node
+    region: singapore
+    plan: 0.5c-512mb
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.21.0
+      - key: DATA_DIR
+        value: /var/data/database
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: GROQ_API_KEY
+        sync: false
+    disk:
+      name: droptest-data
+      mountPath: /var/data
+      sizeGB: 1

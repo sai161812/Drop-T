@@ -1,52 +1,71 @@
-# Deploying DROPTEST
+# Deploying DROPTEST reliably
 
-## Vercel demo deployment
+## Recommended: one Render web service
 
-Deploy the entire repository as one Vercel project. In Project Settings:
+DROPTEST is a stateful Express application. Accounts, sessions, products,
+simulation results, and uploaded images are stored on disk. Deploy the React
+frontend and Express backend together as one Render web service with the
+persistent disk defined in `render.yaml`.
 
-- Root Directory: repository root (leave blank), **not** `client` or `server`.
-- Framework Preset: Other.
-- Build Command: `npm run build`.
-- Output Directory: `dist`.
-- Install Command: `npm install --include=dev`.
-- Node.js: 24.x (the server uses native `node:sqlite`).
+This keeps browser requests on the same domain, so all existing `/api/*` and
+`/uploads/*` URLs work without CORS configuration or a separate frontend API
+URL. It also gives simulations a continuously running Node process instead of
+a short-lived serverless function.
 
-The root `vercel.json` supplies the build settings and routes `/api/*` and
-`/uploads/*` to `api/index.ts`. The frontend uses same-origin API requests;
-there is no separate frontend API URL to configure.
+### Create the service
 
-Add `GROQ_API_KEY` (and optional additional Groq/search keys from `.env.example`)
-in Vercel Environment Variables for the environments you deploy. Set
-`NODE_ENV=production`. Local `.env` files are ignored by Git and are not
-automatically uploaded. Groq keys are needed for AI simulations, not product
-listing or account login. Never put secrets in `VITE_*` variables.
+1. Push `render.yaml` to GitHub.
+2. In Render, choose **New > Blueprint** and connect the `sai161812/Drop-T`
+   repository.
+3. Render reads `render.yaml` and creates the `droptest` web service and its
+   1 GB persistent disk in Singapore.
+4. Enter one `GROQ_API_KEY` when Render asks for it. One working key is enough;
+   the product feed and login do not call Groq.
+5. Apply the Blueprint and wait for `/api/health` to report `healthy`.
 
-Push these changes to the connected GitHub branch, then deploy the new commit.
-After changing project settings or environment variables, redeploy.
+The configured disk is mounted at `/var/data`. SQLite is stored under
+`/var/data/database`, and uploads under `/var/data/uploads`. Only data written
+inside that mount survives deploys and restarts.
 
-Verify:
+Render persistent disks require a paid web service. This is the smallest change
+that makes the current SQLite application durable. A free stateless service
+would reproduce the same missing users and products seen on Vercel.
 
-1. `/api/health` returns JSON with `status: "healthy"`.
-2. `/api/products` returns JSON containing seeded products.
-3. Sign in with a demo account from README.md and reload the page.
-4. Refresh `/explore` directly to verify frontend routing.
+### Verify the new deployment
 
-If an API URL returns HTML, the frontend fallback is handling the request:
-check the root directory and ensure the deployment contains the API function.
-If it returns 500, open Vercel Logs and inspect the function's startup error.
+1. Open the service's `onrender.com` URL.
+2. Open `/api/health`; it should return JSON containing `"status":"healthy"`.
+3. Open `/api/products?limit=50`; it should return a JSON product list.
+4. Sign in using a demo account from `README.md`.
+5. Create a test product, redeploy, and confirm the product still exists.
 
-## Persistent production storage is still required
+The application seeds demo accounts and two starter products only when they are
+missing. Existing records on the persistent disk are retained.
 
-The current backend stores accounts, sessions, products, and results in a local
-SQLite file, and uploaded images on disk. On Vercel those files are placed in
-`/tmp` to avoid read-only filesystem errors. This is **demo storage only**:
-instances do not share it, and files can disappear when an instance is replaced.
-New accounts can consequently fail to sign in on a different instance.
-Existing local data and uploads are excluded from Git and are not deployed.
+## Why Vercel caused the failures
 
-For reliable production use, either run the existing Express backend on a
-persistent server with a mounted disk (set `DATA_DIR` and `UPLOAD_DIR` to that
-disk), or migrate the repositories to a hosted database and uploads to object
-storage before using Vercel functions for the backend. AI simulation execution
-also needs a deployment model that supports its long-running background work.
-Changing environment variables alone does not migrate the database.
+Vercel functions do not provide a shared persistent filesystem. The previous
+deployment placed SQLite and uploads in `/tmp`, which can be replaced at any
+time and is not shared by every function instance. A request could therefore
+see a different database from the previous request. That affects login and the
+product feed before any Groq request is made.
+
+The five optional `GROQ_API_KEY*` variables form a provider key pool used only
+for synthetic simulations. They do not load products, create sessions, or
+authenticate users. Start the Render service with one key. Add fallback keys
+later only if the Groq account's rate limits require them.
+
+## Existing local products
+
+Local development databases are intentionally excluded from Git because they
+contain user, session, and test data. They are not automatically copied into a
+new production service. After the Render service is healthy, export only the
+intended products and accounts from the local database before importing them
+into the production disk. Do not upload the entire development database because
+it contains automated test fixtures.
+
+## Vercel
+
+The Vercel configuration remains available as a demo deployment, but its
+serverless SQLite data is temporary. Once Render is live, use the Render URL as
+the main application URL and archive the duplicate Vercel projects.
