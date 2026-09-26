@@ -258,7 +258,7 @@ const MainApp: React.FC = () => {
           <ExplorePage
             onOpenProduct={handleOpenProduct}
             onNavigateToPublish={() => navigateToTab('publish')}
-            onPromptAuth={() => setIsAuthModalOpen(true)}
+            onPromptAuth={(role?: UserRole) => handleOpenAuthModal(role || 'user')}
             onGoHome={handleGoHome}
           />
         )}
@@ -268,7 +268,7 @@ const MainApp: React.FC = () => {
           <SavedPage
             onOpenProduct={handleOpenProduct}
             onNavigateToExplore={() => navigateToTab('explore')}
-            onPromptAuth={() => setIsAuthModalOpen(true)}
+            onPromptAuth={(role?: UserRole) => handleOpenAuthModal(role || 'user')}
           />
         )}
 
@@ -279,7 +279,7 @@ const MainApp: React.FC = () => {
             onNavigateBack={() => navigateToTab('explore')}
             onEditProduct={handleEditProduct}
             onOpenSyntheticLab={handleOpenSyntheticLab}
-            onPromptAuth={() => setIsAuthModalOpen(true)}
+            onPromptAuth={(role?: UserRole) => handleOpenAuthModal(role || 'user')}
           />
         )}
 

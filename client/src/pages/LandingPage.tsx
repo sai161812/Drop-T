@@ -145,7 +145,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onExplore, onSignIn, o
                 <button type="button" className="btn-hero-primary" onClick={onExplore}>
                   Explore products <ArrowRight size={17} />
                 </button>
-                <button type="button" className="btn-hero-secondary" onClick={() => onSignIn()}>
+                <button type="button" className="btn-hero-secondary" onClick={() => onSignIn('startup')}>
                   Start a review
                 </button>
               </div>
@@ -184,7 +184,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onExplore, onSignIn, o
           </div>
 
           <div className="capabilities-grid">
-            <a href="/lab" className="capability-block capability-primary" onClick={(event) => { event.preventDefault(); onSignIn(); }}>
+            <a href="/lab" className="capability-block capability-primary" onClick={(event) => { event.preventDefault(); onSignIn('startup'); }}>
               <div className="capability-meta">
                 <span>01</span>
                 <span>Private founder workspace</span>
@@ -201,7 +201,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onExplore, onSignIn, o
               </div>
             </a>
 
-            <a href="/lab" className="capability-block" onClick={(event) => { event.preventDefault(); onSignIn(); }}>
+            <a href="/lab" className="capability-block" onClick={(event) => { event.preventDefault(); onSignIn('startup'); }}>
               <div className="capability-meta">
                 <span>02</span>
                 <ArrowUpRight size={18} />
@@ -341,7 +341,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onExplore, onSignIn, o
           </div>
           <div className="cta-action-block">
             <p>Put your product in front of people and pressure-test it before the next expensive commitment.</p>
-            <button type="button" className="btn-cta-dark" onClick={() => onSignIn()}>
+            <button type="button" className="btn-cta-dark" onClick={() => onSignIn('startup')}>
               Publish your product <ArrowRight size={17} />
             </button>
           </div>

@@ -5,7 +5,8 @@ import {
   CommunityFeedbackChoice, 
   CommunityFeedbackFactor,
   COMMUNITY_FEEDBACK_FACTORS,
-  FounderFeedbackBreakdown
+  FounderFeedbackBreakdown,
+  UserRole
 } from '@droptest/shared';
 import { useAuth } from '../context/AuthContext.js';
 import { 
@@ -41,7 +42,7 @@ interface ProductDetailPageProps {
   onNavigateBack: () => void;
   onEditProduct: (productId: string) => void;
   onOpenSyntheticLab: (productId: string) => void;
-  onPromptAuth?: () => void;
+  onPromptAuth?: (role?: UserRole) => void;
 }
 
 const FACTOR_LABELS: Record<CommunityFeedbackFactor, string> = {
@@ -182,7 +183,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const handleToggleSave = async () => {
     if (!token) {
-      onPromptAuth?.();
+      onPromptAuth?.('user');
       return;
     }
 
@@ -211,7 +212,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const handleSubmitFeedback = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
-      onPromptAuth?.();
+      onPromptAuth?.('user');
       return;
     }
 
@@ -278,7 +279,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const handleOpenSupportModal = () => {
     if (!token) {
-      onPromptAuth?.();
+      onPromptAuth?.('sponsor');
       return;
     }
     if (product?.user_proposal) {

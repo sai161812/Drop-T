@@ -196,6 +196,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const getDemoForRole = (r: UserRole) => {
+    return DEMO_ACCOUNTS.find(a => a.role === r) || DEMO_ACCOUNTS[0];
+  };
+
+  const handleFillDemo = (demoAccount: typeof DEMO_ACCOUNTS[number]) => {
+    setEmail(demoAccount.email);
+    setPassword(demoAccount.password);
+    setRole(demoAccount.role);
+    setError(null);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -235,7 +246,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Main Headline */}
         <h2 id="auth-dialog-title" className="auth-main-headline" style={{ marginBottom: '16px' }}>
           {tab === 'signin' ? (
-            <>Log In with Credentials</>
+            <>Log In to {role === 'startup' ? 'Founder' : role === 'sponsor' ? 'Investor' : 'Community'} Account</>
           ) : (
             <>Create Your<br />{role === 'startup' ? 'Founder' : role === 'sponsor' ? 'Investor' : 'Community'} Account</>
           )}
@@ -295,41 +306,97 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="auth-form">
+          {/* Universal Role Selection Tabs */}
+          <div className="auth-field-group">
+            <label className="auth-field-label">
+              {tab === 'signin' ? 'Select Account Role' : 'Select Account Type'}
+            </label>
+            <div className="auth-role-tabs-grid">
+              <button
+                type="button"
+                className={`auth-role-tab-btn ${role === 'user' ? 'active' : ''}`}
+                onClick={() => {
+                  setRole('user');
+                  setError(null);
+                }}
+              >
+                <User size={15} />
+                <span>User</span>
+                <span className="role-sub">Shopper</span>
+              </button>
+              <button
+                type="button"
+                className={`auth-role-tab-btn ${role === 'startup' ? 'active' : ''}`}
+                onClick={() => {
+                  setRole('startup');
+                  setError(null);
+                }}
+              >
+                <Rocket size={15} />
+                <span>Startup</span>
+                <span className="role-sub">Founder</span>
+              </button>
+              <button
+                type="button"
+                className={`auth-role-tab-btn ${role === 'sponsor' ? 'active' : ''}`}
+                onClick={() => {
+                  setRole('sponsor');
+                  setError(null);
+                }}
+              >
+                <Briefcase size={15} />
+                <span>Investor</span>
+                <span className="role-sub">Sponsor</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Demo Credentials Helper for Sign In */}
+          {tab === 'signin' && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '16px',
+              padding: '10px 14px',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Demo {role === 'startup' ? 'Founder' : role === 'sponsor' ? 'Investor' : 'Shopper'} Profile
+                </span>
+                <span style={{ fontWeight: 600, color: '#ffffff', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {getDemoForRole(role).display_name} <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 400, fontSize: '11px' }}>({getDemoForRole(role).email})</span>
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                <button
+                  type="button"
+                  className="auth-quick-pill-btn"
+                  style={{ height: '32px', padding: '0 12px', fontSize: '11px', background: 'rgba(255, 255, 255, 0.09)' }}
+                  onClick={() => handleFillDemo(getDemoForRole(role))}
+                  title="Fill credentials into form"
+                >
+                  Auto-fill
+                </button>
+                <button
+                  type="button"
+                  className="auth-quick-pill-btn"
+                  style={{ height: '32px', padding: '0 12px', fontSize: '11px', background: 'rgba(255, 255, 255, 0.22)', color: '#ffffff', fontWeight: 600 }}
+                  onClick={() => handleQuickLogin(getDemoForRole(role).email)}
+                  disabled={isSubmitting}
+                  title="Log in immediately with 1 click"
+                >
+                  1-Click
+                </button>
+              </div>
+            </div>
+          )}
+
           {tab === 'signup' && (
             <>
-              {/* Role Selection Tabs */}
-              <div className="auth-field-group">
-                <label className="auth-field-label">Select Account Type</label>
-                <div className="auth-role-tabs-grid">
-                  <button
-                    type="button"
-                    className={`auth-role-tab-btn ${role === 'user' ? 'active' : ''}`}
-                    onClick={() => setRole('user')}
-                  >
-                    <User size={15} />
-                    <span>User</span>
-                    <span className="role-sub">Shopper</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`auth-role-tab-btn ${role === 'startup' ? 'active' : ''}`}
-                    onClick={() => setRole('startup')}
-                  >
-                    <Rocket size={15} />
-                    <span>Startup</span>
-                    <span className="role-sub">Founder</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`auth-role-tab-btn ${role === 'sponsor' ? 'active' : ''}`}
-                    onClick={() => setRole('sponsor')}
-                  >
-                    <Briefcase size={15} />
-                    <span>Investor</span>
-                    <span className="role-sub">Sponsor</span>
-                  </button>
-                </div>
-              </div>
 
               {/* Display Name */}
               <div className="auth-field-group">
@@ -428,7 +495,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           </div>
 
-          {/* Remember me & Quick Switch */}
+          {/* Remember me */}
           <div className="auth-options-row">
             <label className="auth-checkbox-label">
               <input
@@ -439,19 +506,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               />
               <span>Remember me</span>
             </label>
-
-            {tab === 'signin' && (
-              <button
-                type="button"
-                className="auth-switch-role-btn"
-                onClick={() => {
-                  const nextRole: UserRole = role === 'startup' ? 'sponsor' : role === 'sponsor' ? 'user' : 'startup';
-                  setRole(nextRole);
-                }}
-              >
-                Switch to {role === 'startup' ? 'Investor' : role === 'sponsor' ? 'User' : 'Startup'}
-              </button>
-            )}
           </div>
 
           {/* Main Action Button */}
@@ -518,24 +572,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         </div>
 
-        {/* 1-Click Demo Accounts */}
+        {/* 1-Click Demo Profiles */}
         <div style={{ marginTop: '16px', marginBottom: '8px', textAlign: 'center' }}>
           <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Or test with 1-click demo profiles
           </span>
         </div>
         <div className="auth-quick-demo-grid">
-          {DEMO_ACCOUNTS.map(account => (
-            <button
-              key={account.email}
-              type="button"
-              className="auth-quick-pill-btn"
-              onClick={() => handleQuickLogin(account.email)}
-              disabled={isSubmitting}
-            >
-              <span>{account.button_label}</span>
-            </button>
-          ))}
+          {DEMO_ACCOUNTS.map(account => {
+            const isMatch = account.role === role;
+            return (
+              <button
+                key={account.email}
+                type="button"
+                className={`auth-quick-pill-btn ${isMatch ? 'active' : ''}`}
+                style={{
+                  border: isMatch ? '1px solid rgba(255, 255, 255, 0.48)' : '1px solid rgba(255, 255, 255, 0.16)',
+                  background: isMatch ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                  fontWeight: isMatch ? 600 : 500
+                }}
+                onClick={() => {
+                  setRole(account.role);
+                  handleQuickLogin(account.email);
+                }}
+                disabled={isSubmitting}
+                title={`Sign in as ${account.display_name} (${account.role})`}
+              >
+                <span>{account.button_label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Hidden compatibility buttons for legacy test selectors */}
@@ -640,19 +706,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="auth-role-tabs-grid" style={{ marginTop: '6px' }}>
                 <button
                   type="button"
+                  className={`auth-role-tab-btn ${oauthSelectedRole === 'user' ? 'active' : ''}`}
+                  onClick={() => setOauthSelectedRole('user')}
+                >
+                  <User size={14} />
+                  <span>User</span>
+                  <span className="role-sub">Shopper</span>
+                </button>
+                <button
+                  type="button"
                   className={`auth-role-tab-btn ${oauthSelectedRole === 'startup' ? 'active' : ''}`}
                   onClick={() => setOauthSelectedRole('startup')}
                 >
                   <Rocket size={14} />
                   <span>Startup</span>
-                </button>
-                <button
-                  type="button"
-                  className={`auth-role-tab-btn ${oauthSelectedRole === 'user' ? 'active' : ''}`}
-                  onClick={() => setOauthSelectedRole('user')}
-                >
-                  <User size={14} />
-                  <span>Shopper</span>
+                  <span className="role-sub">Founder</span>
                 </button>
                 <button
                   type="button"
@@ -661,6 +729,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 >
                   <Briefcase size={14} />
                   <span>Investor</span>
+                  <span className="role-sub">Sponsor</span>
                 </button>
               </div>
             </div>
@@ -677,8 +746,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {activeOAuthProvider[0]}
                 </div>
                 <div style={{ textAlign: 'left', flex: 1, paddingLeft: '8px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>{activeOAuthProvider} Account ({oauthSelectedRole})</div>
-                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>{activeOAuthProvider.toLowerCase()}.{oauthSelectedRole}@droptest.local</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600 }}>
+                    {activeOAuthProvider} Account ({oauthSelectedRole === 'startup' ? 'Founder' : oauthSelectedRole === 'sponsor' ? 'Investor' : 'Shopper'})
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
+                    {activeOAuthProvider.toLowerCase()}.{oauthSelectedRole}@droptest.local
+                  </div>
                 </div>
               </button>
             </div>

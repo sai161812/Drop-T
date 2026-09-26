@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
-import { ProductPublicSummary, ProductCategory } from '@droptest/shared';
+import { ProductPublicSummary, ProductCategory, UserRole } from '@droptest/shared';
 import { 
   Bookmark, 
   BookmarkCheck, 
@@ -13,7 +13,7 @@ import {
 interface SavedPageProps {
   onOpenProduct: (productId: string) => void;
   onNavigateToExplore: () => void;
-  onPromptAuth: () => void;
+  onPromptAuth: (role?: UserRole) => void;
 }
 
 export const SavedPage: React.FC<SavedPageProps> = ({
@@ -55,7 +55,7 @@ export const SavedPage: React.FC<SavedPageProps> = ({
   const handleToggleSave = async (e: React.MouseEvent, productId: string) => {
     e.stopPropagation();
     if (!token) {
-      onPromptAuth();
+      onPromptAuth('user');
       return;
     }
 
@@ -121,7 +121,7 @@ export const SavedPage: React.FC<SavedPageProps> = ({
         <p style={{ color: 'var(--color-text-secondary)', marginBottom: '24px', fontSize: '14px' }}>
           Bookmark early stage startup products across the directory to keep track of their launch progress.
         </p>
-        <button type="button" className="btn btn-primary" onClick={onPromptAuth}>
+        <button type="button" className="btn btn-primary" onClick={() => onPromptAuth('user')}>
           Sign In
         </button>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ProductPublicSummary, ProductCategory } from '@droptest/shared';
+import { ProductPublicSummary, ProductCategory, UserRole } from '@droptest/shared';
 import { 
   Search, 
   Bookmark, 
@@ -18,7 +18,7 @@ const EXPLORE_PRODUCT_LIMIT = 50;
 interface ExplorePageProps {
   onOpenProduct: (productId: string) => void;
   onNavigateToPublish: () => void;
-  onPromptAuth: () => void;
+  onPromptAuth: (role?: UserRole) => void;
   onGoHome?: () => void;
 }
 
@@ -105,7 +105,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
     e.preventDefault();
     e.stopPropagation();
     if (!token) {
-      onPromptAuth();
+      onPromptAuth('user');
       return;
     }
 
