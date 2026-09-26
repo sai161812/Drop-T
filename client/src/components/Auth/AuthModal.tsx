@@ -206,13 +206,60 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Main Headline */}
-        <h2 id="auth-dialog-title" className="auth-main-headline">
+        <h2 id="auth-dialog-title" className="auth-main-headline" style={{ marginBottom: '16px' }}>
           {tab === 'signin' ? (
-            <>Log In, Start Your<br />Validation Journey</>
+            <>Log In with Credentials</>
           ) : (
             <>Create Your<br />{role === 'startup' ? 'Founder' : role === 'sponsor' ? 'Investor' : 'Community'} Account</>
           )}
         </h2>
+
+        {/* Top Segmented Mode Switcher */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '6px',
+          background: 'rgba(255, 255, 255, 0.08)',
+          padding: '4px',
+          borderRadius: '999px',
+          marginBottom: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.14)'
+        }}>
+          <button
+            type="button"
+            onClick={() => { setTab('signin'); setError(null); }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '999px',
+              border: 'none',
+              background: tab === 'signin' ? 'rgba(255, 255, 255, 0.22)' : 'transparent',
+              color: tab === 'signin' ? '#ffffff' : 'rgba(255, 255, 255, 0.65)',
+              fontWeight: 600,
+              fontSize: '13px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTab('signup'); setError(null); }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '999px',
+              border: 'none',
+              background: tab === 'signup' ? 'rgba(255, 255, 255, 0.22)' : 'transparent',
+              color: tab === 'signup' ? '#ffffff' : 'rgba(255, 255, 255, 0.65)',
+              fontWeight: 600,
+              fontSize: '13px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Create Account
+          </button>
+        </div>
 
         {error && (
           <div role="alert" className="auth-error-banner">
@@ -444,7 +491,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         </div>
 
-        {/* 1-Click Demo Accounts (Pill Styled for Judging & Instant Verification) */}
+        {/* 1-Click Demo Accounts */}
+        <div style={{ marginTop: '16px', marginBottom: '8px', textAlign: 'center' }}>
+          <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Or test with 1-click demo profiles
+          </span>
+        </div>
         <div className="auth-quick-demo-grid">
           {DEMO_ACCOUNTS.map(account => (
             <button

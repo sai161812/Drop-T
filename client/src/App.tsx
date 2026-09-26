@@ -57,7 +57,9 @@ const MainApp: React.FC = () => {
       setLabRequest({ review: 'resume' });
       const path = window.location.pathname;
       if (path === '/lab' || path === '/results') window.history.replaceState({}, '', path);
-      if (user) {
+      if (!user) {
+        handleGoHome();
+      } else {
         setIsHomeLandingView(false);
       }
     }

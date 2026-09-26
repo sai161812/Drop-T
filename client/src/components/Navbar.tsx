@@ -189,7 +189,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               className="btn btn-secondary"
               style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
-              onClick={() => signOut()}
+              onClick={async () => {
+                await signOut();
+                if (onGoHome) onGoHome();
+              }}
               title="Sign Out"
             >
               <LogOut size={12} /> Sign Out
