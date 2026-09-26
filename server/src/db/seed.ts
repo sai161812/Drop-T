@@ -3,6 +3,7 @@ import { AuthRepository } from './authRepository.js';
 import { ProductRepository } from './productRepository.js';
 import { v4 as uuidv4 } from 'uuid';
 import { DEMO_ACCOUNTS } from '@droptest/shared';
+import { seedDemoLabRuns } from './seedDemoLabRuns.js';
 
 export const seedDemoData = runSeed;
 
@@ -156,6 +157,13 @@ export function runSeed(): void {
       }
     } catch { /* Leave an unrecognized or edited legacy fixture untouched. */ }
     console.log(`  ✓ Product 2 already exists: "${p2Name}"`);
+  }
+
+  // Seed completed Synthetic Lab runs for demo products so founders can immediately view results
+  try {
+    seedDemoLabRuns();
+  } catch (err: any) {
+    console.warn('  ⚠️ Could not seed demo lab runs:', err.message);
   }
 
   // Community interactions are deliberately not seeded. Seed accounts and
