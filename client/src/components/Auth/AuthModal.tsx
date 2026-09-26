@@ -17,7 +17,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   defaultRole = 'startup',
   initialTab = 'signin'
 }) => {
-  const { signIn, signUp, quickDemoLogin } = useAuth();
+  const { signIn, signUp, socialSignIn, quickDemoLogin } = useAuth();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<'signin' | 'signup'>(initialTab);
   const [role, setRole] = useState<UserRole>(defaultRole);
@@ -142,7 +142,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const { signIn, signUp, socialSignIn, quickDemoLogin } = useAuth();
   const [activeOAuthProvider, setActiveOAuthProvider] = useState<'Google' | 'GitHub' | 'Apple' | null>(null);
   const [oauthCustomEmail, setOauthCustomEmail] = useState('');
   const [oauthCustomName, setOauthCustomName] = useState('');
