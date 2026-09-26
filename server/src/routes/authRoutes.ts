@@ -111,3 +111,34 @@ authRouter.get('/demo-accounts', (_req: Request, res: Response) => {
     }))
   });
 });
+
+// POST /api/auth/social - Real/simulated OAuth callback endpoint
+authRouter.post('/social', (req: Request, res: Response) => {
+  try {
+    const { provider, email, display_name, role, startup_name } = req.body;
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ error: 'A valid email address is required' });
+    }
+
+    const result = AuthRepository.findOrCreateSocialUser({
+      provider: provider || 'google',
+      email: email.trim(),
+      display_name: display_name?.trim(),
+      role: role || 'startup',
+      startup_name: startup_name?.trim()
+    });
+
+    res.cookie('session_token', result.token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+
+    res.json({
+      user: AuthRepository.toPublicUser(result.user),
+      token: result.token
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Social authentication failed' });
+  }
+});

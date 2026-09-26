@@ -167,4 +167,49 @@ export class AuthRepository {
     const res = db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
     return res.changes > 0;
   }
+
+  /**
+   * Find existing user or create a new user via OAuth social login
+   */
+  static findOrCreateSocialUser(payload: {
+    provider: 'google' | 'github' | 'apple';
+    email: string;
+    display_name?: string;
+    role?: UserRole;
+    startup_name?: string;
+  }): { user: User; token: string } {
+    const db = getDatabase();
+    let user = this.getUserByEmail(payload.email);
+    if (!user) {
+      const id = uuidv4();
+      const now = new Date().toISOString();
+      const dummyPassword = randomBytes(24).toString('hex');
+      const passwordHash = this.hashPassword(dummyPassword);
+      const chosenRole: UserRole = payload.role || 'startup';
+      const displayName = payload.display_name?.trim() || payload.email.split('@')[0];
+
+      const stmt = db.prepare(`
+        INSERT INTO users (
+          id, email, password_hash, role, display_name, startup_name, startup_description, created_at, updated_at
+        )
+        VALUES (?, lower(?), ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      stmt.run(
+        id,
+        payload.email.trim(),
+        passwordHash,
+        chosenRole,
+        displayName,
+        chosenRole === 'startup' ? (payload.startup_name?.trim() || `${displayName}'s Startup`) : null,
+        chosenRole === 'startup' ? 'Building next-generation consumer offerings.' : null,
+        now,
+        now
+      );
+      user = this.getUserById(id)! as any;
+    }
+
+    const token = this.createSession(user.id);
+    return { user, token };
+  }
 }

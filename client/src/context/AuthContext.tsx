@@ -8,6 +8,13 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (payload: SignInPayload) => Promise<{ success: boolean; error?: string }>;
   signUp: (payload: SignUpPayload) => Promise<{ success: boolean; error?: string; issues?: any[] }>;
+  socialSignIn: (payload: {
+    provider: 'Google' | 'GitHub' | 'Apple';
+    email: string;
+    displayName?: string;
+    role?: any;
+    startupName?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   quickDemoLogin: (email: string) => Promise<{ success: boolean; error?: string }>;
 }
@@ -111,12 +118,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const socialSignIn = async (payload: {
+    provider: 'Google' | 'GitHub' | 'Apple';
+    email: string;
+    displayName?: string;
+    role?: any;
+    startupName?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/auth/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: payload.provider.toLowerCase(),
+          email: payload.email,
+          display_name: payload.displayName || payload.email.split('@')[0],
+          role: payload.role || 'startup',
+          startup_name: payload.startupName
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || `${payload.provider} sign in failed` };
+      }
+      localStorage.setItem('droptest_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: 'Network error during social authentication' };
+    }
+  };
+
   const quickDemoLogin = async (email: string): Promise<{ success: boolean; error?: string }> => {
     return signIn({ email, password: DEMO_PASSWORD });
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, signIn, signUp, signOut, quickDemoLogin }}>
+    <AuthContext.Provider value={{ user, token, isLoading, signIn, signUp, socialSignIn, signOut, quickDemoLogin }}>
       {children}
     </AuthContext.Provider>
   );
