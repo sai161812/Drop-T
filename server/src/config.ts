@@ -39,13 +39,17 @@ const parsedGroqKeys = parseGroqApiKeys();
 export const config: ServerConfig = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  dataDir: path.resolve(process.cwd(), process.env.DATA_DIR || './data'),
-  uploadDir: path.resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads'),
+  dataDir: process.env.DATA_DIR
+    ? path.resolve(process.cwd(), process.env.DATA_DIR)
+    : (process.env.VERCEL ? '/tmp/data' : path.resolve(process.cwd(), './data')),
+  uploadDir: process.env.UPLOAD_DIR
+    ? path.resolve(process.cwd(), process.env.UPLOAD_DIR)
+    : (process.env.VERCEL ? '/tmp/uploads' : path.resolve(process.cwd(), './uploads')),
   groqApiKey: parsedGroqKeys[0] || process.env.GROQ_API_KEY || '',
   groqApiKeys: parsedGroqKeys,
-  groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  groqModel: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
   groqTemperature: parseFloat(process.env.GROQ_TEMPERATURE || '0.2'),
-  groqMaxRetries: parseInt(process.env.GROQ_MAX_RETRIES || '5', 10),
+  groqMaxRetries: parseInt(process.env.GROQ_MAX_RETRIES || '15', 10),
   braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY || '',
   tavilyApiKey: process.env.TAVILY_API_KEY || '',
   serperApiKey: process.env.SERPER_API_KEY || '',
