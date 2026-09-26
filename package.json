@@ -15,7 +15,7 @@
     "dev:all": "concurrently -n \"SERVER,CLIENT\" -c \"bgBlue.bold,bgMagenta.bold\" \"npm run dev -w @droptest/server\" \"npm run dev -w @droptest/client\"",
     "dev:server": "npm run dev -w @droptest/server",
     "dev:client": "npm run dev -w @droptest/client",
-    "build": "tsc -p shared/tsconfig.json && tsc -p server/tsconfig.json && npm run build -w @droptest/client && node -e \"const fs = require('fs'); fs.cpSync('client/dist', 'dist', {recursive: true, force: true});\"",
+    "build": "npm run build -w @droptest/shared && npm run build -w @droptest/server && npm run build -w @droptest/client && node -e \"const fs = require('fs'); fs.cpSync('client/dist', 'dist', {recursive: true, force: true});\"",
     "test": "npm run test -w @droptest/shared && npm run test -w @droptest/server",
     "test:e2e": "playwright test",
     "test:acceptance": "node scripts/run-acceptance.mjs",
@@ -30,6 +30,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
   }
 }
