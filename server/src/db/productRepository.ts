@@ -139,8 +139,17 @@ export class ProductRepository {
       throw Object.assign(new Error('You do not have permission to delete this product'), { status: 403 });
     }
 
-    const res = db.prepare('DELETE FROM products WHERE id = ?').run(productId);
-    return res.changes > 0;
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      // Unlink tests associated with this product so foreign keys remain intact
+      db.prepare('UPDATE tests SET product_id = NULL WHERE product_id = ?').run(productId);
+      const res = db.prepare('DELETE FROM products WHERE id = ?').run(productId);
+      db.exec('COMMIT');
+      return res.changes > 0;
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   /**
