@@ -41,6 +41,18 @@ const DEFAULT_OPTIONS: Required<EvaluatorOptions> = {
   maxRetries: 15
 };
 
+// Short provider throttles can recover inside an active run. Longer quota
+// windows should release the worker and let the user retry the saved remainder.
+const MAX_INLINE_RATE_LIMIT_WAIT_MS = 30_000;
+
+class GroqRateLimitPauseError extends Error {
+  constructor(waitMs: number) {
+    const waitSeconds = Math.max(1, Math.ceil(waitMs / 1000));
+    super(`Groq rate limit reached. Completed evaluations are saved; retry in about ${waitSeconds} seconds.`);
+    this.name = 'GroqRateLimitPauseError';
+  }
+}
+
 const httpsAgent = new https.Agent({
   keepAlive: false,
   timeout: 30000
@@ -141,7 +153,7 @@ export class GroqKeyPoolManager {
       }
     }
     // All keys in cooldown; find the key that will become available earliest
-    let minWait = 10000;
+    let minWait = Number.POSITIVE_INFINITY;
     let bestIdx = 0;
     for (let i = 0; i < keys.length; i++) {
       const k = keys[i];
@@ -458,6 +470,9 @@ export class GroqEvaluator {
           const keyInfo = GroqKeyPoolManager.acquire();
 
           if (keyInfo.isCooldown && keyInfo.waitMs > 0) {
+            if (keyInfo.waitMs > MAX_INLINE_RATE_LIMIT_WAIT_MS) {
+              throw new GroqRateLimitPauseError(keyInfo.waitMs);
+            }
             const waitSeconds = Math.ceil(keyInfo.waitMs / 1000);
             const currentTotal = TestRepository.getEvaluationsByRunId(runId).length;
             TestRepository.updateRun(runId, {
@@ -549,13 +564,18 @@ export class GroqEvaluator {
             let cooldownMs = 8500;
             const retryHeader = batchErr.headers?.['retry-after'] || batchErr.headers?.get?.('retry-after');
             if (retryHeader) {
-              cooldownMs = Number.isFinite(Number(retryHeader)) ? Number(retryHeader) * 1000 : Math.max(1000, Date.parse(String(retryHeader)) - Date.now());
+              const numericSeconds = Number(retryHeader);
+              const parsedWait = Number.isFinite(numericSeconds)
+                ? numericSeconds * 1000
+                : Date.parse(String(retryHeader)) - Date.now();
+              if (Number.isFinite(parsedWait) && parsedWait > 0) cooldownMs = parsedWait;
             } else {
               const match = String(batchErr.message || '').match(/try again in ([\d\.]+)s/i);
               if (match && match[1]) {
                 cooldownMs = Math.ceil(parseFloat(match[1]) * 1000) + 1200;
               }
             }
+            cooldownMs = Math.min(24 * 60 * 60 * 1000, Math.max(1000, cooldownMs));
 
             if (isRateLimit) {
               GroqKeyPoolManager.markCooldown(keyInfo.key, cooldownMs);
@@ -566,6 +586,22 @@ export class GroqEvaluator {
             }
 
             const isTest = process.env.NODE_ENV === 'test' || config.nodeEnv === 'test' || config.groqApiKey.includes('test');
+            // A different configured key may still have quota. Rotate to it
+            // immediately; acquire() will pause only when every key is cooling
+            // down. Long provider reset windows are surfaced as a retryable
+            // partial run instead of keeping this process asleep.
+            if (isRateLimit && GroqKeyPoolManager.keyCount > 1) {
+              const currentTotal = TestRepository.getEvaluationsByRunId(runId).length;
+              TestRepository.updateRun(runId, {
+                error_message: `Provider key ${keyInfo.index + 1} is rate limited; trying another key. (${currentTotal}/${expectedTotalCount} completed)`
+              });
+              continue;
+            }
+
+            if (isRateLimit && cooldownMs > MAX_INLINE_RATE_LIMIT_WAIT_MS && !isTest) {
+              throw new GroqRateLimitPauseError(cooldownMs);
+            }
+
             const delay = isTest ? 10 : (isRateLimit ? cooldownMs : Math.min(30000, 1500 * Math.pow(2, attempts)));
             const currentTotal = TestRepository.getEvaluationsByRunId(runId).length;
             TestRepository.updateRun(runId, {
@@ -717,4 +753,3 @@ Use only fields: ${fields.join(', ')}. Return an evaluation for every profile_id
     return parseResult.data.evaluations;
   };
 }
-
