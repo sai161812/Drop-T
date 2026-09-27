@@ -1,102 +1,122 @@
 # DROPTEST
 
-DROPTEST is a product-launch validation workbench and community for early-stage startup founders. Founders can publish product proposals, gather structured feedback from real community shoppers and sponsors, receive non-binding financial support proposals, and run deep AI simulations in the **Synthetic Lab**.
+DROPTEST helps early-stage founders pressure-test a product idea before launch. It combines a public product-discovery community with a private Synthetic Lab that evaluates an offering against targeted AI-generated buyer profiles.
 
-Simulated results evaluate willingness to pay and objections against 50 targeted synthetic consumer profiles powered by Llama 3.3 70B. Real community responses and simulated evaluations are strictly segregated.
+The platform keeps two kinds of evidence distinct:
 
----
+- **Community feedback** — responses, saves, and non-binding support proposals from people using the product.
+- **Synthetic research** — repeatable AI persona evaluations, competitor context, and unit-economics scenarios for founders.
 
-## 🚀 Getting Started Locally
+> Synthetic Lab outputs are decision-support signals, not real customer feedback or financial advice.
+
+## What it does
+
+- Publish product proposals and make them discoverable in a public feed.
+- Collect structured buyer feedback and non-binding sponsor/support interest.
+- Save products and manage founder-owned listings.
+- Run a private single-product review across 50 targeted synthetic personas.
+- Compare two variants while changing one decision lever: price, positioning, packaging, or market.
+- Model margins, break-even volume, and conservative, target, and optimistic scenarios.
+- Research comparable products using optional search providers and preserve the supporting references.
+
+## Stack
+
+| Layer | Technology |
+| --- | --- |
+| Web app | React 19, TypeScript, Vite |
+| API | Express, TypeScript |
+| Data | SQLite on the application filesystem |
+| AI evaluation | Groq-compatible models |
+| Tests | Node test runner, Playwright |
+
+## Run locally
 
 ### Prerequisites
-* **Node.js**: 22.5 or newer (for native `node:sqlite` database support)
-* **npm**: 10 or newer
 
-### Setup & Run
+- Node.js 24.x
+- npm 10+
+
+### Setup
+
 ```powershell
+git clone https://github.com/sai161812/Drop-T.git
+Set-Location Drop-T
 npm install
 Copy-Item .env.example .env
-# Set GROQ_API_KEY in .env for live LLM evaluations. (Optional: BRAVE_SEARCH_API_KEY / TAVILY_API_KEY / SERPER_API_KEY for market research)
+```
+
+Add `GROQ_API_KEY` to `.env` to run live Synthetic Lab evaluations. The rest of the application works without it. Search-provider keys (`BRAVE_SEARCH_API_KEY`, `TAVILY_API_KEY`, or `SERPER_API_KEY`) are optional.
+
+```powershell
 npm run seed
 npm run dev
 ```
 
-* **Client**: [http://localhost:5173](http://localhost:5173) (Vite + React)
-* **Server & API**: [http://localhost:3001](http://localhost:3001) (Express + SQLite)
+Open the app at `http://localhost:5173`. The API runs at `http://localhost:3001`.
 
-### Test & Build
+## Demo accounts
+
+Seeding creates the following accounts. All use the password `Password123!`.
+
+| Role | Email | Use case |
+| --- | --- | --- |
+| Founder A | `founder.a@droptest.local` | Publish and run a lab review |
+| Founder B | `founder.b@droptest.local` | Publish and submit cross-startup support |
+| Sponsor | `sponsor@droptest.local` | Explore, save, and make support proposals |
+| Shopper | `shopper@droptest.local` | Explore and submit buyer feedback |
+
+## Core routes
+
+| Area | Route | Access |
+| --- | --- | --- |
+| Explore | `/explore` | Public |
+| Product detail | `/product/:id` | Public |
+| Publish or edit | `/publish` | Founders |
+| My products | `/my-products` | Founders |
+| Synthetic Lab | `/lab?product=:id` | Product owner |
+| Results | `/results?test=:id` | Product owner |
+| Feedback link | `/feedback/:token` | Link recipients |
+
+## Quality checks
+
 ```powershell
-# Run the complete test suite (Shared + Server integration tests):
+# Shared and server tests
 npm test
 
-# Verify production build compilation:
+# Production build
 npm run build
 
-# Run Playwright E2E acceptance tests:
+# Browser acceptance tests
 npm run test:e2e
 ```
 
----
+## Project structure
 
-## 🧪 Synthetic Lab Architecture
+```text
+client/   React user interface
+server/   Express API, SQLite repositories, research and simulation workflows
+shared/   Shared types, validation, finance, and analysis utilities
+e2e/      Playwright acceptance coverage
+```
 
-The Synthetic Lab is a private founder workspace structured into 5 focused sections with a dedicated left-sidebar navigation:
+## Deployment
 
-1. **Overview & Evidence**:
-   * Choose between **Single-Product Review** (50 targeted persona evaluations) or **A/B Comparison Mode** (100 paired evaluations).
-   * Configure launch price verification (with fallback trial pricing if unpriced).
-   * Automated live competitor search and citation selection (Brave / Tavily / Serper / DuckDuckGo).
-2. **Product & Offering**:
-   * Domain-specific schemas: Apparel, Food & Beverage, SaaS & Digital Products, or Custom.
-   * Product specs, value propositions, key differentiators, fulfillment mode, and visual assets.
-   * Variant B configuration when isolating a specific decision lever (Price, Positioning, Packaging, or Markets).
-3. **Target Audience**:
-   * **Intended Buyer Persona** and **Adjacent Buyer Persona** descriptions.
-   * Expected consumer spend boundaries (`min` / `max`).
-   * Serviceable geographic target markets.
-4. **Unit Economics**:
-   * Deterministic financial projections: Fixed launch costs, variable unit costs, and capacity.
-   * Volume scenarios: Conservative, target, and optimistic volume modeling with exact break-even calculations.
-5. **Simulation Panel**:
-   * **50-Profile Panel Preview**: Deterministic allocation across Intended (40%), Adjacent (40%), and Contrasting (20%) consumer segments.
-   * Seed-based determinism (`#12345`) ensuring exact reproducibility.
-   * Simulation Readiness Checklist with live input validation.
-   * Execution controls, live progress tracking, retry handlers for missing evaluations, and deep results breakdown.
+The repository includes a Render Blueprint in `render.yaml`. It deploys the client and API as one Node service with a persistent disk for SQLite data and uploaded assets. This is important: a stateless serverless filesystem will not retain accounts, products, reviews, or uploads.
 
----
+For a deployment walkthrough and operational notes, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## 👥 Demo Accounts
+## Configuration
 
-The database comes pre-seeded with 4 default test accounts (Password: `Password123!`):
+Copy `.env.example` to `.env`; do not commit the resulting file. The important settings are:
 
-| Role | Email | Capabilities |
-| --- | --- | --- |
-| **Startup Founder A** | `founder.a@droptest.local` | Publish products, run Synthetic Lab, receive feedback & support |
-| **Startup Founder B** | `founder.b@droptest.local` | Publish products, run Synthetic Lab, submit cross-startup support |
-| **Investor / Sponsor** | `sponsor@droptest.local` | Explore feed, save products, submit feedback & support proposals |
-| **Community User** | `shopper@droptest.local` | Explore feed, save products, submit structured buyer feedback |
+| Variable | Purpose |
+| --- | --- |
+| `GROQ_API_KEY` | Enables live persona evaluations |
+| `GROQ_MODEL` | Selects the evaluation model |
+| `DATA_DIR` | Local SQLite storage location |
+| `UPLOAD_DIR` | Local uploaded-file location |
+| Search-provider keys | Enables comparable-product search |
 
----
+## License
 
-## 🗺️ Application Routes
-
-| View | Route | Access |
-| --- | --- | --- |
-| **Landing Page** | `/` | Public |
-| **Explore Products** | `/explore` | Public / All roles |
-| **Product Detail** | `/product/:id` | Public / All roles |
-| **Saved Products** | `/saved` | Authenticated users |
-| **Publish / Edit** | `/publish` or `/publish?edit=:id` | Startup founders |
-| **My Products** | `/my-products` | Startup founders |
-| **Synthetic Lab** | `/lab?product=:id` | Product owner only |
-| **Simulation Results** | `/results?test=:id` | Product owner only |
-| **Public Feedback** | `/feedback/:token` | Link recipients (Anonymous / Auth) |
-
----
-
-## 🔒 Verification & Boundaries
-
-* **Simulated Personas**: Exactly 50 profiles are evaluated per single review. They simulate objections and willingness to pay based on defined constraints and live competitor reference claims.
-* **Separation of Evidence**: AI persona simulations and real human community feedback are strictly isolated in storage and analysis.
-* **Deterministic Financials**: Margins, break-evens, and scenario revenues are calculated strictly via deterministic arithmetic.
-* **Non-Binding Support**: Sponsorships and support proposals represent non-binding interest (no financial transaction or escrow).
+No license has been specified for this repository.
